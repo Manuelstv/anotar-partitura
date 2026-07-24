@@ -158,12 +158,16 @@ def coletar(pg):
     comp_min = 20.0 * k           # comprimento minimo de uma horizontal
     alt_min = 4.0 * k             # altura minima de uma vertical
 
-    horiz, vert, formas = [], [], []
+    horiz, vert, formas, caminhos = [], [], [], []
     for p in pg.get_drawings():
         r = p["rect"]
         if r.height < 250 * k and r.width < 250 * k:   # hastes, beams, ligaduras, colchetes
             formas.append({"x": (r.x0 + r.x1) / 2, "y": (r.y0 + r.y1) / 2,
                            "x0": r.x0, "x1": r.x1, "y0": r.y0, "y1": r.y1})
+        if p.get("fill") is not None and r.width > 0 and r.height > 0:
+            caminhos.append({"x0": r.x0, "x1": r.x1, "y0": r.y0, "y1": r.y1,
+                             "w": r.width, "h": r.height,
+                             "curvas": sum(1 for it in p["items"] if it[0] == "c")})
         for it in p["items"]:
             if it[0] == "l":
                 p1, p2 = it[1], it[2]
@@ -181,7 +185,7 @@ def coletar(pg):
             elif abs(p1.x - p2.x) < 1.2 * k and abs(p2.y - p1.y) > alt_min:
                 vert.append({"x": p1.x, "y0": min(p1.y, p2.y), "y1": max(p1.y, p2.y),
                              "h": abs(p2.y - p1.y)})
-    return glifos, textos, horiz, vert, formas
+    return glifos, textos, horiz, vert, formas, caminhos
 
 
 def _cobertura(segs):
@@ -284,6 +288,81 @@ def pautas(horiz, largura_pagina, altura_pagina):
     return sorted(achadas, key=lambda g: g[0])
 
 
+# ------------------------------------------- glifos por CONTORNO (sem fonte)
+# Alguns PDFs convertem os simbolos musicais em curvas, e ai nao ha caractere para
+# ler. Mas a geometria e inconfundivel quando medida em ESPACOS de pauta:
+#   cabeca de nota  ~1.3 x 1.05   preenchida, com curva
+#   sustenido       ~1.0 x 2.7    centro na altura da nota
+#   bequadro        ~0.7 x 2.6    centro na altura da nota, mais estreito
+#   bemol           ~0.8 x 2.5    bojo NA nota, haste acima -> nota 1/2 espaco abaixo
+#   clave de sol    ~2.6 x 7.1
+# Medido no acervo do Manuel: 435 sustenidos, 234 bequadros, 114 bemois.
+CABECA_W = (1.05, 1.60)
+CABECA_H = (0.80, 1.35)
+ACC_W = (0.50, 1.20)
+ACC_H = (2.20, 3.10)
+
+
+def glifos_de_contorno(caminhos, sistemas):
+    """Reconstroi cabecas, acidentes e claves a partir da geometria das curvas."""
+    glifos = []
+    for linhas in sistemas:
+        esp = (linhas[-1] - linhas[0]) / 4.0
+        topo, base = linhas[0], linhas[-1]
+        na_faixa = lambda c: topo - 5 * esp < (c["y0"] + c["y1"]) / 2 < base + 5 * esp
+        aqui = [c for c in caminhos if na_faixa(c)]
+
+        cabecas = [c for c in aqui
+                   if CABECA_W[0] <= c["w"] / esp <= CABECA_W[1]
+                   and CABECA_H[0] <= c["h"] / esp <= CABECA_H[1] and c["curvas"]]
+        if not cabecas:
+            continue
+        larg_nota = sorted(c["w"] for c in cabecas)[len(cabecas) // 2]
+        for c in cabecas:
+            glifos.append({"tipo": "cabeca", "extra": None,
+                           "x": (c["x0"] + c["x1"]) / 2, "y": (c["y0"] + c["y1"]) / 2,
+                           "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]})
+
+        # clave: a forma bem alta a esquerda do sistema
+        claves = [c for c in aqui if c["h"] / esp > 5.5 and 1.5 < c["w"] / esp < 4.0]
+        for c in claves:
+            glifos.append({"tipo": "clave", "extra": 38,      # so clave de sol no acervo
+                           "x": (c["x0"] + c["x1"]) / 2, "y": (c["y0"] + c["y1"]) / 2,
+                           "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]})
+
+        x_primeira = min(c["x0"] for c in cabecas)
+        for c in aqui:
+            if not (ACC_W[0] <= c["w"] / esp <= ACC_W[1]
+                    and ACC_H[0] <= c["h"] / esp <= ACC_H[1]):
+                continue
+            cy = (c["y0"] + c["y1"]) / 2
+            viz = [h for h in cabecas
+                   if -0.2 * esp <= h["x0"] - c["x1"] < 1.3 * esp
+                   and abs((h["y0"] + h["y1"]) / 2 - cy) < 0.8 * esp]
+            if viz:
+                h = min(viz, key=lambda h: h["x0"] - c["x1"])
+                dy = (((h["y0"] + h["y1"]) / 2) - cy) / esp
+            elif c["x1"] < x_primeira:
+                dy = None          # candidato a armadura: nao tem nota colada
+            else:
+                continue           # pausa, bandeirola: nao e acidente
+            # bemol tem o bojo NA nota, entao a nota fica meio espaco abaixo do centro
+            if dy is not None and dy >= 0.30:
+                simbolo = 'b'
+            elif c["w"] >= 0.64 * larg_nota:
+                simbolo = '#'
+            else:
+                simbolo = 'n'
+            # na armadura o bemol nao tem nota vizinha: usa a largura para separar
+            if dy is None and 'b' != simbolo and c["w"] < 0.72 * larg_nota:
+                simbolo = 'n'
+            glifos.append({"tipo": "acc", "extra": simbolo,
+                           "x": (c["x0"] + c["x1"]) / 2,
+                           "y": cy + (0.5 * esp if simbolo == 'b' else 0.0),
+                           "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]})
+    return glifos
+
+
 # ------------------------------------------------------------------- alturas
 def indice_diatonico(cy, linhas, topo_ref):
     """Posicao vertical -> indice diatonico (C0 == 0)."""
@@ -293,17 +372,37 @@ def indice_diatonico(cy, linhas, topo_ref):
     return topo_ref + passos
 
 
-def armadura(glifos, linhas, x_clave, x_primeira_nota):
-    """Conta sustenidos/bemois entre a clave e a primeira nota -> alteracoes por letra."""
+def armadura(glifos, linhas, x_clave, cabecas):
+    """Le a armadura de clave -> alteracoes por letra + os x que nao sao acidente solto.
+
+    A armadura e o grupo CONTIGUO logo depois da clave, e nenhum acidente dela tem
+    cabeca de nota colada a direita. So medir "esta antes da primeira nota" nao serve:
+    o acidente da primeira nota fica a 1-2pt dela, dentro de qualquer margem razoavel,
+    e era contado como se fosse da armadura (a nota perdia o sustenido e o tom saia
+    errado para toda a linha).
+    """
     span = linhas[-1] - linhas[0]
-    entre = [g for g in glifos
-             if g["tipo"] == "acc" and g["extra"] in ('#', 'b')
-             and x_clave < g["x"] < x_primeira_nota - 0.2 * span]
+    accs = sorted([g for g in glifos if g["tipo"] == "acc" and g["extra"] in ('#', 'b')],
+                  key=lambda g: g["x0"])
+
+    def tem_nota_colada(g):
+        return any(-0.1 * span <= h["x0"] - g["x1"] < 1.6 * span
+                   and abs(h["y"] - g["y"]) < 0.35 * span for h in cabecas)
+
+    entre, borda = [], x_clave
+    for g in accs:
+        if g["x0"] - borda > 2.0 * span:      # buraco grande: a armadura acabou
+            break
+        if g["x0"] < x_clave or tem_nota_colada(g):
+            break
+        entre.append(g)
+        borda = g["x1"]
+
     s = sum(1 for g in entre if g["extra"] == '#')
     b = sum(1 for g in entre if g["extra"] == 'b')
-    if s and s <= 7:
+    if s and s <= 7 and not b:
         return {n: '#' for n in ORDEM_SUSTENIDOS[:s]}, {g["x"] for g in entre}
-    if b and b <= 7:
+    if b and b <= 7 and not s:
         return {n: 'b' for n in ORDEM_BEMOIS[:b]}, {g["x"] for g in entre}
     return {}, set()
 
@@ -317,8 +416,11 @@ def nome(idx, alt, sistema):
 # --------------------------------------------------------------------- leitura
 def ler_notas(pg, sistema):
     """Retorna (rotulos, existentes). rotulos = [{x, y_base, texto, ordem}]."""
-    glifos, textos, horiz, vert, formas = coletar(pg)
+    glifos, textos, horiz, vert, formas, caminhos = coletar(pg)
     sistemas = pautas(horiz, pg.rect.width, pg.rect.height)
+    if not glifos and sistemas:
+        # PDF com os simbolos convertidos em curvas: le pela geometria
+        glifos = glifos_de_contorno(caminhos, sistemas)
     rotulos, existentes = [], []
 
     centros = [(s[0] + s[-1]) / 2 for s in sistemas]
@@ -343,9 +445,8 @@ def ler_notas(pg, sistema):
         topo_ref = min(claves, key=lambda g: g["x"])["extra"] if claves else 38
         x_clave = min((g["x1"] for g in claves), default=topo - 999)
 
-        x_primeira = min(g["x0"] for g in cabecas)
         alt_armadura, xs_armadura = armadura([g for g in glifos if na_pauta(g, 1.4)],
-                                            linhas, x_clave, x_primeira)
+                                            linhas, x_clave, cabecas)
 
         acidentes = [g for g in glifos if g["tipo"] == "acc" and na_pauta(g)
                      and g["x"] not in xs_armadura]
@@ -396,7 +497,7 @@ def ler_notas(pg, sistema):
         # ---- linha de base dos rotulos: logo abaixo da tinta DESTE sistema.
         # So conta tinta abaixo da ultima linha da pauta, e ignora nomes de nota
         # ja escritos (senao a anotacao antiga do sistema de baixo empurra tudo).
-        corpo = max(span * 0.34, 5.0)
+        corpo = max(span * 0.40, 5.5)
         limite = min((s[0] for s in sistemas if s[0] > base_l + span), default=pg.rect.y1)
         # so olha a metade de cima do vao: mais abaixo ja e material do proximo sistema
         # (o colchete de casa 1a/2a fica logo acima da pauta seguinte).
@@ -453,7 +554,7 @@ def escrever(pg, rotulos, cor):
                        r["texto"], fontname=FONTE, fontsize=r["corpo"], color=cor)
 
 
-def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0.75)):
+def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0)):
     """Anota um PDF em memoria e devolve os bytes do PDF novo + um relatorio.
 
     Mesmo nucleo usado pela linha de comando; existe separado para a versao web,
@@ -493,7 +594,7 @@ def main():
                     help="letras = C D E F G A B (default) | dore = Do Re Mi Fa Sol La Si")
     ap.add_argument("--limpar", action="store_true",
                     help="apaga os nomes de nota que ja existem na partitura")
-    ap.add_argument("--cor", default="0,0,0.75", help="cor R,G,B em 0-1 (default azul escuro)")
+    ap.add_argument("--cor", default="0,0,0", help="cor R,G,B em 0-1 (default preto)")
     a = ap.parse_args()
 
     cor = tuple(float(v) for v in a.cor.split(","))
