@@ -11,12 +11,13 @@ não é enviado para servidor nenhum.
 ## Como funciona
 
 Não é OCR nem rede neural — é **aritmética sobre as coordenadas do PDF**. Partitura gerada
-por computador guarda cada cabeça de nota como um *caractere* de uma fonte musical, e as
-linhas da pauta como vetor. Então:
+por computador guarda cada cabeça de nota como um *caractere* de uma fonte musical (ou como *curva*), e
+as linhas da pauta como vetor. Então:
 
 1. lê as linhas horizontais → acha pautas por **periodicidade** (5 linhas de passo igual,
    tolerando beam/colchete intercalado);
-2. lê os glifos da fonte musical → clave, armadura, acidentes, cabeças de nota;
+2. lê os glifos → clave, armadura, acidentes, cabeças de nota (por fonte SMuFL, por
+   layout Sonata, ou pela geometria quando os glifos viraram contorno);
 3. altura = quantos meio-espaços a cabeça está acima da linha de cima da pauta;
 4. aplica armadura, acidente explícito e a regra de que o acidente vale até a barra;
 5. estampa o nome embaixo da pauta, abaixo de hastes/ligaduras, com 2ª fileira quando
@@ -34,6 +35,7 @@ página, porque o mesmo A4 aparece gravado em escalas diferentes (já vi 595×84
 | MuseScore / Dorico | Leland, Bravura, Petaluma… | ✅ SMuFL |
 | Sibelius | Opus | ✅ layout Sonata |
 | Finale | Maestro | ✅ layout Sonata |
+| Glifos convertidos em **contorno** (sem fonte) | — | ✅ leitura por geometria |
 | PDF escaneado (imagem) | — | ❌ precisa de OMR (Audiveris/oemer) |
 
 Clave de sol, fá e dó. Só a de sol foi testada de fato (é o caso de sax).
@@ -46,7 +48,7 @@ por coluna x:
 
 | Conjunto | Programa | Notas conferidas | Acurácia |
 |---|---|---|---|
-| 182 PDFs "With Note Names" (Online Sax Academy) | Sibelius | 37.644 | **99,51%** |
+| 182 PDFs "With Note Names" (Online Sax Academy) | Sibelius | 37.644 | **99,60%** |
 | Negra ron y velas (sax alto) | MuseScore | 154 | **100%** |
 | The-chicken (alto + tenor) | Sibelius | 98 | **100%** |
 
@@ -60,6 +62,7 @@ falha quando não há gabarito: cobertura baixa significa pauta não detectada.
 | Conjunto | Arquivos | Cabeças rotuladas |
 |---|---|---|
 | 979 PDFs vetoriais (Online Sax Academy) | 958 a 100% | 226.614 / 229.243 = **98,85%** |
+| Cadernin 2026 sax alto (253 pág., glifos em contorno) | 1 | 15.717 notas |
 
 O que sobra são quase todos exercícios de **ritmo** (pauta de 1 linha), onde não existe
 altura para nomear.
@@ -77,7 +80,7 @@ uv run anotar_partitura.py "partitura.pdf" --limpar          # cobre nomes antig
 | `-o` | PDF de saída (default: `<nome>_notas.pdf`) |
 | `--sistema` | `letras` (default) ou `dore` |
 | `--limpar` | cobre nomes de nota que já estavam na partitura |
-| `--cor` | R,G,B de 0 a 1 (default `0,0,0.75`, azul escuro) |
+| `--cor` | R,G,B de 0 a 1 (default `0,0,0`, preto) |
 
 `--limpar` é heurístico. Duas travas evitam apagar cifra de acorde: só limpa se houver
 nome para ≥50% das notas, e só apaga a família dominante (se a anotação está em Do-Re-Mi,
