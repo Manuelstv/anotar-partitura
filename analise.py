@@ -69,6 +69,15 @@ TRIADE = {
 }
 
 
+def _classe(nome):
+    """Nome de nota -> classe de altura (C=0). Usada pela deteccao de tom."""
+    i = LETRAS.index(nome[0].upper()) if nome[:1].upper() in LETRAS else None
+    if i is None:
+        return None
+    acc = 1 if nome[1:2] == '#' else (-1 if nome[1:2] == 'b' else 0)
+    return (SEMI_LETRA[i] + acc) % 12
+
+
 def _nome_grau(i_raiz, acc_raiz, semitons, passo):
     """Letra pelo passo diatonico; acidente pela distancia ate o semitom alvo."""
     li = (i_raiz + passo) % 7
