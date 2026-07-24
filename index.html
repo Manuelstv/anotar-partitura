@@ -149,6 +149,17 @@
 
   /* ------------------------------------------------------------- analise */
   .analise { border-top: 1px solid var(--borda); }
+  .analise.aberta > .corpo { padding-top: var(--s4); }
+  .tit-analise { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
+                 text-transform: uppercase; letter-spacing: .05em;
+                 padding: var(--s4) var(--s4) 0; margin: 0; }
+  .selo {
+    display: inline-flex; align-items: baseline; gap: 3px; flex: none;
+    background: var(--superficie-2); border: 1px solid var(--borda);
+    border-radius: var(--r-sm); padding: 4px var(--s3); line-height: 1.1;
+  }
+  .selo .n { font-size: var(--t-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .selo .u { font-size: var(--t-xs); color: var(--texto-3); }
   .analise > summary {
     padding: var(--s3) var(--s4); cursor: pointer; font-size: var(--t-sm);
     color: var(--texto-2); list-style: none; display: flex; align-items: center; gap: var(--s2);
@@ -291,7 +302,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=6";
+    const v = "?v=7";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
@@ -332,9 +343,9 @@ function ficha(txt) {
 }
 
 function montarAnalise(info, dificuldade) {
-  const d = document.createElement("details");
-  d.className = "analise";
-  d.innerHTML = `<summary>Análise da música</summary><div class="corpo"></div>`;
+  const d = document.createElement("section");
+  d.className = "analise aberta";
+  d.innerHTML = `<h2 class="tit-analise">Análise da música</h2><div class="corpo"></div>`;
   const corpo = d.querySelector(".corpo");
 
   const fatos = document.createElement("dl");
@@ -361,8 +372,6 @@ function montarAnalise(info, dificuldade) {
     }
     fatos.append(w);
   }
-  corpo.append(fatos);
-
   if (dificuldade != null) {
     const b = document.createElement("div");
     b.className = "bloco";
@@ -374,6 +383,7 @@ function montarAnalise(info, dificuldade) {
     b.querySelector(".cheio").style.width = (10 * dificuldade) + "%";
     corpo.append(b);
   }
+  corpo.append(fatos);
 
   if (info.cifras?.length) {
     const b = document.createElement("div");
@@ -492,6 +502,15 @@ function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
   if (rel.por_pagina.length > 1) detalhe.push(`${rel.por_pagina.length} páginas`);
   if (rel.limpos) detalhe.push(`${rel.limpos} nomes antigos cobertos`);
   cartao.marcar("bom", detalhe.join(" · "));
+
+  if (nota != null) {
+    const selo = document.createElement("span");
+    selo.className = "selo";
+    selo.title = "Dificuldade estimada no sax alto";
+    selo.innerHTML = `<span class="n"></span><span class="u">/10</span>`;
+    selo.querySelector(".n").textContent = nota.toFixed(1);
+    cartao.topo.append(selo);
+  }
 
   const a = document.createElement("a");
   a.className = "btn btn-primario";
