@@ -164,7 +164,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const fonte = await (await fetch("anotar_partitura.py?v=3")).text();
+    const fonte = await (await fetch("anotar_partitura.py?v=4")).text();
     py.FS.writeFile("/anotar_partitura.py", fonte);
     py.runPython("import sys; sys.path.insert(0, '/')\nimport anotar_partitura");
     return py;
