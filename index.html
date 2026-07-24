@@ -4,274 +4,532 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anotar partitura — nome das notas no seu PDF</title>
-<meta name="description" content="Arraste um PDF de partitura e baixe de volta o mesmo PDF com o nome de cada nota escrito embaixo da pauta. Roda 100% no seu navegador.">
+<meta name="description" content="Arraste um PDF de partitura e baixe o mesmo PDF com o nome de cada nota escrito embaixo da pauta, mais uma análise da música. Roda 100% no seu navegador.">
 <style>
+  /* ---------------------------------------------------------------- tokens
+     Escala tipografica com salto de ~1.25x e no maximo 3 tamanhos por bloco;
+     escala de espaco em multiplos de 4. O acento e reservado para a acao
+     primaria e para o foco — em nenhum outro lugar. */
   :root {
-    --bg: #fbfaf8; --fg: #1b1a17; --dim: #6b6862; --linha: #e2ded6;
-    --card: #ffffff; --acento: #1f3fbf; --acento-fraco: #edf0fd;
-    --ok: #17683f; --erro: #a8261c; --sombra: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.05);
+    --t-xl: 2rem;      --t-lg: 1.125rem;  --t-md: 1rem;    --t-sm: .875rem;  --t-xs: .75rem;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+
+    --bg: #faf9f7;  --superficie: #fff;   --superficie-2: #f4f2ee;
+    --texto: #1a1917; --texto-2: #5d5a54; --texto-3: #8a867e;
+    --borda: #e4e0d8; --borda-forte: #cfcabf;
+    --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #eef1fe;
+    --ok: #146c43; --erro: #b3261e; --aviso: #8a6100;
+    --sombra: 0 1px 2px rgba(20,18,14,.05), 0 6px 20px rgba(20,18,14,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #16171a; --fg: #eceae5; --dim: #9a978f; --linha: #2e3035;
-      --card: #1e2024; --acento: #91a8ff; --acento-fraco: #1e2438;
-      --ok: #64d39b; --erro: #ff8b7e; --sombra: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+      --bg: #141517; --superficie: #1c1e21; --superficie-2: #23262a;
+      --texto: #ecebe8; --texto-2: #a8a49c; --texto-3: #7d7ا;
+      --texto-3: #7d7a73;
+      --borda: #2c2f34; --borda-forte: #3b3f45;
+      --acento: #8fa5ff; --acento-texto: #12141a; --acento-fraco: #1c2440;
+      --ok: #5fd39b; --erro: #ff9083; --aviso: #e0b062;
+      --sombra: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.28);
     }
   }
   :root[data-theme="dark"] {
-    --bg: #16171a; --fg: #eceae5; --dim: #9a978f; --linha: #2e3035;
-    --card: #1e2024; --acento: #91a8ff; --acento-fraco: #1e2438;
-    --ok: #64d39b; --erro: #ff8b7e; --sombra: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    --bg: #141517; --superficie: #1c1e21; --superficie-2: #23262a;
+    --texto: #ecebe8; --texto-2: #a8a49c; --texto-3: #7d7a73;
+    --borda: #2c2f34; --borda-forte: #3b3f45;
+    --acento: #8fa5ff; --acento-texto: #12141a; --acento-fraco: #1c2440;
+    --ok: #5fd39b; --erro: #ff9083; --aviso: #e0b062;
+    --sombra: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.28);
   }
   :root[data-theme="light"] {
-    --bg: #fbfaf8; --fg: #1b1a17; --dim: #6b6862; --linha: #e2ded6;
-    --card: #ffffff; --acento: #1f3fbf; --acento-fraco: #edf0fd;
-    --ok: #17683f; --erro: #a8261c; --sombra: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.05);
+    --bg: #faf9f7; --superficie: #fff; --superficie-2: #f4f2ee;
+    --texto: #1a1917; --texto-2: #5d5a54; --texto-3: #8a867e;
+    --borda: #e4e0d8; --borda-forte: #cfcabf;
+    --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #eef1fe;
+    --ok: #146c43; --erro: #b3261e; --aviso: #8a6100;
+    --sombra: 0 1px 2px rgba(20,18,14,.05), 0 6px 20px rgba(20,18,14,.06);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   }
 
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0; background: var(--bg); color: var(--texto);
+    font: var(--t-md)/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 780px; margin: 0 auto; padding: 40px 20px 80px; }
-  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 .4em; letter-spacing: -.02em; }
-  .sub { color: var(--dim); margin: 0 0 2rem; font-size: 1.02rem; }
-  .sub code { font-size: .92em; }
-  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .pagina { max-width: 720px; margin: 0 auto; padding: var(--s7) var(--s5) 96px; }
+  :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: var(--r-sm); }
 
-  /* zona de arraste */
+  h1 { font-size: var(--t-xl); line-height: 1.15; letter-spacing: -.021em; margin: 0 0 var(--s3); }
+  h2 { font-size: var(--t-lg); line-height: 1.3; letter-spacing: -.011em; margin: 0 0 var(--s3); }
+  p  { margin: 0 0 var(--s4); }
+  .apoio { color: var(--texto-2); }
+  .meta  { color: var(--texto-3); font-size: var(--t-sm); }
+
+  /* ------------------------------------------------------------ dropzone */
   #zona {
-    border: 2px dashed var(--linha); border-radius: 14px; background: var(--card);
-    padding: 42px 24px; text-align: center; cursor: pointer;
-    transition: border-color .15s, background .15s; box-shadow: var(--sombra);
+    border: 2px dashed var(--borda-forte); border-radius: var(--r-lg);
+    background: var(--superficie); padding: var(--s7) var(--s5);
+    text-align: center; cursor: pointer; display: block; width: 100%;
+    font: inherit; color: inherit;
+    transition: border-color .15s ease, background .15s ease, transform .12s ease, box-shadow .15s ease;
   }
-  #zona:hover, #zona.sobre { border-color: var(--acento); background: var(--acento-fraco); }
-  #zona.sobre { border-style: solid; }
-  #zona .icone { font-size: 2rem; line-height: 1; display: block; margin-bottom: .5rem; }
-  #zona strong { font-weight: 600; }
-  #zona small { color: var(--dim); display: block; margin-top: .5rem; }
-  #arquivo { display: none; }
+  #zona:hover { border-color: var(--texto-3); background: var(--superficie-2); }
+  #zona.sobre {
+    border-style: solid; border-color: var(--acento); background: var(--acento-fraco);
+    transform: scale(1.006); box-shadow: var(--sombra);
+  }
+  #zona .titulo { font-size: var(--t-lg); font-weight: 620; display: block; margin-bottom: var(--s1); }
+  #zona .sub { color: var(--texto-2); font-size: var(--t-sm); }
+  #zona svg { display: block; margin: 0 auto var(--s3); color: var(--texto-3); }
+  #zona.sobre svg { color: var(--acento); }
+  #arquivo { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
-  /* opcoes */
+  /* ------------------------------------------------------------- opcoes  */
   .opcoes {
-    display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center;
-    margin: 22px 0 4px; font-size: .95rem;
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s5);
+    margin-top: var(--s4); font-size: var(--t-sm); color: var(--texto-2);
   }
-  .opcoes fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 14px; align-items: center; }
-  .opcoes legend { float: left; margin-right: 12px; color: var(--dim); }
-  label { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
-  input[type=radio], input[type=checkbox] { accent-color: var(--acento); margin: 0; }
+  .grupo { display: inline-flex; align-items: center; gap: var(--s3); }
+  .segmento { display: inline-flex; background: var(--superficie-2); border-radius: var(--r-sm); padding: 2px; }
+  .segmento label {
+    padding: 5px var(--s3); border-radius: 6px; cursor: pointer; color: var(--texto-2);
+    transition: background .12s ease, color .12s ease; white-space: nowrap;
+  }
+  .segmento input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .segmento input:checked + span { color: var(--texto); font-weight: 600; }
+  .segmento label:has(input:checked) { background: var(--superficie); box-shadow: var(--sombra); }
+  .segmento label:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 1px; }
+  .caixa { display: inline-flex; align-items: center; gap: var(--s2); cursor: pointer; }
+  .caixa input { accent-color: var(--acento); width: 16px; height: 16px; margin: 0; }
 
-  /* estado */
-  #estado {
-    margin: 26px 0 0; padding: 14px 16px; border-radius: 10px; font-size: .95rem;
-    background: var(--card); border: 1px solid var(--linha); display: none;
-  }
-  #estado.on { display: block; }
-  #estado .barra { height: 4px; background: var(--linha); border-radius: 99px; overflow: hidden; margin-top: 10px; }
-  #estado .barra i { display: block; height: 100%; width: 30%; background: var(--acento); border-radius: 99px;
-                     animation: desliza 1.1s ease-in-out infinite; }
-  @keyframes desliza { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+  /* ------------------------------------------------------------ progresso */
+  #barra { margin-top: var(--s5); display: none; }
+  #barra.on { display: block; }
+  #barra .rotulo { display: flex; justify-content: space-between; font-size: var(--t-sm);
+                   color: var(--texto-2); margin-bottom: var(--s2); gap: var(--s3); }
+  #barra .trilho { height: 6px; background: var(--superficie-2); border-radius: 99px; overflow: hidden; }
+  #barra .cheio { height: 100%; width: 0%; background: var(--acento); border-radius: 99px;
+                  transition: width .25s ease; }
+  #barra.indeterminado .cheio { width: 35%; animation: correr 1.2s ease-in-out infinite; }
+  @keyframes correr { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
 
-  /* resultados */
-  #saida { margin-top: 26px; display: grid; gap: 12px; }
-  .item {
-    background: var(--card); border: 1px solid var(--linha); border-radius: 12px;
-    padding: 14px 16px; box-shadow: var(--sombra);
-    display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center;
+  /* -------------------------------------------------------------- lista  */
+  #lista { margin-top: var(--s5); display: grid; gap: var(--s3); }
+  .cartao {
+    background: var(--superficie); border: 1px solid var(--borda);
+    border-radius: var(--r-md); box-shadow: var(--sombra); overflow: hidden;
   }
-  .item .nome { font-weight: 600; overflow-wrap: anywhere; }
-  .item .det { color: var(--dim); font-size: .88rem; grid-column: 1; }
-  .item .det.ruim { color: var(--erro); }
-  .item .det b { color: var(--ok); font-weight: 600; }
-  .baixar {
-    grid-row: 1 / span 2; grid-column: 2; text-decoration: none; white-space: nowrap;
-    background: var(--acento); color: #fff; padding: 9px 15px; border-radius: 9px;
-    font-size: .92rem; font-weight: 600;
+  .topo { display: flex; align-items: center; gap: var(--s4); padding: var(--s4); }
+  .ident { min-width: 0; flex: 1; }
+  .ident .nome { font-weight: 600; overflow-wrap: anywhere; line-height: 1.35; }
+  .ident .estado { font-size: var(--t-sm); color: var(--texto-2); margin-top: 2px; }
+  .ident .estado.bom { color: var(--ok); }
+  .ident .estado.ruim { color: var(--erro); }
+  .ponto {
+    width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--borda-forte);
   }
-  :root[data-theme="dark"] .baixar, @media (prefers-color-scheme: dark) { }
-  .previa { grid-column: 1 / -1; margin-top: 8px; }
-  .previa img {
-    max-width: 100%; border: 1px solid var(--linha); border-radius: 8px; background: #fff;
-    display: block;
-  }
-  details summary { cursor: pointer; color: var(--dim); font-size: .88rem; }
+  .ponto.trabalhando { background: var(--acento); animation: pulsa 1s ease-in-out infinite; }
+  .ponto.bom { background: var(--ok); }
+  .ponto.ruim { background: var(--erro); }
+  @keyframes pulsa { 50% { opacity: .35; } }
 
-  footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--linha);
-           color: var(--dim); font-size: .88rem; }
+  .btn {
+    font: inherit; font-size: var(--t-sm); font-weight: 600; border-radius: var(--r-sm);
+    padding: 9px var(--s4); cursor: pointer; white-space: nowrap; text-decoration: none;
+    border: 1px solid transparent; flex: none;
+  }
+  .btn-primario { background: var(--acento); color: var(--acento-texto); }
+  .btn-primario:hover { filter: brightness(1.08); }
+  .btn-secundario { background: transparent; color: var(--texto-2); border-color: var(--borda-forte); }
+  .btn-secundario:hover { background: var(--superficie-2); color: var(--texto); }
+
+  /* ------------------------------------------------------------- analise */
+  .analise { border-top: 1px solid var(--borda); }
+  .analise > summary {
+    padding: var(--s3) var(--s4); cursor: pointer; font-size: var(--t-sm);
+    color: var(--texto-2); list-style: none; display: flex; align-items: center; gap: var(--s2);
+  }
+  .analise > summary::-webkit-details-marker { display: none; }
+  .analise > summary::before { content: "▸"; font-size: .7em; transition: transform .15s ease; }
+  .analise[open] > summary::before { transform: rotate(90deg); }
+  .analise > summary:hover { color: var(--texto); }
+  .corpo { padding: 0 var(--s4) var(--s5); display: grid; gap: var(--s5); }
+
+  .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: var(--s3); }
+  .fato { background: var(--superficie-2); border-radius: var(--r-sm); padding: var(--s3); }
+  .fato dt { font-size: var(--t-xs); color: var(--texto-3); text-transform: uppercase;
+             letter-spacing: .05em; margin-bottom: 2px; }
+  .fato dd { margin: 0; font-size: var(--t-lg); font-weight: 600; line-height: 1.2;
+             font-variant-numeric: tabular-nums; }
+  .fato dd .unid { font-size: var(--t-xs); font-weight: 400; color: var(--texto-3); }
+
+  .bloco h3 { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
+              margin: 0 0 var(--s2); }
+  .fichas { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .ficha { background: var(--superficie-2); border: 1px solid var(--borda);
+           border-radius: 99px; padding: 3px var(--s3); font-size: var(--t-sm);
+           font-variant-numeric: tabular-nums; }
+  .escalas { display: grid; gap: var(--s1); font-size: var(--t-sm); margin: 0; }
+  .escalas div { display: grid; grid-template-columns: 68px 1fr auto; gap: var(--s3);
+                 align-items: baseline; padding: 3px 0; border-top: 1px solid var(--borda); }
+  .escalas div:first-child { border-top: 0; }
+  .escalas b { font-weight: 600; }
+  .escalas .notas-ac { color: var(--texto); font-variant-numeric: tabular-nums; }
+  .escalas .esc { color: var(--texto-3); font-size: var(--t-xs); text-align: right; }
+  @media (max-width: 480px) {
+    .escalas div { grid-template-columns: 56px 1fr; }
+    .escalas .esc { grid-column: 2; text-align: left; }
+  }
+  .dificeis { margin: 0; padding-left: 1.1em; font-size: var(--t-sm); color: var(--texto-2); }
+  .dificeis li { margin-bottom: 2px; }
+
+  .medidor { display: flex; align-items: center; gap: var(--s3); }
+  .medidor .trilho { display: block; flex: 1; height: 8px; background: var(--superficie-2);
+                     border-radius: 99px; overflow: hidden; }
+  .medidor .cheio { display: block; height: 100%; background: var(--texto-2);
+                    border-radius: 99px; transition: width .3s ease; }
+  .medidor .valor { font-size: var(--t-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .previa img { width: 100%; border: 1px solid var(--borda); border-radius: var(--r-sm);
+                background: #fff; display: block; }
+
+  /* --------------------------------------------------------------- fim   */
+  .nota-rodape { margin-top: var(--s6); color: var(--texto-3); font-size: var(--t-sm); }
+  footer { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--borda);
+           color: var(--texto-3); font-size: var(--t-sm); }
   footer a { color: var(--acento); }
-  .aviso { color: var(--dim); font-size: .88rem; margin-top: 10px; }
+  @media (max-width: 560px) {
+    .pagina { padding: var(--s5) var(--s4) 72px; }
+    :root { --t-xl: 1.625rem; }
+    .topo { flex-wrap: wrap; }
+    .btn { width: 100%; text-align: center; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Anotar partitura</h1>
-  <p class="sub">
-    Arraste um PDF de partitura e baixe de volta <strong>o mesmo PDF</strong> com o nome de
-    cada nota escrito embaixo da pauta. Nada é re-desenhado — só entra uma camada de texto.
-    Roda inteiro no seu navegador: o arquivo não sai do seu computador.
-  </p>
+<div class="pagina">
+  <header>
+    <h1>Anotar partitura</h1>
+    <p class="apoio">
+      Arraste um PDF de partitura e baixe <strong>o mesmo PDF</strong> com o nome de cada
+      nota escrito embaixo da pauta — mais uma análise da música e o nível de
+      dificuldade no sax alto. Roda inteiro no seu navegador: o arquivo não sai do seu
+      computador.
+    </p>
+  </header>
 
-  <div id="zona" tabindex="0" role="button" aria-label="Escolher PDFs de partitura">
-    <span class="icone" aria-hidden="true">🎼</span>
-    <strong>Arraste os PDFs aqui</strong> ou clique para escolher
-    <small>pode soltar vários de uma vez</small>
-  </div>
-  <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple>
+  <button type="button" id="zona" aria-describedby="dica-formatos">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/>
+    </svg>
+    <span class="titulo">Arraste os PDFs aqui</span>
+    <span class="sub">ou clique para escolher — pode soltar vários de uma vez</span>
+  </button>
+  <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple tabindex="-1" aria-hidden="true">
 
   <div class="opcoes">
-    <fieldset>
-      <legend>Nomes</legend>
-      <label><input type="radio" name="sistema" value="letras" checked> C D E F G A B</label>
-      <label><input type="radio" name="sistema" value="dore"> Dó Ré Mi Fá Sol Lá Si</label>
-    </fieldset>
-    <label><input type="checkbox" id="limpar"> Apagar nomes de nota que já estejam na partitura</label>
+    <div class="grupo">
+      <span id="rot-nomes">Nomes</span>
+      <div class="segmento" role="radiogroup" aria-labelledby="rot-nomes">
+        <label><input type="radio" name="sistema" value="letras" checked><span>C D E</span></label>
+        <label><input type="radio" name="sistema" value="dore"><span>Dó Ré Mi</span></label>
+      </div>
+    </div>
+    <label class="caixa">
+      <input type="checkbox" id="limpar">
+      <span>Apagar nomes já existentes</span>
+    </label>
   </div>
 
-  <div id="estado" role="status" aria-live="polite"></div>
-  <div id="saida"></div>
+  <div id="barra" role="status" aria-live="polite">
+    <div class="rotulo"><span id="barra-txt"></span><span id="barra-num" class="meta"></span></div>
+    <div class="trilho"><div class="cheio" id="barra-cheio"></div></div>
+  </div>
 
-  <p class="aviso">
-    Funciona com partitura <strong>gerada por computador</strong> (MuseScore, Dorico,
-    Sibelius, Finale). PDF <strong>escaneado</strong> não dá — sem vetor não há coordenada
-    para ler a altura das notas.
+  <div id="lista"></div>
+
+  <p class="nota-rodape" id="dica-formatos">
+    Funciona com partitura gerada por computador — MuseScore, Dorico, Sibelius, Finale —
+    inclusive quando os símbolos foram convertidos em curvas. PDF escaneado não dá: sem
+    vetor não há coordenada para ler a altura das notas.
   </p>
 
   <footer>
-    Leitura por geometria vetorial, não OCR: as cabeças de nota já estão no PDF como
-    caracteres de fonte musical, então a altura sai por aritmética sobre as coordenadas.
+    Leitura por geometria vetorial, não OCR: as cabeças de nota já estão no PDF com
+    coordenada exata, então a altura sai por aritmética. A análise é determinística —
+    nenhuma parte dela é inferida por IA.
     <a href="https://github.com/Manuelstv/anotar-partitura">Código no GitHub</a>.
   </footer>
 </div>
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
-const zona = $("#zona"), entrada = $("#arquivo"), estado = $("#estado"), saida = $("#saida");
+const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
+const barra = $("#barra"), barraTxt = $("#barra-txt"), barraNum = $("#barra-num"),
+      barraCheio = $("#barra-cheio");
+const MAX_MB = 40;
 
-function diz(html, carregando = false) {
-  estado.classList.add("on");
-  estado.innerHTML = html + (carregando ? '<div class="barra"><i></i></div>' : "");
+function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true }) {
+  barra.classList.toggle("on", on);
+  barra.classList.toggle("indeterminado", indet);
+  barraTxt.textContent = texto;
+  barraNum.textContent = total > 1 ? `${feito} de ${total}` : "";
+  barraCheio.style.width = indet ? "" : (total ? (100 * feito / total) + "%" : "0%");
 }
 
-// ---- Pyodide sob demanda: so baixa quando o usuario solta o primeiro arquivo
+// ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
 function pegarPy() {
   if (pyPromise) return pyPromise;
   pyPromise = (async () => {
-    diz("Preparando o motor de leitura… <small>(primeira vez baixa ~25 MB; depois fica no cache)</small>", true);
+    progresso({ texto: "Preparando o motor de leitura (primeira vez baixa ~25 MB)", indet: true });
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const fonte = await (await fetch("anotar_partitura.py?v=4")).text();
-    py.FS.writeFile("/anotar_partitura.py", fonte);
-    py.runPython("import sys; sys.path.insert(0, '/')\nimport anotar_partitura");
+    const v = "?v=6";
+    for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
+      py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
+    }
+    py.runPython("import sys; sys.path.insert(0, '/')\nimport anotar_partitura, analise, dificuldade");
     return py;
   })();
   return pyPromise;
 }
 
+// ---- um cartao por arquivo, criado ANTES de processar
+function criarCartao(nome) {
+  const c = document.createElement("div");
+  c.className = "cartao";
+  c.innerHTML = `<div class="topo">
+      <span class="ponto"></span>
+      <div class="ident"><div class="nome"></div><div class="estado">na fila</div></div>
+    </div>`;
+  c.querySelector(".nome").textContent = nome;
+  lista.append(c);
+  return {
+    raiz: c,
+    ponto: c.querySelector(".ponto"),
+    estado: c.querySelector(".estado"),
+    topo: c.querySelector(".topo"),
+    marcar(classe, texto) {
+      this.ponto.className = "ponto " + classe;
+      this.estado.className = "estado " + (classe === "trabalhando" ? "" : classe);
+      this.estado.textContent = texto;
+    },
+  };
+}
+
+function ficha(txt) {
+  const e = document.createElement("span");
+  e.className = "ficha";
+  e.textContent = txt;
+  return e;
+}
+
+function montarAnalise(info, dificuldade) {
+  const d = document.createElement("details");
+  d.className = "analise";
+  d.innerHTML = `<summary>Análise da música</summary><div class="corpo"></div>`;
+  const corpo = d.querySelector(".corpo");
+
+  const fatos = document.createElement("dl");
+  fatos.className = "fatos";
+  const linhas = [
+    ["Tom", info.tom, ""],
+    ["Âmbito", `${info.grave}–${info.agudo}`, ""],
+    ["Extensão", info.extensao, "semitons"],
+    ["Notas", info.n_notas, ""],
+    ["Compassos", info.compassos, ""],
+    ["Alteradas", Math.round(info.frac_alteradas * 100) + "%", ""],
+  ];
+  for (const [rot, val, unid] of linhas) {
+    const w = document.createElement("div");
+    w.className = "fato";
+    w.innerHTML = `<dt></dt><dd></dd>`;
+    w.querySelector("dt").textContent = rot;
+    w.querySelector("dd").textContent = val;
+    if (unid) {
+      const u = document.createElement("span");
+      u.className = "unid";
+      u.textContent = " " + unid;
+      w.querySelector("dd").append(u);
+    }
+    fatos.append(w);
+  }
+  corpo.append(fatos);
+
+  if (dificuldade != null) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Dificuldade no sax alto</h3>
+      <div class="medidor"><span class="valor"></span>
+      <span class="trilho"><span class="cheio"></span></span>
+      <span class="meta">de 10</span></div>`;
+    b.querySelector(".valor").textContent = dificuldade.toFixed(1);
+    b.querySelector(".cheio").style.width = (10 * dificuldade) + "%";
+    corpo.append(b);
+  }
+
+  if (info.cifras?.length) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Cifras encontradas</h3><div class="fichas"></div>`;
+    info.cifras.forEach(c => b.querySelector(".fichas").append(ficha(c)));
+    corpo.append(b);
+
+    if (info.escalas?.length) {
+      const e = document.createElement("div");
+      e.className = "bloco";
+      e.innerHTML = `<h3>Como cada acorde é formado</h3><div class="escalas"></div>`;
+      for (const it of info.escalas) {
+        const l = document.createElement("div");
+        l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
+        l.querySelector("b").textContent = it.cifra;
+        l.querySelector(".notas-ac").textContent = (it.notas || []).join(" ");
+        l.querySelector(".esc").textContent = it.escala;
+        e.querySelector(".escalas").append(l);
+      }
+      corpo.append(e);
+    }
+  }
+
+  if (info.mais_tocadas?.length) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Notas mais tocadas</h3><div class="fichas"></div>`;
+    info.mais_tocadas.forEach(([n, q]) => b.querySelector(".fichas").append(ficha(`${n} · ${q}×`)));
+    corpo.append(b);
+  }
+
+  if (info.dificeis?.length) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Onde a música pesa</h3><ul class="dificeis"></ul>`;
+    for (const t of info.dificeis) {
+      const li = document.createElement("li");
+      li.textContent = `pág. ${t.pagina}, ${t.sistema}ª pauta — ${t.motivos.join(", ")}`;
+      b.querySelector("ul").append(li);
+    }
+    corpo.append(b);
+  }
+  return d;
+}
+
 async function processar(arquivos) {
-  const lista = [...arquivos].filter(f => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
-  if (!lista.length) { diz("Isso não parece um PDF."); return; }
+  const todos = [...arquivos];
+  if (!todos.length) return;
+
+  // valida antes de qualquer download pesado
+  const fila = [];
+  for (const f of todos) {
+    const cartao = criarCartao(f.name);
+    if (!/\.pdf$/i.test(f.name) && f.type !== "application/pdf") {
+      cartao.marcar("ruim", "não é um PDF");
+    } else if (f.size > MAX_MB * 1024 * 1024) {
+      cartao.marcar("ruim", `maior que ${MAX_MB} MB`);
+    } else {
+      fila.push({ f, cartao });
+    }
+  }
+  if (!fila.length) { progresso({ on: false }); return; }
 
   const py = await pegarPy();
   const sistema = document.querySelector('input[name=sistema]:checked').value;
   const limpar = $("#limpar").checked;
 
-  for (let i = 0; i < lista.length; i++) {
-    const f = lista[i];
-    diz(`Lendo <strong>${f.name}</strong>… ${lista.length > 1 ? `(${i + 1} de ${lista.length})` : ""}`, true);
-    await new Promise(r => setTimeout(r, 30));       // deixa a UI pintar
+  for (let i = 0; i < fila.length; i++) {
+    const { f, cartao } = fila[i];
+    progresso({ texto: `Lendo ${f.name}`, feito: i, total: fila.length });
+    cartao.marcar("trabalhando", "lendo…");
+    await new Promise(r => setTimeout(r, 20));
     try {
-      const dados = new Uint8Array(await f.arrayBuffer());
-      py.FS.writeFile("/entrada.pdf", dados);
+      py.FS.writeFile("/entrada.pdf", new Uint8Array(await f.arrayBuffer()));
       py.globals.set("_sistema", sistema);
       py.globals.set("_limpar", limpar);
       const res = py.runPython(`
-import anotar_partitura as A, json
+import json, anotar_partitura as A, analise, dificuldade as Dif, pymupdf
 _dados = open("/entrada.pdf","rb").read()
 _saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar)
 _previa = b""
+_info, _nota = None, None
 if _rel["total"]:
-    import pymupdf
     _d = pymupdf.open(stream=_saida, filetype="pdf")
     _previa = _d[0].get_pixmap(dpi=96).tobytes("png")
     _d.close()
-(_saida, _previa, json.dumps(_rel))
+    try:
+        _info = analise.analisar(_dados)
+    except Exception:
+        _info = None
+    try:
+        _nota = Dif.nota("/entrada.pdf", json.load(open("/pesos_dificuldade.json")))[0]
+    except Exception:
+        _nota = None
+(_saida, _previa, json.dumps({"rel": _rel, "info": _info, "nota": _nota}))
 `);
-      const [pdfOut, previaOut, relJson] = res.toJs({ create_proxies: false });
+      const [pdfOut, previaOut, extra] = res.toJs({ create_proxies: false });
       res.destroy?.();
-      mostrar(f.name, pdfOut, previaOut, JSON.parse(relJson));
+      concluir(cartao, f.name, pdfOut, previaOut, JSON.parse(extra));
     } catch (e) {
-      mostrarErro(f.name, e);
+      falhar(cartao, f, e);
     }
   }
-  estado.classList.remove("on");
+  progresso({ texto: "Pronto", feito: fila.length, total: fila.length });
+  setTimeout(() => progresso({ on: false }), 1200);
 }
 
-function mostrar(nome, bytes, previa, rel) {
+function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
   const base = nome.replace(/\.pdf$/i, "");
-  const div = document.createElement("div");
-  div.className = "item";
-
-  const nomeEl = document.createElement("div");
-  nomeEl.className = "nome";
-  nomeEl.textContent = base + "_notas.pdf";
-
-  const det = document.createElement("div");
-  det.className = "det";
-  if (rel.total) {
-    det.innerHTML = `<b>${rel.total} notas</b> anotadas` +
-      (rel.por_pagina.length > 1 ? ` em ${rel.por_pagina.length} páginas` : "") +
-      (rel.limpos ? ` · ${rel.limpos} nomes antigos cobertos` : "") +
-      (rel.existentes && !rel.limpos
-        ? ` · <span title="marque a opção acima para cobrir">${rel.existentes} nomes já existiam</span>` : "");
-  } else {
-    det.className = "det ruim";
-    det.textContent = "Nenhuma nota encontrada — provavelmente é um PDF escaneado (imagem).";
+  if (!rel.total) {
+    cartao.marcar("ruim", "nenhuma nota encontrada — provavelmente é um PDF escaneado");
+    return;
   }
+  const detalhe = [`${rel.total} notas anotadas`];
+  if (rel.por_pagina.length > 1) detalhe.push(`${rel.por_pagina.length} páginas`);
+  if (rel.limpos) detalhe.push(`${rel.limpos} nomes antigos cobertos`);
+  cartao.marcar("bom", detalhe.join(" · "));
 
-  div.append(nomeEl, det);
+  const a = document.createElement("a");
+  a.className = "btn btn-primario";
+  a.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+  a.download = base + "_notas.pdf";
+  a.textContent = "Baixar PDF";
+  cartao.topo.append(a);
 
-  if (rel.total) {
-    const a = document.createElement("a");
-    a.className = "baixar";
-    a.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-    a.download = base + "_notas.pdf";
-    a.textContent = "Baixar PDF";
-    div.append(a);
+  if (info) cartao.raiz.append(montarAnalise(info, nota));
 
-    if (previa && previa.length) {
-      const d = document.createElement("details");
-      d.className = "previa";
-      d.innerHTML = "<summary>Ver primeira página</summary>";
-      const img = document.createElement("img");
-      img.alt = "Primeira página anotada de " + base;
-      img.loading = "lazy";
-      img.src = URL.createObjectURL(new Blob([previa], { type: "image/png" }));
-      d.append(img);
-      div.append(d);
-    }
+  if (previa?.length) {
+    const d = document.createElement("details");
+    d.className = "analise";
+    d.innerHTML = `<summary>Ver primeira página</summary><div class="corpo previa"></div>`;
+    const img = document.createElement("img");
+    img.alt = "Primeira página anotada de " + base;
+    img.loading = "lazy";
+    img.src = URL.createObjectURL(new Blob([previa], { type: "image/png" }));
+    d.querySelector(".corpo").append(img);
+    cartao.raiz.append(d);
   }
-  saida.prepend(div);
 }
 
-function mostrarErro(nome, e) {
-  const div = document.createElement("div");
-  div.className = "item";
-  div.innerHTML = `<div class="nome">${nome}</div>
-    <div class="det ruim">Falhou: ${String(e.message || e).split("\n").pop().slice(0, 200)}</div>`;
-  saida.prepend(div);
+function falhar(cartao, f, e) {
+  cartao.marcar("ruim", String(e?.message || e).split("\n").pop().slice(0, 140));
+  const b = document.createElement("button");
+  b.className = "btn btn-secundario";
+  b.textContent = "Tentar de novo";
+  b.onclick = () => { cartao.raiz.remove(); processar([f]); };
+  cartao.topo.append(b);
 }
 
 // ---- eventos
 zona.addEventListener("click", () => entrada.click());
-zona.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entrada.click(); }
+entrada.addEventListener("change", () => {
+  if (entrada.files.length) processar(entrada.files);
+  entrada.value = "";
 });
-entrada.addEventListener("change", () => { if (entrada.files.length) processar(entrada.files); });
 ["dragenter", "dragover"].forEach(ev =>
   zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add("sobre"); }));
 ["dragleave", "drop"].forEach(ev =>
