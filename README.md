@@ -41,18 +41,28 @@ Pauta de **ritmo** (1 linha) não recebe nome — não há altura para ler.
 
 ## Precisão medida
 
-Validado contra partituras que **já traziam** os nomes impressos, casando nota↔nome por
-coluna x:
+**Acurácia**, contra partituras que **já traziam** os nomes impressos, casando nota↔nome
+por coluna x:
 
-| Conjunto | Programa | Resultado |
-|---|---|---|
-| Negra ron y velas (sax alto) | MuseScore | 154/154 = **100%** |
-| The-chicken (alto + tenor) | Sibelius | 98/98 = **100%** |
-| Acervo Online Sax Academy — 182 PDFs "With Note Names" | Sibelius | ver `RESULTADOS.md` |
+| Conjunto | Programa | Notas conferidas | Acurácia |
+|---|---|---|---|
+| 182 PDFs "With Note Names" (Online Sax Academy) | Sibelius | 37.644 | **99,51%** |
+| Negra ron y velas (sax alto) | MuseScore | 154 | **100%** |
+| The-chicken (alto + tenor) | Sibelius | 98 | **100%** |
 
 No The-chicken, 2 notas divergiram dos nomes impressos no próprio PDF — a conferência
 (posição na pauta + a transposição alto→tenor da mesma peça) mostrou que os nomes **do
 PDF** estavam errados, não a leitura.
+
+**Cobertura** — quantas das cabeças de nota presentes no PDF recebem rótulo. É o sinal de
+falha quando não há gabarito: cobertura baixa significa pauta não detectada.
+
+| Conjunto | Arquivos | Cabeças rotuladas |
+|---|---|---|
+| 979 PDFs vetoriais (Online Sax Academy) | 958 a 100% | 226.614 / 229.243 = **98,85%** |
+
+O que sobra são quase todos exercícios de **ritmo** (pauta de 1 linha), onde não existe
+altura para nomear.
 
 ## Linha de comando
 
