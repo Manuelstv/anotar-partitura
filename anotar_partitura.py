@@ -372,39 +372,57 @@ def indice_diatonico(cy, linhas, topo_ref):
     return topo_ref + passos
 
 
-def armadura(glifos, linhas, x_clave, cabecas):
+def armadura(glifos, linhas, x_clave, topo_ref, cabecas):
     """Le a armadura de clave -> alteracoes por letra + os x que nao sao acidente solto.
 
-    A armadura e o grupo CONTIGUO logo depois da clave, e nenhum acidente dela tem
-    cabeca de nota colada a direita. So medir "esta antes da primeira nota" nao serve:
-    o acidente da primeira nota fica a 1-2pt dela, dentro de qualquer margem razoavel,
-    e era contado como se fosse da armadura (a nota perdia o sustenido e o tom saia
-    errado para toda a linha).
+    A armadura e o grupo contiguo logo depois da clave, e para no primeiro acidente que
+    tenha uma CABECA DE NOTA colada a direita, na mesma altura — esse e da nota.
+
+    So medir "esta antes da primeira nota" nao serve: o acidente da primeira nota fica
+    a 1-2pt dela, dentro de qualquer margem razoavel, e ia para a armadura — a nota
+    perdia o sustenido e o tom saia errado para a linha toda.
+
+    Nao da para checar as LETRAS canonicas (F C G D...) aqui: a posicao vertical do
+    glifo de bemol nao e a da nota (o bojo fica abaixo do centro da caixa), e a checagem
+    passava a rejeitar armadura de bemol.
     """
     span = linhas[-1] - linhas[0]
-    accs = sorted([g for g in glifos if g["tipo"] == "acc" and g["extra"] in ('#', 'b')],
-                  key=lambda g: g["x0"])
+    accs = sorted([g for g in glifos if g["tipo"] == "acc" and g["extra"] in ('#', 'b')
+                   and g["x0"] >= x_clave], key=lambda g: g["x0"])
 
-    def tem_nota_colada(g):
-        return any(-0.1 * span <= h["x0"] - g["x1"] < 1.6 * span
+    def colada(g):
+        """Nota logo a direita e na mesma altura: o acidente e dela, nao da armadura.
+
+        O limiar de 0.25 span vem de medicao: acidente de NOTA fica a ~0.09 span da
+        cabeca; acidente de ARMADURA, a 0.49 span ou mais (mesmo em sistema de
+        continuacao, que nao tem formula de compasso no meio).
+        """
+        return any(-0.1 * span <= h["x0"] - g["x1"] < 0.25 * span
                    and abs(h["y"] - g["y"]) < 0.35 * span for h in cabecas)
 
     entre, borda = [], x_clave
     for g in accs:
-        if g["x0"] - borda > 2.0 * span:      # buraco grande: a armadura acabou
-            break
-        if g["x0"] < x_clave or tem_nota_colada(g):
+        if g["x0"] - borda > 2.0 * span or colada(g) or len(entre) >= 7:
             break
         entre.append(g)
         borda = g["x1"]
 
     s = sum(1 for g in entre if g["extra"] == '#')
     b = sum(1 for g in entre if g["extra"] == 'b')
-    if s and s <= 7 and not b:
+    if s and not b:
         return {n: '#' for n in ORDEM_SUSTENIDOS[:s]}, {g["x"] for g in entre}
-    if b and b <= 7 and not s:
+    if b and not s:
         return {n: 'b' for n in ORDEM_BEMOIS[:b]}, {g["x"] for g in entre}
     return {}, set()
+
+
+SEMITONS = [0, 2, 4, 5, 7, 9, 11]          # C D E F G A B dentro da oitava
+
+
+def midi_de(idx, alt):
+    """Indice diatonico (C0 == 0) + alteracao -> numero MIDI (C0 == 12)."""
+    desvio = {'': 0, '#': 1, 'b': -1, '##': 2, 'bb': -2}.get(alt, 0)
+    return 12 + 12 * (idx // 7) + SEMITONS[idx % 7] + desvio
 
 
 def nome(idx, alt, sistema):
@@ -446,7 +464,7 @@ def ler_notas(pg, sistema):
         x_clave = min((g["x1"] for g in claves), default=topo - 999)
 
         alt_armadura, xs_armadura = armadura([g for g in glifos if na_pauta(g, 1.4)],
-                                            linhas, x_clave, cabecas)
+                                            linhas, x_clave, topo_ref, cabecas)
 
         acidentes = [g for g in glifos if g["tipo"] == "acc" and na_pauta(g)
                      and g["x"] not in xs_armadura]
@@ -492,7 +510,7 @@ def ler_notas(pg, sistema):
                 alt = estado[idx]
             else:
                 alt = alt_armadura.get(letra, '')
-            notas.append((h, nome(idx, alt, sistema)))
+            notas.append((h, nome(idx, alt, sistema), idx, alt, i_barra))
 
         # ---- linha de base dos rotulos: logo abaixo da tinta DESTE sistema.
         # So conta tinta abaixo da ultima linha da pauta, e ignora nomes de nota
@@ -520,9 +538,14 @@ def ler_notas(pg, sistema):
         if y_base > teto:
             y_base = max(teto, base_l + span * 0.62)
 
-        for ordem, (h, txt) in enumerate(notas):
+        for ordem, (h, txt, idx, alt, cmp_) in enumerate(notas):
             rotulos.append({"x": (h["x0"] + h["x1"]) / 2, "y_base": y_base,
-                            "y_nota": h["y"], "texto": txt, "corpo": corpo, "ordem": ordem})
+                            "y_nota": h["y"], "texto": txt, "corpo": corpo, "ordem": ordem,
+                            "idx": idx, "alt": alt, "midi": midi_de(idx, alt),
+                            "sistema": sidx, "compasso": cmp_,
+                            "armadura": (len(alt_armadura)
+                                         * (1 if '#' in alt_armadura.values() else -1)
+                                         if alt_armadura else 0)})
 
         # Nomes de nota que JA existem na partitura (candidatos a remocao).
         # Exige alinhamento com uma cabeca de nota: cifra de acorde solta no comeco
