@@ -207,21 +207,27 @@ def pautas(horiz, largura_pagina, altura_pagina):
     niveis = {}
     for y, x0, x1 in horiz:
         niveis.setdefault(round(y, 1), []).append((x0, x1))
-    cand = [(y, _cobertura(segs)) for y, segs in niveis.items()]
-    if not cand:
+    if not niveis:
         return []
 
-    # junta niveis quase coincidentes (mesma linha desenhada em duas passadas)
-    cand.sort()
+    # Junta niveis quase coincidentes (mesma linha desenhada em duas passadas). Duas
+    # regras importam aqui: a cobertura do grupo e a UNIAO dos segmentos (somando, um
+    # punhado de tracos curtos empilhados virava "linha longa" fantasma), e o y do
+    # grupo e o do nivel de MAIOR cobertura (a linha real), nao o primeiro.
     k = altura_pagina / 842.0
     junta_max = 1.2 * k
-    juntos = []
-    for y, c in cand:
-        if juntos and y - juntos[-1][0] < junta_max:
-            y0, c0 = juntos[-1]
-            juntos[-1] = ((y0 * c0 + y * c) / (c0 + c) if c0 + c else y0, c0 + c)
+    grupos = []
+    for y, segs in sorted(niveis.items()):
+        c = _cobertura(segs)
+        if grupos and y - grupos[-1]["ult"] < junta_max:
+            g = grupos[-1]
+            g["segs"].extend(segs)
+            g["ult"] = y
+            if c > g["dom"]:
+                g["dom"], g["y"] = c, y
         else:
-            juntos.append((y, c))
+            grupos.append({"y": y, "ult": y, "segs": list(segs), "dom": c})
+    juntos = [(g["y"], _cobertura(g["segs"])) for g in grupos]
 
     corte = 0.15 * largura_pagina
     longas = sorted((y, c) for y, c in juntos if c >= corte and c < largura_pagina * 0.99)
@@ -244,16 +250,20 @@ def pautas(horiz, largura_pagina, altura_pagina):
     # Procura 5 linhas em PROGRESSAO de passo d — por periodicidade, nao por
     # adjacencia, o que tolera beam/colchete intercalado. Entre os candidatos de cada
     # degrau, prefere o MAIS LONGO: linha de pauta cruza o sistema, colchete nao.
+    # As sementes sao testadas da linha MAIS LONGA para a mais curta, para a pauta
+    # verdadeira se formar antes que uma fantasma consuma as linhas dela.
+    ordem = sorted(range(len(longas)), key=lambda i: (-longas[i][1], ys[i]))
     usados, achadas = set(), []
-    for i, (y, _) in enumerate(longas):
+    for i in ordem:
         if i in usados:
             continue
+        y = ys[i]
         linhas, idx = [y], [i]
         for m in range(1, 5):
             alvo = y + m * d
             melhor = None
-            for j in range(i + 1, len(longas)):
-                if j in usados or abs(ys[j] - alvo) > tol:
+            for j in range(len(longas)):
+                if j in usados or j == i or abs(ys[j] - alvo) > tol:
                     continue
                 if melhor is None or (longas[j][1], -abs(ys[j] - alvo)) > \
                         (longas[melhor][1], -abs(ys[melhor] - alvo)):
@@ -262,10 +272,16 @@ def pautas(horiz, largura_pagina, altura_pagina):
                 break
             linhas.append(ys[melhor])
             idx.append(melhor)
-        if len(linhas) == 5:
-            achadas.append(linhas)
-            usados.update(idx)
-    return achadas
+        if len(linhas) < 5:
+            continue
+        # As 5 linhas de uma pauta tem praticamente o mesmo comprimento. Se uma delas
+        # for muito mais curta, o grupo pegou uma linha que nao e de pauta.
+        cobs = [longas[j][1] for j in idx]
+        if min(cobs) < 0.55 * max(cobs):
+            continue
+        achadas.append(sorted(linhas))
+        usados.update(idx)
+    return sorted(achadas, key=lambda g: g[0])
 
 
 # ------------------------------------------------------------------- alturas
