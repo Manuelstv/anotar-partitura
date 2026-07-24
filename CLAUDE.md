@@ -13,11 +13,16 @@ no código, para evitar problemas de encoding).
 
 | Caminho | O que é |
 |---|---|
-| `~/notes-pdf/` | este repo (dev). `anotar_partitura.py` é o arquivo que importa |
+| `~/notes-pdf/` | este repo (dev). `anotar_partitura.py` é o núcleo |
+| `analise.py` | análise musical determinística (tom, cifras, soletração, escalas, pontos difíceis) |
+| `dificuldade.py` + `pesos_dificuldade.json` | nota 0–10 de dificuldade no sax alto; `calibrar` reajusta os pesos |
 | `~/anotar-partitura-web/` | cópia publicada: `index.html` + o mesmo `.py` |
 | `github.com/Manuelstv/anotar-partitura` | repo público, Pages no branch `master` |
 | `https://manuelstv.github.io/anotar-partitura/` | site — arrasta PDF, baixa anotado |
 | `C:\Users\ManuelSperanzaTorres\Anotar partitura.bat` | atalho Windows de arrastar-soltar (+ variante `(Do-Re-Mi).bat`) |
+
+O site carrega `anotar_partitura.py`, `analise.py`, `dificuldade.py` e
+`pesos_dificuldade.json` no Pyodide — os **mesmos** arquivos da CLI.
 
 **O `.py` é um só para CLI e web.** Ao alterá-lo, copiar para `~/anotar-partitura-web/` e
 subir. `git push` está bloqueado por permissão neste ambiente: usar
@@ -76,7 +81,19 @@ meio espaço abaixo do centro da caixa; clave altura > 5,5.
 5. **`--limpar` é heurístico e tem duas travas** (≥50% das notas com nome, e só a família
    dominante). O acervo tem letras de música em PT-BR onde "A" e "E" são palavras — sem
    as travas, viraria tarja branca em cima da letra.
-6. Ao mudar a assinatura de `coletar()`, atualizar `validar2.py` e `_exploracao/*.py`.
+6. Ao mudar a assinatura de `coletar()`, atualizar `validar2.py`, `analise.py` e
+   `_exploracao/*.py`.
+7. **Cifra vs. nome de nota vs. marca de ensaio** (`analise.ler_cifras`): o nome de nota
+   escrito embaixo de um sistema cai na faixa "acima" do sistema seguinte — o teto tem de
+   ser o MEIO do vão. Marca de ensaio ("A", "B") casa com a regex de cifra e é separada
+   por estar dentro de uma caixa desenhada. E o `7` da cifra é sobrescrito, span à parte:
+   sem juntar, "G7" vira "G" e a escala sugerida sai errada.
+8. **Soletrar acorde pelo GRAU diatônico**, nunca por tabela fixa de sustenidos/bemóis:
+   senão C7 sai "A#" em vez de "Bb". E `add9`/`6/9` não levam sétima.
+9. Na nota de dificuldade, os pesos são **não-negativos** de propósito: sem essa
+   restrição a colinearidade dava peso negativo para salto, ou seja, "salto grande
+   facilita". Validar sempre fora da amostra (5 folds) e pela ordenação da mesma música
+   em níveis diferentes — é a métrica que importa.
 
 ## Como medir (fazer isso a cada mudança no núcleo)
 
@@ -88,6 +105,10 @@ Há **duas** métricas, e as duas importam:
 - **Cobertura** — quantas das cabeças presentes no PDF receberam rótulo.
   `_exploracao/levantar.py <raiz> saida.csv` + `_exploracao/analisar.py saida.csv`.
   Cobertura baixa = pauta não detectada.
+
+Para a dificuldade: `uv run dificuldade.py calibrar <raiz>` reporta R² dentro e fora da
+amostra e a taxa de ordenação. Hoje: R²cv 0,445 e **91,7%** de ordenação correta. O que
+falta é o RITMO — não leio duração, e é o fator que mais separaria os níveis.
 
 Casos de regressão obrigatórios (em `~/Downloads`): `Marlon Blanco - Negra ron y
 velas-Saxofone_Alto.pdf` (MuseScore, 100%), `The-chicken.pdf` (Sibelius, 98% — as 2
