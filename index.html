@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anotar partitura — nome das notas no seu PDF</title>
+<meta name="description" content="Arraste um PDF de partitura e baixe de volta o mesmo PDF com o nome de cada nota escrito embaixo da pauta. Roda 100% no seu navegador.">
+<style>
+  :root {
+    --bg: #fbfaf8; --fg: #1b1a17; --dim: #6b6862; --linha: #e2ded6;
+    --card: #ffffff; --acento: #1f3fbf; --acento-fraco: #edf0fd;
+    --ok: #17683f; --erro: #a8261c; --sombra: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16171a; --fg: #eceae5; --dim: #9a978f; --linha: #2e3035;
+      --card: #1e2024; --acento: #91a8ff; --acento-fraco: #1e2438;
+      --ok: #64d39b; --erro: #ff8b7e; --sombra: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16171a; --fg: #eceae5; --dim: #9a978f; --linha: #2e3035;
+    --card: #1e2024; --acento: #91a8ff; --acento-fraco: #1e2438;
+    --ok: #64d39b; --erro: #ff8b7e; --sombra: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+  }
+  :root[data-theme="light"] {
+    --bg: #fbfaf8; --fg: #1b1a17; --dim: #6b6862; --linha: #e2ded6;
+    --card: #ffffff; --acento: #1f3fbf; --acento-fraco: #edf0fd;
+    --ok: #17683f; --erro: #a8261c; --sombra: 0 1px 2px rgba(0,0,0,.05), 0 8px 24px rgba(0,0,0,.05);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0 0 .4em; letter-spacing: -.02em; }
+  .sub { color: var(--dim); margin: 0 0 2rem; font-size: 1.02rem; }
+  .sub code { font-size: .92em; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  /* zona de arraste */
+  #zona {
+    border: 2px dashed var(--linha); border-radius: 14px; background: var(--card);
+    padding: 42px 24px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s; box-shadow: var(--sombra);
+  }
+  #zona:hover, #zona.sobre { border-color: var(--acento); background: var(--acento-fraco); }
+  #zona.sobre { border-style: solid; }
+  #zona .icone { font-size: 2rem; line-height: 1; display: block; margin-bottom: .5rem; }
+  #zona strong { font-weight: 600; }
+  #zona small { color: var(--dim); display: block; margin-top: .5rem; }
+  #arquivo { display: none; }
+
+  /* opcoes */
+  .opcoes {
+    display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center;
+    margin: 22px 0 4px; font-size: .95rem;
+  }
+  .opcoes fieldset { border: 0; padding: 0; margin: 0; display: flex; gap: 14px; align-items: center; }
+  .opcoes legend { float: left; margin-right: 12px; color: var(--dim); }
+  label { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  input[type=radio], input[type=checkbox] { accent-color: var(--acento); margin: 0; }
+
+  /* estado */
+  #estado {
+    margin: 26px 0 0; padding: 14px 16px; border-radius: 10px; font-size: .95rem;
+    background: var(--card); border: 1px solid var(--linha); display: none;
+  }
+  #estado.on { display: block; }
+  #estado .barra { height: 4px; background: var(--linha); border-radius: 99px; overflow: hidden; margin-top: 10px; }
+  #estado .barra i { display: block; height: 100%; width: 30%; background: var(--acento); border-radius: 99px;
+                     animation: desliza 1.1s ease-in-out infinite; }
+  @keyframes desliza { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+
+  /* resultados */
+  #saida { margin-top: 26px; display: grid; gap: 12px; }
+  .item {
+    background: var(--card); border: 1px solid var(--linha); border-radius: 12px;
+    padding: 14px 16px; box-shadow: var(--sombra);
+    display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; align-items: center;
+  }
+  .item .nome { font-weight: 600; overflow-wrap: anywhere; }
+  .item .det { color: var(--dim); font-size: .88rem; grid-column: 1; }
+  .item .det.ruim { color: var(--erro); }
+  .item .det b { color: var(--ok); font-weight: 600; }
+  .baixar {
+    grid-row: 1 / span 2; grid-column: 2; text-decoration: none; white-space: nowrap;
+    background: var(--acento); color: #fff; padding: 9px 15px; border-radius: 9px;
+    font-size: .92rem; font-weight: 600;
+  }
+  :root[data-theme="dark"] .baixar, @media (prefers-color-scheme: dark) { }
+  .previa { grid-column: 1 / -1; margin-top: 8px; }
+  .previa img {
+    max-width: 100%; border: 1px solid var(--linha); border-radius: 8px; background: #fff;
+    display: block;
+  }
+  details summary { cursor: pointer; color: var(--dim); font-size: .88rem; }
+
+  footer { margin-top: 56px; padding-top: 22px; border-top: 1px solid var(--linha);
+           color: var(--dim); font-size: .88rem; }
+  footer a { color: var(--acento); }
+  .aviso { color: var(--dim); font-size: .88rem; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Anotar partitura</h1>
+  <p class="sub">
+    Arraste um PDF de partitura e baixe de volta <strong>o mesmo PDF</strong> com o nome de
+    cada nota escrito embaixo da pauta. Nada é re-desenhado — só entra uma camada de texto.
+    Roda inteiro no seu navegador: o arquivo não sai do seu computador.
+  </p>
+
+  <div id="zona" tabindex="0" role="button" aria-label="Escolher PDFs de partitura">
+    <span class="icone" aria-hidden="true">🎼</span>
+    <strong>Arraste os PDFs aqui</strong> ou clique para escolher
+    <small>pode soltar vários de uma vez</small>
+  </div>
+  <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple>
+
+  <div class="opcoes">
+    <fieldset>
+      <legend>Nomes</legend>
+      <label><input type="radio" name="sistema" value="letras" checked> C D E F G A B</label>
+      <label><input type="radio" name="sistema" value="dore"> Dó Ré Mi Fá Sol Lá Si</label>
+    </fieldset>
+    <label><input type="checkbox" id="limpar"> Apagar nomes de nota que já estejam na partitura</label>
+  </div>
+
+  <div id="estado" role="status" aria-live="polite"></div>
+  <div id="saida"></div>
+
+  <p class="aviso">
+    Funciona com partitura <strong>gerada por computador</strong> (MuseScore, Dorico,
+    Sibelius, Finale). PDF <strong>escaneado</strong> não dá — sem vetor não há coordenada
+    para ler a altura das notas.
+  </p>
+
+  <footer>
+    Leitura por geometria vetorial, não OCR: as cabeças de nota já estão no PDF como
+    caracteres de fonte musical, então a altura sai por aritmética sobre as coordenadas.
+    <a href="https://github.com/Manuelstv/anotar-partitura">Código no GitHub</a>.
+  </footer>
+</div>
+
+<script type="module">
+const $ = (s) => document.querySelector(s);
+const zona = $("#zona"), entrada = $("#arquivo"), estado = $("#estado"), saida = $("#saida");
+
+function diz(html, carregando = false) {
+  estado.classList.add("on");
+  estado.innerHTML = html + (carregando ? '<div class="barra"><i></i></div>' : "");
+}
+
+// ---- Pyodide sob demanda: so baixa quando o usuario solta o primeiro arquivo
+let pyPromise = null;
+function pegarPy() {
+  if (pyPromise) return pyPromise;
+  pyPromise = (async () => {
+    diz("Preparando o motor de leitura… <small>(primeira vez baixa ~25 MB; depois fica no cache)</small>", true);
+    const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
+    const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
+    await py.loadPackage("pymupdf");
+    const fonte = await (await fetch("anotar_partitura.py?v=3")).text();
+    py.FS.writeFile("/anotar_partitura.py", fonte);
+    py.runPython("import sys; sys.path.insert(0, '/')\nimport anotar_partitura");
+    return py;
+  })();
+  return pyPromise;
+}
+
+async function processar(arquivos) {
+  const lista = [...arquivos].filter(f => /\.pdf$/i.test(f.name) || f.type === "application/pdf");
+  if (!lista.length) { diz("Isso não parece um PDF."); return; }
+
+  const py = await pegarPy();
+  const sistema = document.querySelector('input[name=sistema]:checked').value;
+  const limpar = $("#limpar").checked;
+
+  for (let i = 0; i < lista.length; i++) {
+    const f = lista[i];
+    diz(`Lendo <strong>${f.name}</strong>… ${lista.length > 1 ? `(${i + 1} de ${lista.length})` : ""}`, true);
+    await new Promise(r => setTimeout(r, 30));       // deixa a UI pintar
+    try {
+      const dados = new Uint8Array(await f.arrayBuffer());
+      py.FS.writeFile("/entrada.pdf", dados);
+      py.globals.set("_sistema", sistema);
+      py.globals.set("_limpar", limpar);
+      const res = py.runPython(`
+import anotar_partitura as A, json
+_dados = open("/entrada.pdf","rb").read()
+_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar)
+_previa = b""
+if _rel["total"]:
+    import pymupdf
+    _d = pymupdf.open(stream=_saida, filetype="pdf")
+    _previa = _d[0].get_pixmap(dpi=96).tobytes("png")
+    _d.close()
+(_saida, _previa, json.dumps(_rel))
+`);
+      const [pdfOut, previaOut, relJson] = res.toJs({ create_proxies: false });
+      res.destroy?.();
+      mostrar(f.name, pdfOut, previaOut, JSON.parse(relJson));
+    } catch (e) {
+      mostrarErro(f.name, e);
+    }
+  }
+  estado.classList.remove("on");
+}
+
+function mostrar(nome, bytes, previa, rel) {
+  const base = nome.replace(/\.pdf$/i, "");
+  const div = document.createElement("div");
+  div.className = "item";
+
+  const nomeEl = document.createElement("div");
+  nomeEl.className = "nome";
+  nomeEl.textContent = base + "_notas.pdf";
+
+  const det = document.createElement("div");
+  det.className = "det";
+  if (rel.total) {
+    det.innerHTML = `<b>${rel.total} notas</b> anotadas` +
+      (rel.por_pagina.length > 1 ? ` em ${rel.por_pagina.length} páginas` : "") +
+      (rel.limpos ? ` · ${rel.limpos} nomes antigos cobertos` : "") +
+      (rel.existentes && !rel.limpos
+        ? ` · <span title="marque a opção acima para cobrir">${rel.existentes} nomes já existiam</span>` : "");
+  } else {
+    det.className = "det ruim";
+    det.textContent = "Nenhuma nota encontrada — provavelmente é um PDF escaneado (imagem).";
+  }
+
+  div.append(nomeEl, det);
+
+  if (rel.total) {
+    const a = document.createElement("a");
+    a.className = "baixar";
+    a.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+    a.download = base + "_notas.pdf";
+    a.textContent = "Baixar PDF";
+    div.append(a);
+
+    if (previa && previa.length) {
+      const d = document.createElement("details");
+      d.className = "previa";
+      d.innerHTML = "<summary>Ver primeira página</summary>";
+      const img = document.createElement("img");
+      img.alt = "Primeira página anotada de " + base;
+      img.loading = "lazy";
+      img.src = URL.createObjectURL(new Blob([previa], { type: "image/png" }));
+      d.append(img);
+      div.append(d);
+    }
+  }
+  saida.prepend(div);
+}
+
+function mostrarErro(nome, e) {
+  const div = document.createElement("div");
+  div.className = "item";
+  div.innerHTML = `<div class="nome">${nome}</div>
+    <div class="det ruim">Falhou: ${String(e.message || e).split("\n").pop().slice(0, 200)}</div>`;
+  saida.prepend(div);
+}
+
+// ---- eventos
+zona.addEventListener("click", () => entrada.click());
+zona.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); entrada.click(); }
+});
+entrada.addEventListener("change", () => { if (entrada.files.length) processar(entrada.files); });
+["dragenter", "dragover"].forEach(ev =>
+  zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add("sobre"); }));
+["dragleave", "drop"].forEach(ev =>
+  zona.addEventListener(ev, () => zona.classList.remove("sobre")));
+zona.addEventListener("drop", (e) => {
+  e.preventDefault();
+  if (e.dataTransfer.files.length) processar(e.dataTransfer.files);
+});
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => e.preventDefault());
+</script>
+</body>
+</html>
