@@ -7,47 +7,45 @@
 <meta name="description" content="Arraste um PDF de partitura e baixe o mesmo PDF com o nome de cada nota embaixo da pauta, mais a análise da música. Roda no seu navegador.">
 <style>
   /* ---------------------------------------------------------------- tokens
-     Escala tipografica com salto de ~1.25x e no maximo 3 tamanhos por bloco;
-     escala de espaco em multiplos de 4. O acento e reservado para a acao
-     primaria e para o foco — em nenhum outro lugar. */
-  :root {
-    --t-xl: 2rem;      --t-lg: 1.125rem;  --t-md: 1rem;    --t-sm: .875rem;  --t-xs: .75rem;
-    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
-    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+     Escala tipografica com salto de ~1.25x, no maximo 3 tamanhos por bloco, e
+     espaco em multiplos de 4. O acento e reservado para a acao primaria, o foco
+     e o valor que o usuario veio buscar — em nenhum outro lugar.
 
-    --bg: #faf9f7;  --superficie: #fff;   --superficie-2: #f4f2ee;
-    --texto: #1a1917; --texto-2: #5d5a54; --texto-3: #8a867e;
-    --borda: #e4e0d8; --borda-forte: #cfcabf;
-    --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #eef1fe;
-    --ok: #146c43; --erro: #b3261e; --aviso: #8a6100;
-    --sombra: 0 1px 2px rgba(20,18,14,.05), 0 6px 20px rgba(20,18,14,.06);
+     Superficie: quatro degraus (fundo -> cartao -> cartao interno -> realce).
+     No tema escuro, ELEVACAO E LUZ, nao sombra: sombra preta sobre fundo preto
+     nao aparece, entao cada nivel e um cinza um passo mais claro, com um fio de
+     borda. No tema claro vale o contrario — a sombra e que separa. */
+  :root {
+    --t-xl: 2.125rem; --t-lg: 1.125rem; --t-md: 1rem; --t-sm: .875rem; --t-xs: .75rem;
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 18px;
+
+    --bg: #f7f5f1;  --sup: #fff;  --sup2: #f2efe9;  --sup3: #e9e5dc;
+    --texto: #171614; --texto-2: #56534c; --texto-3: #7e7a72;
+    --borda: #e5e0d7; --borda-forte: #cdc7bb;
+    --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #e9edfd;
+    --ok: #146c43; --erro: #b3261e;
+    --pauta: rgba(23,22,20,.10);
+    --sombra: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.07);
+    --sombra-1: 0 1px 2px rgba(20,18,14,.05);
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #141517; --superficie: #1c1e21; --superficie-2: #23262a;
-      --texto: #ecebe8; --texto-2: #a8a49c; --texto-3: #7d7ا;
-      --texto-3: #7d7a73;
-      --borda: #2c2f34; --borda-forte: #3b3f45;
-      --acento: #8fa5ff; --acento-texto: #12141a; --acento-fraco: #1c2440;
-      --ok: #5fd39b; --erro: #ff9083; --aviso: #e0b062;
-      --sombra: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.28);
-    }
-  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #101114;  --sup: #191b1f;  --sup2: #212429;  --sup3: #2a2e35;
+    --texto: #f1efeb; --texto-2: #b3aea6; --texto-3: #918c84;
+    --borda: #2b2f35; --borda-forte: #3c4149;
+    --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
+    --ok: #62d69e; --erro: #ff9083;
+    --pauta: rgba(241,239,235,.13);
+    --sombra: none; --sombra-1: none;
+  } }
   :root[data-theme="dark"] {
-    --bg: #141517; --superficie: #1c1e21; --superficie-2: #23262a;
-    --texto: #ecebe8; --texto-2: #a8a49c; --texto-3: #7d7a73;
-    --borda: #2c2f34; --borda-forte: #3b3f45;
-    --acento: #8fa5ff; --acento-texto: #12141a; --acento-fraco: #1c2440;
-    --ok: #5fd39b; --erro: #ff9083; --aviso: #e0b062;
-    --sombra: 0 1px 2px rgba(0,0,0,.4), 0 6px 20px rgba(0,0,0,.28);
-  }
-  :root[data-theme="light"] {
-    --bg: #faf9f7; --superficie: #fff; --superficie-2: #f4f2ee;
-    --texto: #1a1917; --texto-2: #5d5a54; --texto-3: #8a867e;
-    --borda: #e4e0d8; --borda-forte: #cfcabf;
-    --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #eef1fe;
-    --ok: #146c43; --erro: #b3261e; --aviso: #8a6100;
-    --sombra: 0 1px 2px rgba(20,18,14,.05), 0 6px 20px rgba(20,18,14,.06);
+    --bg: #101114;  --sup: #191b1f;  --sup2: #212429;  --sup3: #2a2e35;
+    --texto: #f1efeb; --texto-2: #b3aea6; --texto-3: #918c84;
+    --borda: #2b2f35; --borda-forte: #3c4149;
+    --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
+    --ok: #62d69e; --erro: #ff9083;
+    --pauta: rgba(241,239,235,.13);
+    --sombra: none; --sombra-1: none;
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -60,227 +58,308 @@
     font: var(--t-md)/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  .pagina { max-width: 720px; margin: 0 auto; padding: var(--s7) var(--s5) 96px; }
+  .pagina { max-width: 760px; margin: 0 auto; padding: var(--s6) var(--s5) 96px; }
   :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: var(--r-sm); }
 
-  h1 { font-size: var(--t-xl); line-height: 1.15; letter-spacing: -.021em; margin: 0 0 var(--s3); }
+  h1 { font-size: var(--t-xl); line-height: 1.1; letter-spacing: -.024em; margin: 0 0 var(--s3);
+       font-weight: 680; }
   h2 { font-size: var(--t-lg); line-height: 1.3; letter-spacing: -.011em; margin: 0 0 var(--s3); }
   p  { margin: 0 0 var(--s4); }
-  .apoio { color: var(--texto-2); }
+  .apoio { color: var(--texto-2); max-width: 56ch; }
   .meta  { color: var(--texto-3); font-size: var(--t-sm); }
 
-  /* ------------------------------------------------------------ dropzone */
+  /* --------------------------------------------------------------- marca
+     A identidade e o proprio assunto: cinco linhas de pauta. Aparece na marca e,
+     bem apagada, atras do titulo — sem imagem, so gradiente repetido. */
+  header { position: relative; margin-bottom: var(--s5); }
+  header::before {
+    content: ""; position: absolute; inset: -14px -12px auto -12px; height: 122px;
+    background: repeating-linear-gradient(to bottom,
+      transparent 0 13px, var(--pauta) 13px 14px, transparent 14px 27px);
+    /* apaga em TODAS as direcoes: senao a pauta vira um punhado de rebarbas
+       atravessando a pagina de ponta a ponta, e parece defeito, nao motivo */
+    -webkit-mask-image: radial-gradient(120% 105% at 13% 6%, #000 0%,
+                        rgba(0,0,0,.42) 40%, transparent 74%);
+            mask-image: radial-gradient(120% 105% at 13% 6%, #000 0%,
+                        rgba(0,0,0,.42) 40%, transparent 74%);
+    pointer-events: none; z-index: 0;
+  }
+  header > * { position: relative; z-index: 1; }
+  .marca { display: inline-flex; align-items: center; gap: var(--s2);
+           margin-bottom: var(--s4); color: var(--texto-2);
+           font-size: var(--t-xs); font-weight: 650; letter-spacing: .09em;
+           text-transform: uppercase; }
+  .marca svg { display: block; color: var(--acento); }
+
+  /* ------------------------------------------------------------- painel  */
+  .painel { background: var(--sup); border: 1px solid var(--borda);
+            border-radius: var(--r-lg); box-shadow: var(--sombra); overflow: hidden; }
   #zona {
-    border: 2px dashed var(--borda-forte); border-radius: var(--r-lg);
-    background: var(--superficie); padding: var(--s7) var(--s5);
-    text-align: center; cursor: pointer; display: block; width: 100%;
-    font: inherit; color: inherit;
-    transition: border-color .15s ease, background .15s ease, transform .12s ease, box-shadow .15s ease;
+    border: 0; border-bottom: 1px solid var(--borda); background: transparent;
+    padding: var(--s6) var(--s5); text-align: center; cursor: pointer;
+    display: block; width: 100%; font: inherit; color: inherit;
+    transition: background .15s ease, color .15s ease;
   }
-  #zona:hover { border-color: var(--texto-3); background: var(--superficie-2); }
-  #zona.sobre {
-    border-style: solid; border-color: var(--acento); background: var(--acento-fraco);
-    transform: scale(1.006); box-shadow: var(--sombra);
+  #zona:hover { background: var(--sup2); }
+  #zona.sobre { background: var(--acento-fraco); }
+  #zona .titulo { font-size: var(--t-lg); font-weight: 640; display: block; margin-bottom: 2px; }
+  #zona .sub { color: var(--texto-3); font-size: var(--t-sm); }
+  #zona .alvo {
+    width: 44px; height: 44px; margin: 0 auto var(--s3); border-radius: 50%;
+    display: grid; place-items: center; color: var(--acento);
+    background: var(--acento-fraco); transition: transform .12s ease;
   }
-  #zona .titulo { font-size: var(--t-lg); font-weight: 620; display: block; margin-bottom: var(--s1); }
-  #zona .sub { color: var(--texto-2); font-size: var(--t-sm); }
-  #zona svg { display: block; margin: 0 auto var(--s3); color: var(--texto-3); }
-  #zona.sobre svg { color: var(--acento); }
+  #zona:hover .alvo, #zona.sobre .alvo { transform: translateY(-2px); }
   #arquivo { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
   /* ------------------------------------------------------------- opcoes  */
   .opcoes {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s5);
-    margin-top: var(--s4); font-size: var(--t-sm); color: var(--texto-2);
+    padding: var(--s3) var(--s4); background: var(--sup2);
+    font-size: var(--t-sm); color: var(--texto-2);
   }
-  .grupo { display: inline-flex; align-items: center; gap: var(--s3); }
-  .segmento { display: inline-flex; background: var(--superficie-2); border-radius: var(--r-sm); padding: 2px; }
+  .grupo { display: inline-flex; align-items: center; gap: var(--s2); }
+  .segmento { display: inline-flex; background: var(--sup3); border-radius: var(--r-sm); padding: 2px; }
   .segmento label {
-    padding: 5px var(--s3); border-radius: 6px; cursor: pointer; color: var(--texto-2);
+    padding: 4px var(--s3); border-radius: 6px; cursor: pointer; color: var(--texto-2);
     transition: background .12s ease, color .12s ease; white-space: nowrap;
   }
   .segmento input { position: absolute; opacity: 0; width: 0; height: 0; }
-  .segmento input:checked + span { color: var(--texto); font-weight: 600; }
-  .segmento label:has(input:checked) { background: var(--superficie); box-shadow: var(--sombra); }
+  .segmento input:checked + span { color: var(--texto); font-weight: 620; }
+  .segmento label:has(input:checked) { background: var(--sup); box-shadow: var(--sombra-1); }
   .segmento label:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 1px; }
   .caixa { display: inline-flex; align-items: center; gap: var(--s2); cursor: pointer; }
   .caixa input { accent-color: var(--acento); width: 16px; height: 16px; margin: 0; }
 
   /* ------------------------------------------------------------ progresso */
-  #barra { margin-top: var(--s5); display: none; }
+  #barra { margin-top: var(--s4); display: none; }
   #barra.on { display: block; }
   #barra .rotulo { display: flex; justify-content: space-between; font-size: var(--t-sm);
                    color: var(--texto-2); margin-bottom: var(--s2); gap: var(--s3); }
-  #barra .trilho { height: 6px; background: var(--superficie-2); border-radius: 99px; overflow: hidden; }
+  #barra .trilho { height: 6px; background: var(--sup3); border-radius: 99px; overflow: hidden; }
   #barra .cheio { height: 100%; width: 0%; background: var(--acento); border-radius: 99px;
                   transition: width .25s ease; }
   #barra.indeterminado .cheio { width: 35%; animation: correr 1.2s ease-in-out infinite; }
   @keyframes correr { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
 
   /* -------------------------------------------------------------- lista  */
-  #lista { margin-top: var(--s5); display: grid; gap: var(--s3); }
+  #lista { margin-top: var(--s5); display: grid; gap: var(--s4); }
   .cartao {
-    background: var(--superficie); border: 1px solid var(--borda);
-    border-radius: var(--r-md); box-shadow: var(--sombra); overflow: hidden;
+    background: var(--sup); border: 1px solid var(--borda);
+    border-radius: var(--r-lg); box-shadow: var(--sombra); overflow: hidden;
   }
-  .topo { display: flex; align-items: center; gap: var(--s4); padding: var(--s4); }
+  .topo { display: flex; align-items: center; gap: var(--s4); padding: var(--s4) var(--s5); }
   .ident { min-width: 0; flex: 1; }
-  .ident .nome { font-weight: 600; overflow-wrap: anywhere; line-height: 1.35; }
+  .ident .nome { font-weight: 640; overflow-wrap: anywhere; line-height: 1.35; }
   .ident .estado { font-size: var(--t-sm); color: var(--texto-2); margin-top: 2px; }
   .ident .estado.bom { color: var(--ok); }
   .ident .estado.ruim { color: var(--erro); }
-  .ponto {
-    width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--borda-forte);
-  }
+  .ponto { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--borda-forte); }
   .ponto.trabalhando { background: var(--acento); animation: pulsa 1s ease-in-out infinite; }
   .ponto.bom { background: var(--ok); }
   .ponto.ruim { background: var(--erro); }
   @keyframes pulsa { 50% { opacity: .35; } }
 
   .btn {
-    font: inherit; font-size: var(--t-sm); font-weight: 600; border-radius: var(--r-sm);
+    font: inherit; font-size: var(--t-sm); font-weight: 620; border-radius: var(--r-sm);
     padding: 9px var(--s4); cursor: pointer; white-space: nowrap; text-decoration: none;
     border: 1px solid transparent; flex: none;
+    transition: background .12s ease, color .12s ease, filter .12s ease;
   }
   .btn-primario { background: var(--acento); color: var(--acento-texto); }
   .btn-primario:hover { filter: brightness(1.08); }
-  .btn-secundario { background: transparent; color: var(--texto-2); border-color: var(--borda-forte); }
-  .btn-secundario:hover { background: var(--superficie-2); color: var(--texto); }
+  .btn-secundario { background: var(--sup2); color: var(--texto-2); border-color: var(--borda); }
+  .btn-secundario:hover { background: var(--sup3); color: var(--texto); }
 
   /* ------------------------------------------------------------- analise */
-  .analise { border-top: 1px solid var(--borda); }
-  .analise.aberta > .corpo { padding-top: var(--s4); }
-  .tit-analise { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
-                 text-transform: uppercase; letter-spacing: .05em;
-                 padding: var(--s4) var(--s4) 0; margin: 0; }
+  .analise { border-top: 1px solid var(--borda); background: var(--sup2); }
+  .tit-analise { font-size: var(--t-xs); font-weight: 650; color: var(--texto-3);
+                 text-transform: uppercase; letter-spacing: .09em;
+                 padding: var(--s5) var(--s5) 0; margin: 0; }
   .selo {
     display: inline-flex; align-items: baseline; gap: 3px; flex: none;
-    background: var(--superficie-2); border: 1px solid var(--borda);
+    background: var(--acento-fraco); border: 1px solid transparent;
     border-radius: var(--r-sm); padding: 4px var(--s3); line-height: 1.1;
+    color: var(--acento);
   }
   .selo .n { font-size: var(--t-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .selo .u { font-size: var(--t-xs); color: var(--texto-3); }
+  .selo .u { font-size: var(--t-xs); opacity: .75; }
   .analise > summary {
-    padding: var(--s3) var(--s4); cursor: pointer; font-size: var(--t-sm);
+    padding: var(--s3) var(--s5); cursor: pointer; font-size: var(--t-sm);
     color: var(--texto-2); list-style: none; display: flex; align-items: center; gap: var(--s2);
   }
   .analise > summary::-webkit-details-marker { display: none; }
   .analise > summary::before { content: "▸"; font-size: .7em; transition: transform .15s ease; }
   .analise[open] > summary::before { transform: rotate(90deg); }
   .analise > summary:hover { color: var(--texto); }
-  .corpo { padding: 0 var(--s4) var(--s5); display: grid; gap: var(--s5); }
 
-  .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: var(--s3); }
-  .fato { background: var(--superficie-2); border-radius: var(--r-sm); padding: var(--s3); }
+  /* Duas colunas a partir de 640px: em coluna unica a analise virava uma fita
+     sem fim, e o olho nao tinha onde parar. */
+  .corpo { padding: var(--s4) var(--s5) var(--s5); display: grid; gap: var(--s3); }
+  @media (min-width: 640px) { .corpo { grid-template-columns: 1fr 1fr; } }
+  .corpo > .larga { grid-column: 1 / -1; }
+  .bloco { background: var(--sup); border: 1px solid var(--borda);
+           border-radius: var(--r-md); padding: var(--s4); }
+  .bloco h3 { font-size: var(--t-xs); font-weight: 650; color: var(--texto-3);
+              text-transform: uppercase; letter-spacing: .07em; margin: 0 0 var(--s3); }
+
+  .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+           gap: var(--s2); margin: 0; }
+  .fato { background: var(--sup2); border-radius: var(--r-sm); padding: var(--s2) var(--s3); }
   .fato dt { font-size: var(--t-xs); color: var(--texto-3); text-transform: uppercase;
-             letter-spacing: .05em; margin-bottom: 2px; }
-  .fato dd { margin: 0; font-size: var(--t-lg); font-weight: 600; line-height: 1.2;
+             letter-spacing: .06em; margin-bottom: 1px; }
+  .fato dd { margin: 0; font-size: var(--t-lg); font-weight: 640; line-height: 1.2;
              font-variant-numeric: tabular-nums; }
   .fato dd .unid { font-size: var(--t-xs); font-weight: 400; color: var(--texto-3); }
 
-  .bloco h3 { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
-              margin: 0 0 var(--s2); }
   .fichas { display: flex; flex-wrap: wrap; gap: var(--s2); }
-  .ficha { background: var(--superficie-2); border: 1px solid var(--borda);
+  .ficha { background: var(--sup2); border: 1px solid var(--borda);
            border-radius: 99px; padding: 3px var(--s3); font-size: var(--t-sm);
            font-variant-numeric: tabular-nums; }
-  .escalas { display: grid; gap: var(--s1); font-size: var(--t-sm); margin: 0; }
-  .escalas div { display: grid; grid-template-columns: 68px 1fr auto; gap: var(--s3);
-                 align-items: baseline; padding: 3px 0; border-top: 1px solid var(--borda); }
-  .escalas div:first-child { border-top: 0; }
-  .escalas b { font-weight: 600; }
+  .escalas { display: grid; gap: 0; font-size: var(--t-sm); margin: 0; }
+  .escalas div { display: grid; grid-template-columns: 62px 1fr auto; gap: var(--s2);
+                 align-items: baseline; padding: 5px 0; border-top: 1px solid var(--borda); }
+  .escalas div:first-child { border-top: 0; padding-top: 0; }
+  .escalas b { font-weight: 650; }
   .escalas .notas-ac { color: var(--texto); font-variant-numeric: tabular-nums; }
   .escalas .esc { color: var(--texto-3); font-size: var(--t-xs); text-align: right; }
   .escalas.campo b { color: var(--texto-2); font-variant-numeric: tabular-nums; }
-  .aviso-campo { font-size: var(--t-xs); color: var(--texto-3); margin: -2px 0 var(--s2); }
+  .aviso-campo { font-size: var(--t-xs); color: var(--texto-3); margin: var(--s2) 0 0; }
+  .bloco > .aviso-campo:not(:last-child) { margin: -4px 0 var(--s3); }
   @media (max-width: 480px) {
-    .escalas div { grid-template-columns: 56px 1fr; }
+    .escalas div { grid-template-columns: 52px 1fr; }
     .escalas .esc { grid-column: 2; text-align: left; }
   }
   .dificeis { margin: 0; padding-left: 1.1em; font-size: var(--t-sm); color: var(--texto-2); }
-  .dificeis li { margin-bottom: 2px; }
+  .dificeis li { margin-bottom: 3px; }
 
   .medidor { display: flex; align-items: center; gap: var(--s3); }
-  .medidor .trilho { display: block; flex: 1; height: 8px; background: var(--superficie-2);
+  .medidor .trilho { display: block; flex: 1; height: 8px; background: var(--sup3);
                      border-radius: 99px; overflow: hidden; }
-  .medidor .cheio { display: block; height: 100%; background: var(--texto-2);
+  .medidor .cheio { display: block; height: 100%; background: var(--acento);
                     border-radius: 99px; transition: width .3s ease; }
-  .medidor .valor { font-size: var(--t-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .medidor .valor { font-size: 1.5rem; font-weight: 680; font-variant-numeric: tabular-nums;
+                    line-height: 1; }
 
+  /* -------------------------------------------------------------- player */
   .tocador { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
-  .tocador .btn { padding: 6px var(--s4); }
-  .tocador .and { display: flex; align-items: center; gap: var(--s2);
-                  font-size: var(--t-xs); color: var(--texto-3); }
-  .tocador input[type=range] { width: 120px; accent-color: var(--acento); }
-  .tocador .bpm { font-variant-numeric: tabular-nums; min-width: 3.4em; }
-  @media (max-width: 480px) { .tocador .btn { width: auto; } }
+  .transporte { display: flex; align-items: center; gap: var(--s1); }
+  .icone {
+    width: 36px; height: 36px; padding: 0; display: grid; place-items: center;
+    border-radius: 50%; border: 1px solid var(--borda); background: var(--sup2);
+    color: var(--texto-2); cursor: pointer; flex: none;
+    transition: background .12s ease, color .12s ease;
+  }
+  .icone:hover { background: var(--sup3); color: var(--texto); }
+  .icone.play { width: 42px; height: 42px; background: var(--acento);
+                border-color: transparent; color: var(--acento-texto); }
+  .icone.play:hover { filter: brightness(1.08); background: var(--acento); }
+  .icone svg { display: block; }
+  /* o atributo hidden do HTML nao vale dentro de SVG — tem de ser CSS */
+  .icone.play .ic-pause { display: none; }
+  .icone.play.rodando .ic-play { display: none; }
+  .icone.play.rodando .ic-pause { display: inline; }
+  .relogio { font-size: var(--t-xs); color: var(--texto-3);
+             font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .linha { flex: 1 1 120px; min-width: 100px; height: 20px; margin: 0;
+           -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+  .linha::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 99px; background: var(--trilho, var(--sup3)); }
+  .linha::-moz-range-track {
+    height: 6px; border-radius: 99px; background: var(--trilho, var(--sup3)); }
+  .linha::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px;
+    border-radius: 50%; background: var(--acento); border: 0; }
+  .linha::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%; background: var(--acento); border: 0; }
+  .and { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3);
+         font-size: var(--t-xs); color: var(--texto-3); }
+  .and input[type=range] { width: 108px; accent-color: var(--acento); }
+  .and .bpm { font-variant-numeric: tabular-nums; min-width: 4.4em; }
 
   .previa img { width: 100%; border: 1px solid var(--borda); border-radius: var(--r-sm);
                 background: #fff; display: block; }
+  .previa { padding: 0 var(--s5) var(--s5); }
 
   /* --------------------------------------------------------------- fim   */
-  .glossario { margin-top: var(--s6); border: 1px solid var(--borda);
-               border-radius: var(--r-md); background: var(--superficie); }
+  .glossario { margin-top: var(--s3); border: 1px solid var(--borda);
+               border-radius: var(--r-md); background: var(--sup); }
+  .glossario:first-of-type { margin-top: var(--s6); }
   .glossario > summary {
     padding: var(--s3) var(--s4); cursor: pointer; font-size: var(--t-sm);
-    font-weight: 600; color: var(--texto-2); list-style: none;
+    font-weight: 620; color: var(--texto-2); list-style: none;
     display: flex; align-items: center; gap: var(--s2);
   }
   .glossario > summary::-webkit-details-marker { display: none; }
   .glossario > summary::before { content: "▸"; font-size: .7em; transition: transform .15s ease; }
   .glossario[open] > summary::before { transform: rotate(90deg); }
   .glossario > summary:hover { color: var(--texto); }
-  .termos { margin: 0; padding: 0 var(--s4) var(--s5); font-size: var(--t-sm); }
-  .termos dt { font-weight: 600; margin-top: var(--s4); }
+  .glossario > p { padding: 0 var(--s4); font-size: var(--t-sm); color: var(--texto-2); }
+  .termos { margin: 0; padding: 0 var(--s4) var(--s4); font-size: var(--t-sm); }
+  .termos dt { font-weight: 640; margin-top: var(--s3); }
   .termos dt:first-child { margin-top: 0; }
   .termos dd { margin: 2px 0 0; color: var(--texto-2); }
-
   .nota-rodape { margin-top: var(--s6); color: var(--texto-3); font-size: var(--t-sm); }
-  footer { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--borda);
+  footer { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--borda);
            color: var(--texto-3); font-size: var(--t-sm); }
   footer a { color: var(--acento); }
   @media (max-width: 560px) {
     .pagina { padding: var(--s5) var(--s4) 72px; }
-    :root { --t-xl: 1.625rem; }
-    .topo { flex-wrap: wrap; }
-    .btn { width: 100%; text-align: center; }
+    :root { --t-xl: 1.75rem; }
+    .topo { flex-wrap: wrap; padding: var(--s4); }
+    .topo .btn { width: 100%; text-align: center; }
+    .corpo, .tit-analise, .previa { padding-left: var(--s4); padding-right: var(--s4); }
   }
 </style>
 </head>
 <body>
 <div class="pagina">
   <header>
-    <h1>Anotar partitura</h1>
+    <span class="marca">
+      <svg width="26" height="19" viewBox="0 0 26 19" aria-hidden="true">
+        <g stroke="currentColor" stroke-width="1" opacity=".5" fill="none">
+          <path d="M0 2.5h26M0 6.5h26M0 10.5h26M0 14.5h26M0 18.5h26"/>
+        </g>
+        <ellipse cx="8" cy="12.5" rx="4.1" ry="3" fill="currentColor" transform="rotate(-18 8 12.5)"/>
+        <path d="M11.9 12V3" stroke="currentColor" stroke-width="1.5" fill="none"/>
+      </svg>
+      Anotar partitura
+    </span>
+    <h1>O nome de cada nota, no seu próprio PDF</h1>
     <p class="apoio">
-      Baixe <strong>o mesmo PDF</strong> com o nome de cada nota embaixo da pauta, mais a
-      análise da música e a dificuldade no sax alto. Roda no seu navegador — o arquivo não
-      sai do seu aparelho.
+      Volta o <strong>mesmo arquivo</strong> com o nome embaixo da pauta — mais a análise da
+      música, a melodia tocada ao piano e a dificuldade no sax alto. Tudo roda no navegador:
+      o PDF não sai do seu aparelho.
     </p>
   </header>
 
-  <button type="button" id="zona" aria-describedby="dica-formatos">
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/>
-    </svg>
-    <span class="titulo">Arraste os PDFs aqui</span>
-    <span class="sub">ou toque para escolher — vários de uma vez</span>
-  </button>
-  <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple tabindex="-1" aria-hidden="true">
+  <section class="painel">
+    <button type="button" id="zona" aria-describedby="dica-formatos">
+      <span class="alvo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/>
+        </svg>
+      </span>
+      <span class="titulo">Arraste os PDFs aqui</span>
+      <span class="sub">ou toque para escolher — vários de uma vez</span>
+    </button>
+    <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple tabindex="-1" aria-hidden="true">
 
-  <div class="opcoes">
-    <div class="grupo">
-      <span id="rot-nomes">Nomes</span>
-      <div class="segmento" role="radiogroup" aria-labelledby="rot-nomes">
-        <label><input type="radio" name="sistema" value="letras" checked><span>C D E</span></label>
-        <label><input type="radio" name="sistema" value="dore"><span>Dó Ré Mi</span></label>
+    <div class="opcoes">
+      <div class="grupo">
+        <span id="rot-nomes">Nomes</span>
+        <div class="segmento" role="radiogroup" aria-labelledby="rot-nomes">
+          <label><input type="radio" name="sistema" value="letras" checked><span>C D E</span></label>
+          <label><input type="radio" name="sistema" value="dore"><span>Dó Ré Mi</span></label>
+        </div>
       </div>
+      <label class="caixa">
+        <input type="checkbox" id="limpar">
+        <span>Apagar nomes antigos</span>
+      </label>
     </div>
-    <label class="caixa">
-      <input type="checkbox" id="limpar">
-      <span>Apagar nomes antigos</span>
-    </label>
-  </div>
+  </section>
 
   <div id="barra" role="status" aria-live="polite">
     <div class="rotulo"><span id="barra-txt"></span><span id="barra-num" class="meta"></span></div>
@@ -404,7 +483,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=11";
+    const v = "?v=13";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
@@ -495,50 +574,143 @@ function tocarNota(midi, quando, segundos) {
   m.start(quando);
 }
 
+function cortarSaida() {
+  // Derruba a saida e poe outra no lugar: o que ja estava agendado continua rodando,
+  // mas desligado do alto-falante. E o unico jeito de calar na hora — Web Audio nao
+  // deixa "desagendar" nota. Os osciladores morrem sozinhos no stop() deles.
+  if (!saidaAudio) return;
+  saidaAudio.disconnect();
+  saidaAudio = ctxAudio.createGain();
+  saidaAudio.connect(ctxAudio.destination);
+}
+
 function montarTocador(melodia) {
   const b = document.createElement("div");
-  b.className = "bloco";
+  b.className = "bloco larga";
+  const ico = (d, extra = "") => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+      aria-hidden="true">${d}</svg>${extra}`;
   b.innerHTML = `<h3>Ouvir a melodia</h3>
     <div class="tocador">
-      <button type="button" class="btn btn-secundario tocar">▶ Tocar</button>
-      <label class="and">Andamento
-        <input type="range" min="40" max="180" step="2" value="92">
-        <span class="bpm">92</span></label>
+      <div class="transporte">
+        <button type="button" class="icone atras" aria-label="Voltar 5 segundos">
+          ${ico('<polygon points="11 19 2 12 11 5 11 19" fill="currentColor"/><line x1="20" y1="5" x2="20" y2="19"/>')}
+        </button>
+        <button type="button" class="icone play" aria-label="Tocar">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+            <polygon class="ic-play" points="7 4 20 12 7 20" fill="currentColor"/>
+            <g class="ic-pause" fill="currentColor"><rect x="7" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></g>
+          </svg>
+        </button>
+        <button type="button" class="icone frente" aria-label="Avançar 5 segundos">
+          ${ico('<polygon points="13 19 22 12 13 5 13 19" fill="currentColor"/><line x1="4" y1="5" x2="4" y2="19"/>')}
+        </button>
+      </div>
+      <span class="relogio agora">0:00</span>
+      <input type="range" class="linha" min="0" step="0.01" value="0" aria-label="Posição na música">
+      <span class="relogio fim">0:00</span>
     </div>
-    <p class="aviso-campo">Piano sintetizado, nas notas escritas (não no som real do sax).</p>`;
-  const bt = b.querySelector(".tocar"), faixa = b.querySelector("input"), bpm = b.querySelector(".bpm");
-  faixa.oninput = () => { bpm.textContent = faixa.value; };
+    <label class="and">Andamento
+      <input type="range" class="bpm-faixa" min="40" max="180" step="2" value="92">
+      <span class="bpm">92 BPM</span></label>
+    <p class="aviso-campo">Piano sintetizado, nas notas escritas — não é o som do sax.</p>`;
 
-  let relogio = null, i = 0, t0 = 0;
-  const parar = () => {
+  const bt = b.querySelector(".play"), linha = b.querySelector(".linha"),
+        faixaBpm = b.querySelector(".bpm-faixa"), rotBpm = b.querySelector(".bpm"),
+        relAgora = b.querySelector(".agora"), relFim = b.querySelector(".fim");
+  const total = Math.max(melodia.total, melodia.notas[melodia.notas.length - 1].t + 1);
+  linha.max = total;
+
+  // A posicao e guardada em TEMPOS, nao em segundos: mudar o andamento no meio nao
+  // pode fazer o cursor pular de lugar na musica.
+  let pos = 0, tocando = false, arrastando = false, relogio = null, i = 0, ancora = 0;
+  const seg = () => 60 / Number(faixaBpm.value);
+  const mmss = (s) => (s = Math.max(0, s),
+    `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`);
+
+  function pintar() {
+    if (!arrastando) linha.value = pos;
+    const pct = 100 * pos / total;
+    linha.style.setProperty("--trilho",
+      `linear-gradient(to right, var(--acento) ${pct}%, var(--sup3) ${pct}%)`);
+    relAgora.textContent = mmss(pos * seg());
+    relFim.textContent = mmss(total * seg());
+  }
+
+  function ancorar() {            // recalcula o zero do relogio para a posicao atual
+    const c = audio();
+    ancora = c.currentTime + 0.08 - pos * seg();
+    i = melodia.notas.findIndex(n => n.t >= pos - 1e-6);
+    if (i < 0) i = melodia.notas.length;
+  }
+
+  function passo() {
+    if (arrastando) return;
+    const c = ctxAudio, s = seg();
+    while (i < melodia.notas.length && ancora + melodia.notas[i].t * s < c.currentTime + 0.2) {
+      const n = melodia.notas[i++];
+      tocarNota(n.midi, Math.max(c.currentTime, ancora + n.t * s), n.d * s);
+    }
+    pos = Math.min(total, Math.max(0, (c.currentTime - ancora) / s));
+    if (pos >= total) { parar(); pos = 0; }
+    pintar();
+  }
+
+  const icone = (parado) => {
+    bt.classList.toggle("rodando", !parado);
+    bt.setAttribute("aria-label", parado ? "Tocar" : "Pausar");
+  };
+
+  function parar() {
     clearInterval(relogio);
     relogio = null;
-    if (saidaAudio) {          // corta a saida: o que ja estava agendado morre mudo
-      saidaAudio.disconnect();
-      saidaAudio = ctxAudio.createGain();
-      saidaAudio.connect(ctxAudio.destination);
-    }
-    bt.textContent = "▶ Tocar";
-  };
-  bt.onclick = () => {
-    if (relogio) return parar();
+    tocando = false;
+    cortarSaida();
+    icone(true);
+  }
+
+  function tocar() {
     const c = audio();
     c.resume();
-    const seg = 60 / Number(faixa.value);
-    i = 0;
-    t0 = c.currentTime + 0.15 - melodia.notas[0].t * seg;
-    bt.textContent = "■ Parar";
-    relogio = setInterval(() => {
-      // agenda so o que vai soar nos proximos 200 ms: parar fica instantaneo e o
-      // navegador nao precisa segurar mil nos de audio ao mesmo tempo
-      while (i < melodia.notas.length && t0 + melodia.notas[i].t * seg < c.currentTime + 0.2) {
-        const n = melodia.notas[i++];
-        tocarNota(n.midi, Math.max(c.currentTime, t0 + n.t * seg), n.d * seg);
-      }
-      if (i >= melodia.notas.length
-          && c.currentTime > t0 + melodia.total * seg + 0.5) parar();
-    }, 25);
+    if (pos >= total - 0.01) pos = 0;
+    tocando = true;
+    ancorar();
+    icone(false);
+    clearInterval(relogio);
+    relogio = setInterval(passo, 25);
+  }
+
+  function buscar(novo) {
+    pos = Math.min(total, Math.max(0, novo));
+    if (tocando) { cortarSaida(); ancorar(); }
+    pintar();
+  }
+
+  bt.onclick = () => (tocando ? parar() : tocar());
+  b.querySelector(".atras").onclick = () => buscar(pos - 5 / seg());
+  b.querySelector(".frente").onclick = () => buscar(pos + 5 / seg());
+
+  linha.addEventListener("pointerdown", () => { arrastando = true; cortarSaida(); });
+  linha.addEventListener("input", () => {
+    pos = Number(linha.value);
+    pintar();
+    if (!arrastando && tocando) ancorar();     // seta do teclado: sem pointerdown
+  });
+  const soltar = () => {
+    if (!arrastando) return;
+    arrastando = false;
+    if (tocando) ancorar();
   };
+  linha.addEventListener("pointerup", soltar);
+  linha.addEventListener("pointercancel", soltar);
+
+  faixaBpm.addEventListener("input", () => {
+    rotBpm.textContent = faixaBpm.value + " BPM";
+    if (tocando) { cortarSaida(); ancorar(); }
+    pintar();
+  });
+
+  pintar();
   return b;
 }
 
@@ -549,7 +721,7 @@ function montarAnalise(info, dificuldade) {
   const corpo = d.querySelector(".corpo");
 
   const fatos = document.createElement("dl");
-  fatos.className = "fatos";
+  fatos.className = "fatos larga";
   const DICAS = {
     "Tom": `A "casa" da música, vinda da armadura. Relativa: ${info.tom_relativo}.`,
     "Âmbito": "Nota mais grave e mais aguda, em altura escrita.",
@@ -581,6 +753,7 @@ function montarAnalise(info, dificuldade) {
     }
     fatos.append(w);
   }
+  corpo.append(fatos);
   if (info.melodia?.notas?.length) corpo.append(montarTocador(info.melodia));
 
   if (dificuldade != null) {
@@ -594,29 +767,33 @@ function montarAnalise(info, dificuldade) {
     b.querySelector(".cheio").style.width = (10 * dificuldade) + "%";
     corpo.append(b);
   }
-  corpo.append(fatos);
 
+  if (info.mais_tocadas?.length) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Notas mais tocadas</h3><div class="fichas"></div>`;
+    info.mais_tocadas.forEach(([n, q]) => b.querySelector(".fichas").append(ficha(`${n} · ${q}×`)));
+    corpo.append(b);
+  }
+
+  // Cifra lida e formacao do acorde sao o mesmo assunto: um cartao so, as fichas
+  // para bater o olho e a lista logo abaixo para ver de que notas cada uma e feita.
   if (info.cifras?.length) {
     const b = document.createElement("div");
     b.className = "bloco";
-    b.innerHTML = `<h3>Cifras encontradas</h3><div class="fichas"></div>`;
+    b.innerHTML = `<h3>Acordes da música</h3><div class="fichas"></div>
+      <p class="aviso-campo">Lidos do PDF. Cada linha: as notas do acorde e a escala que cabe.</p>
+      <div class="escalas"></div>`;
     info.cifras.forEach(c => b.querySelector(".fichas").append(ficha(c)));
-    corpo.append(b);
-
-    if (info.escalas?.length) {
-      const e = document.createElement("div");
-      e.className = "bloco";
-      e.innerHTML = `<h3>Como cada acorde é formado</h3><div class="escalas"></div>`;
-      for (const it of info.escalas) {
-        const l = document.createElement("div");
-        l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
-        l.querySelector("b").textContent = it.cifra;
-        l.querySelector(".notas-ac").textContent = (it.notas || []).join(" ");
-        l.querySelector(".esc").textContent = it.escala;
-        e.querySelector(".escalas").append(l);
-      }
-      corpo.append(e);
+    for (const it of info.escalas || []) {
+      const l = document.createElement("div");
+      l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
+      l.querySelector("b").textContent = it.cifra;
+      l.querySelector(".notas-ac").textContent = (it.notas || []).join(" ");
+      l.querySelector(".esc").textContent = it.escala;
+      b.querySelector(".escalas").append(l);
     }
+    corpo.append(b);
   }
 
   if (info.campo?.length) {
@@ -627,9 +804,8 @@ function montarAnalise(info, dificuldade) {
       <p class="aviso-campo"></p><div class="escalas campo"></div>`;
     b.querySelector("h3").textContent = `Campo harmônico de ${info.tom}`;
     b.querySelector(".aviso-campo").textContent = semCifra
-      ? "A partitura não traz cifra. Estes são os acordes que cabem neste tom — a base "
-        + "provável da harmonia, não a harmonia lida."
-      : "Os acordes que o tom comporta, para comparar com as cifras acima.";
+      ? "Sem cifra no PDF. Estes são os acordes que cabem no tom — base provável, não lida."
+      : "Os acordes que o tom comporta, para comparar com os de cima.";
     for (const g of info.campo) {
       const l = document.createElement("div");
       l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
@@ -641,17 +817,9 @@ function montarAnalise(info, dificuldade) {
     corpo.append(b);
   }
 
-  if (info.mais_tocadas?.length) {
-    const b = document.createElement("div");
-    b.className = "bloco";
-    b.innerHTML = `<h3>Notas mais tocadas</h3><div class="fichas"></div>`;
-    info.mais_tocadas.forEach(([n, q]) => b.querySelector(".fichas").append(ficha(`${n} · ${q}×`)));
-    corpo.append(b);
-  }
-
   if (info.dificeis?.length) {
     const b = document.createElement("div");
-    b.className = "bloco";
+    b.className = "bloco larga";
     b.innerHTML = `<h3>Onde a música pesa</h3><ul class="dificeis"></ul>`;
     for (const t of info.dificeis) {
       const li = document.createElement("li");
