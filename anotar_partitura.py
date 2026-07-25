@@ -571,6 +571,43 @@ def _niveis(hs, beams, bandeiras, esp):
 
 
 GRACA = 0.85            # cabeca menor que isso x a mediana e apojatura (nao ocupa tempo)
+LIG_ALT = 2.2           # altura maxima do arco de ligadura, em espacos de pauta
+LIG_LARG = (0.55, 18.0) # largura minima e maxima do arco
+
+
+def ligaduras_de(caminhos, notas, esp, pausas=()):
+    """{indice da nota que so continua o som: indice da nota que comeca o som}.
+
+    Ligadura de VALOR e um arco entre duas cabecas VIZINHAS e de MESMA altura. Com
+    alturas diferentes o arco e fraseado (slur) e nao muda nome nenhum. Exigir que
+    sejam vizinhas e o que separa a ligadura de um fraseado longo que por acaso
+    comeca e termina na mesma nota — sem isso, "G ... G" com meio compasso no meio
+    viraria uma nota so.
+    """
+    if len(notas) < 2:
+        return {}
+    arcos = [c for c in caminhos
+             if 2 <= c["curvas"] <= 4 and c["h"] <= LIG_ALT * esp
+             and LIG_LARG[0] * esp <= c["w"] <= LIG_LARG[1] * esp]
+
+    def ponta(x, c):
+        cand = [(k, n[0]) for k, n in enumerate(notas)
+                if abs(n[0]["x"] - x) < 1.5 * esp
+                and min(abs(n[0]["y"] - c["y0"]), abs(n[0]["y"] - c["y1"])) < 1.7 * esp]
+        return min(cand, key=lambda kn: abs(kn[1]["x"] - x))[0] if cand else None
+
+    out = {}
+    for c in arcos:
+        i, j = ponta(c["x0"], c), ponta(c["x1"], c)
+        if i is None or j is None or j != i + 1:
+            continue
+        if notas[i][2] != notas[j][2] or notas[i][3] != notas[j][3]:
+            continue                       # alturas diferentes -> e fraseado
+        xi, xj = notas[i][0]["x"], notas[j][0]["x"]
+        if any(xi < p["x"] < xj for p in pausas):
+            continue                       # tem pausa no meio: o som nao continua
+        out[j] = i
+    return out
 
 
 def _e_ritornello(p, pontos, barras, esp):
@@ -732,6 +769,21 @@ def ler_notas(pg, sistema, com_pausas=False):
                 alt = alt_armadura.get(letra, '')
             notas.append((h, nome(idx, alt, sistema), idx, alt, i_barra))
 
+        # ---- ligadura de valor: a segunda cabeca nao ganha nome, e a primeira
+        # recebe "_" e a duracao das duas somadas. Sem isso, uma nota so segurada
+        # sai como tres ataques ("G G G") e ensina errado.
+        lig = ligaduras_de([c for c in caminhos
+                            if topo - 3 * span < (c["y0"] + c["y1"]) / 2 < base_l + 3 * span],
+                           notas, span / 4.0, descansos)
+        segura = set(lig)
+        somado = {}
+        for j in sorted(lig):
+            raiz = lig[j]
+            while raiz in lig:
+                raiz = lig[raiz]
+            somado[raiz] = (somado.get(raiz, dur_de[id(notas[raiz][0])][0])
+                            + dur_de[id(notas[j][0])][0])
+
         # ---- linha de base dos rotulos: logo abaixo da tinta DESTE sistema.
         # So conta tinta abaixo da ultima linha da pauta, e ignora nomes de nota
         # ja escritos (senao a anotacao antiga do sistema de baixo empurra tudo).
@@ -767,11 +819,18 @@ def ler_notas(pg, sistema, com_pausas=False):
                                "sistema": sidx, "compasso": i_barra})
 
         for ordem, (h, txt, idx, alt, cmp_) in enumerate(notas):
+            d, gr = dur_de.get(id(h), (1, False))
+            total = somado.get(ordem, d)
+            # A cabeca que so CONTINUA o som fica no relatorio (o compasso precisa da
+            # duracao dela) mas com texto vazio: nao e estampada.
+            preso = ordem in segura
+            marca = "_" if (not gr and (ordem in somado or total >= 2)) else ""
             rotulos.append({"x": (h["x0"] + h["x1"]) / 2, "y_base": y_base,
-                            "y_nota": h["y"], "texto": txt, "corpo": corpo, "ordem": ordem,
+                            "y_nota": h["y"], "corpo": corpo, "ordem": ordem,
+                            "texto": "" if preso else txt + marca,
+                            "nome": txt, "ligada": preso, "dur_total": total,
                             "idx": idx, "alt": alt, "midi": midi_de(idx, alt),
-                            "dur": dur_de.get(id(h), (1, False))[0],
-                            "graca": dur_de.get(id(h), (1, False))[1],
+                            "dur": d, "graca": gr,
                             "sistema": sidx, "compasso": cmp_,
                             "armadura": (len(alt_armadura)
                                          * (1 if '#' in alt_armadura.values() else -1)
@@ -798,15 +857,21 @@ def escrever(pg, rotulos, cor):
     """Estampa os rotulos, empurrando para uma 2a fileira quando colidem."""
     FONTE = "helv"
     por_linha = {}
-    for r in sorted(rotulos, key=lambda r: (r["y_base"], r["x"])):
-        larg = fitz.get_text_length(r["texto"], fontname=FONTE, fontsize=r["corpo"])
+    for r in sorted((r for r in rotulos if r["texto"]),
+                    key=lambda r: (r["y_base"], r["x"])):
+        # O "_" de nota segurada corre PARA A DIREITA, sobre o espaco da cabeca que
+        # nao recebeu nome. Se ele entrasse na largura, o nome sairia descentrado da
+        # nota e ainda empurraria o rotulo para a segunda fileira sem necessidade.
+        base = r["texto"].rstrip("_")
+        cauda = r["texto"][len(base):]
+        larg = fitz.get_text_length(base, fontname=FONTE, fontsize=r["corpo"])
         x0 = r["x"] - larg / 2
         fila, ocupado = 0, por_linha.setdefault(r["y_base"], {})
         while ocupado.get(fila, -1e9) > x0 - 0.08 * r["corpo"]:
             fila += 1
         ocupado[fila] = x0 + larg
         pg.insert_text((x0, r["y_base"] + fila * r["corpo"] * 1.05),
-                       r["texto"], fontname=FONTE, fontsize=r["corpo"], color=cor)
+                       base + cauda, fontname=FONTE, fontsize=r["corpo"], color=cor)
 
 
 def melodia(dados, limite=3000):
@@ -822,7 +887,12 @@ def melodia(dados, limite=3000):
     for pg in doc:
         rot, _, pausas = ler_notas(pg, "letras", com_pausas=True)
         itens = [{"x": r["x"], "s": r["sistema"], "midi": r["midi"],
-                  "d": 0.125 if r["graca"] else r["dur"]} for r in rot]
+                  "d": 0.125 if r["graca"] else r["dur_total"]}
+                 for r in rot if not r["ligada"]]
+        # a cabeca presa por ligadura nao e um ataque novo, mas o tempo dela tem de
+        # passar: entra como "pausa" de duracao propria
+        itens += [{"x": r["x"], "s": r["sistema"], "midi": None, "d": 0}
+                  for r in rot if r["ligada"]]
         itens += [{"x": p["x"], "s": p["sistema"], "midi": None, "d": p["dur"]}
                   for p in pausas]
         itens.sort(key=lambda i: (i["s"], i["x"]))
