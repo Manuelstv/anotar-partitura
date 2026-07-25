@@ -280,7 +280,7 @@
   <div id="lista"></div>
 
   <details class="glossario">
-    <summary>O que cada número quer dizer</summary>
+    <summary>Teoria e análise musical</summary>
     <dl class="termos">
       <dt>Tom</dt>
       <dd>A "casa" da música, dada pela armadura. Maior soa mais aberto; menor, mais
@@ -359,7 +359,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=8";
+    const v = "?v=9";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
