@@ -230,8 +230,6 @@
     .escalas div { grid-template-columns: 52px 1fr; }
     .escalas .esc { grid-column: 2; text-align: left; }
   }
-  .dificeis { margin: 0; padding-left: 1.1em; font-size: var(--t-sm); color: var(--texto-2); }
-  .dificeis li { margin-bottom: 3px; }
 
   .medidor { display: flex; align-items: center; gap: var(--s3); }
   .medidor .trilho { display: block; flex: 1; height: 8px; background: var(--sup3);
@@ -280,6 +278,33 @@
   .previa img { width: 100%; border: 1px solid var(--borda); border-radius: var(--r-sm);
                 background: #fff; display: block; }
   .previa { padding: 0 var(--s5) var(--s5); }
+
+  /* ---------------------------------------------------------------- dicas
+     Um balao so, position:fixed e preso no body. Dentro do cartao ele seria
+     cortado pelo overflow:hidden, e mexer no z-index nao resolveria isso. */
+  .tem-dica { cursor: help; }
+  .bloco h3.tem-dica, .tem-dica dt {
+    text-decoration: underline dotted; text-decoration-color: var(--borda-forte);
+    text-underline-offset: 3px;
+  }
+  .bloco h3.tem-dica:hover, .tem-dica:hover dt { text-decoration-color: var(--texto-3); }
+  .dica {
+    position: fixed; z-index: 90; left: 0; top: 0;
+    max-width: min(330px, calc(100vw - 24px));
+    background: var(--sup3); color: var(--texto);
+    border: 1px solid var(--borda-forte); border-radius: var(--r-md);
+    padding: var(--s3) var(--s4); font-size: var(--t-sm); line-height: 1.45;
+    box-shadow: 0 8px 28px rgba(0,0,0,.22);
+    opacity: 0; visibility: hidden; transform: translateY(3px);
+    transition: opacity .12s ease, transform .12s ease, visibility .12s;
+    pointer-events: none;
+  }
+  .dica.on { opacity: 1; visibility: visible; transform: none; }
+  .dica p { margin: 0 0 var(--s2); }
+  .dica p:last-child, .dica ul:last-child { margin-bottom: 0; }
+  .dica ul { margin: 0 0 var(--s2); padding-left: 1.05em; }
+  .dica li { margin-bottom: 2px; }
+  .dica b { font-weight: 650; }
 
   /* --------------------------------------------------------------- fim   */
   .glossario { margin-top: var(--s3); border: 1px solid var(--borda);
@@ -369,90 +394,6 @@
 
   <div id="lista"></div>
 
-  <details class="glossario">
-    <summary>Teoria e análise musical</summary>
-    <dl class="termos">
-      <dt>Tom</dt>
-      <dd>A armadura diz em que tom a música está. Maior costuma soar mais aberto e menor
-        mais fechado, e as duas compartilham a mesma armadura.</dd>
-
-      <dt>Âmbito</dt>
-      <dd>Da nota mais grave até a mais aguda, sempre na altura escrita, que no sax alto
-        é diferente da que sai.</dd>
-
-      <dt>Extensão</dt>
-      <dd>A distância entre essas duas notas, contada em semitons. Doze semitons dão
-        uma oitava.</dd>
-
-      <dt>Notas</dt>
-      <dd>Quantas notas o PDF tem ao todo.</dd>
-
-      <dt>Compassos</dt>
-      <dd>Trechos entre uma barra vertical e a seguinte.</dd>
-
-      <dt>Alteradas</dt>
-      <dd>Quanto da música tem sustenido, bemol ou bequadro. Quanto maior essa fatia,
-        mais cromática a peça, e cromatismo dá trabalho no dedilhado.</dd>
-
-      <dt>Dificuldade</dt>
-      <dd>Uma nota de 0 a 10 para sax alto. A seção seguinte explica como ela sai.</dd>
-
-      <dt>Cifras</dt>
-      <dd>Os acordes que o arranjador escreveu acima da pauta, lidos direto do
-        arquivo.</dd>
-
-      <dt>Como cada acorde é formado</dt>
-      <dd>Que notas formam o acorde e qual escala cabe por cima dele. No <b>G7</b>, por
-        exemplo, são G B D F, com escala mixolídia.</dd>
-
-      <dt>Campo harmônico</dt>
-      <dd>Os sete acordes que nascem do tom, empilhando terças sobre a escala. Eles
-        formam o repertório que combina com a música, mesmo que ela não toque todos. Se a
-        partitura vier sem cifra, é daqui que você parte para harmonizar ou improvisar.</dd>
-
-      <dt>Notas mais tocadas</dt>
-      <dd>As que mais aparecem na música. Costumam ser bons pontos de apoio para começar
-        e terminar frases.</dd>
-
-      <dt>Onde a música pesa</dt>
-      <dd>Os trechos mais difíceis, com o motivo de cada um: salto grande, agudo de
-        palma, grave de mindinho, acúmulo de alteradas.</dd>
-    </dl>
-  </details>
-
-  <details class="glossario">
-    <summary>Como a dificuldade é medida</summary>
-    <p>Cada partitura vira seis medidas. Cada medida tem um peso, e a soma delas dá a
-      nota de 0 a 10.</p>
-    <dl class="termos">
-      <dt>Notas diferentes</dt>
-      <dd>Quantas alturas distintas a música usa. É o fator de maior peso, porque cada
-        altura nova é mais um dedilhado para acertar.</dd>
-
-      <dt>Alteradas</dt>
-      <dd>Quanto da música é cromática. Sustenido e bemol costumam pedir dedilhado
-        auxiliar.</dd>
-
-      <dt>Extensão</dt>
-      <dd>Distância da nota mais grave à mais aguda.</dd>
-
-      <dt>Agudo</dt>
-      <dd>A parte da música acima do dó agudo, onde entra a chave de palma.</dd>
-
-      <dt>Altíssimo</dt>
-      <dd>O que passa do registro normal do sax, lá no sobreagudo.</dd>
-
-      <dt>Quebras de registro</dt>
-      <dd>Quantas vezes a melodia atravessa a virada de oitava do sax, onde muda a mão toda.</dd>
-    </dl>
-    <p>Os pesos vieram de um ajuste sobre <b>572 partituras</b> que já estavam marcadas
-      como iniciante, intermediário ou avançado. Todos ficaram positivos de propósito, para
-      que nenhum fator possa deixar a peça mais fácil.</p>
-    <p>Testando fora da amostra, a nota acerta a ordem <b>iniciante &lt; intermediário &lt;
-      avançado</b> em <b>92%</b> das músicas que aparecem nos três níveis. Vale como
-      comparação entre peças. O <b>ritmo</b> ainda não entra na conta.</p>
-  </details>
-
   <p class="nota-rodape" id="dica-formatos">
     Funciona com partitura feita no computador, tipo MuseScore, Dorico, Sibelius ou
     Finale. Partitura escaneada não funciona, porque numa imagem não existe coordenada
@@ -473,6 +414,59 @@ const barra = $("#barra"), barraTxt = $("#barra-txt"), barraNum = $("#barra-num"
       barraCheio = $("#barra-cheio");
 const MAX_MB = 40;
 
+// ---------------------------------------------------------------- dicas
+// Balao unico reaproveitado. Aparece no hover, no foco pelo teclado e no toque;
+// some com Esc, ao rolar a pagina e ao tocar em qualquer outro lugar.
+const DICA = document.createElement("div");
+DICA.className = "dica";
+DICA.id = "dica";
+DICA.setAttribute("role", "tooltip");
+document.body.append(DICA);
+let alvoDica = null, ultimoPonteiro = "mouse";
+const trecho = (html) => document.createRange().createContextualFragment(html);
+
+function mostrarDica(el) {
+  if (!el._dica) return;
+  DICA.replaceChildren(el._dica.cloneNode(true));
+  DICA.classList.add("on");
+  const a = el.getBoundingClientRect(), d = DICA.getBoundingClientRect();
+  const x = Math.max(8, Math.min(a.left + a.width / 2 - d.width / 2, innerWidth - d.width - 8));
+  const acima = a.top - d.height - 8;
+  DICA.style.left = x + "px";
+  DICA.style.top = (acima >= 8 ? acima : a.bottom + 8) + "px";
+  el.setAttribute("aria-describedby", "dica");
+  alvoDica = el;
+}
+
+function esconderDica() {
+  DICA.classList.remove("on");
+  alvoDica?.removeAttribute("aria-describedby");
+  alvoDica = null;
+}
+
+function comDica(el, conteudo) {
+  if (!el) return el;
+  el._dica = typeof conteudo === "string" ? document.createTextNode(conteudo) : conteudo;
+  el.classList.add("tem-dica");
+  if (el.tabIndex < 0) el.tabIndex = 0;
+  el.addEventListener("pointerenter", (e) => e.pointerType === "mouse" && mostrarDica(el));
+  el.addEventListener("pointerleave", (e) => e.pointerType === "mouse" && esconderDica());
+  el.addEventListener("focus", () => mostrarDica(el));
+  el.addEventListener("blur", esconderDica);
+  el.addEventListener("click", () => {
+    if (ultimoPonteiro === "mouse") return;      // no mouse o hover ja resolveu
+    alvoDica === el ? esconderDica() : mostrarDica(el);
+  });
+  return el;
+}
+addEventListener("pointerdown", (e) => {
+  ultimoPonteiro = e.pointerType || "mouse";
+  if (alvoDica && !alvoDica.contains(e.target)) esconderDica();
+}, true);
+addEventListener("keydown", (e) => e.key === "Escape" && esconderDica());
+addEventListener("scroll", esconderDica, true);
+addEventListener("resize", esconderDica);
+
 function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true }) {
   barra.classList.toggle("on", on);
   barra.classList.toggle("indeterminado", indet);
@@ -490,7 +484,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=14";
+    const v = "?v=16";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
@@ -619,8 +613,9 @@ function montarTocador(melodia) {
     </div>
     <label class="and">Andamento
       <input type="range" class="bpm-faixa" min="40" max="180" step="2" value="92">
-      <span class="bpm">92 BPM</span></label>
-    <p class="aviso-campo">Piano sintetizado, tocando as notas como estão escritas.</p>`;
+      <span class="bpm">92 BPM</span></label>`;
+  comDica(b.querySelector("h3"), "Piano sintetizado tocando as notas como estão escritas, "
+    + "então não é o timbre do sax. Arraste a linha para pular para outro trecho.");
 
   const bt = b.querySelector(".play"), linha = b.querySelector(".linha"),
         faixaBpm = b.querySelector(".bpm-faixa"), rotBpm = b.querySelector(".bpm"),
@@ -730,12 +725,15 @@ function montarAnalise(info, dificuldade) {
   const fatos = document.createElement("dl");
   fatos.className = "fatos larga";
   const DICAS = {
-    "Tom": `Vem da armadura. A relativa é ${info.tom_relativo}.`,
-    "Âmbito": "Nota mais grave e mais aguda, em altura escrita.",
-    "Extensão": "Distância entre elas em semitons. Doze é uma oitava.",
-    "Notas": "Total de cabeças de nota no PDF.",
+    "Tom": `A armadura diz em que tom a música está. Maior costuma soar mais aberto e
+            menor mais fechado. A relativa deste é ${info.tom_relativo}.`,
+    "Âmbito": "Da nota mais grave até a mais aguda, na altura escrita, que no sax alto é "
+              + "diferente da que sai.",
+    "Extensão": "A distância entre essas duas notas em semitons. Doze semitons dão uma oitava.",
+    "Notas": "Quantas cabeças de nota o arquivo tem ao todo.",
     "Compassos": "Trechos entre uma barra vertical e a seguinte.",
-    "Alteradas": "Fatia de notas com sustenido, bemol ou bequadro.",
+    "Alteradas": "Quanto da música tem sustenido, bemol ou bequadro. Quanto maior essa "
+                 + "fatia, mais cromática a peça, e cromatismo dá trabalho no dedilhado.",
   };
   const linhas = [
     ["Tom", info.tom, ""],
@@ -748,7 +746,7 @@ function montarAnalise(info, dificuldade) {
   for (const [rot, val, unid] of linhas) {
     const w = document.createElement("div");
     w.className = "fato";
-    w.title = DICAS[rot] || "";
+    comDica(w, DICAS[rot] || "");
     w.innerHTML = `<dt></dt><dd></dd>`;
     w.querySelector("dt").textContent = rot;
     w.querySelector("dd").textContent = val;
@@ -772,6 +770,20 @@ function montarAnalise(info, dificuldade) {
       <span class="meta">de 10</span></div>`;
     b.querySelector(".valor").textContent = dificuldade.toFixed(1);
     b.querySelector(".cheio").style.width = (10 * dificuldade) + "%";
+    comDica(b.querySelector("h3"), trecho(`
+      <p>Cada partitura vira seis medidas. Cada uma tem um peso, e a soma delas dá a nota.</p>
+      <ul>
+        <li><b>Notas diferentes</b>: quantas alturas distintas a música usa. É a de maior peso.</li>
+        <li><b>Alteradas</b>: quanto dela é cromática.</li>
+        <li><b>Extensão</b>: da nota mais grave até a mais aguda.</li>
+        <li><b>Agudo</b>: o que passa do dó agudo, onde entra a chave de palma.</li>
+        <li><b>Altíssimo</b>: o que passa do registro normal do sax.</li>
+        <li><b>Quebras de registro</b>: quantas vezes a melodia atravessa a virada de oitava.</li>
+      </ul>
+      <p>Os pesos vieram de 572 partituras já marcadas como iniciante, intermediário ou
+      avançado, e todos ficaram positivos, para que nenhum fator deixe a peça mais fácil.
+      Fora da amostra a nota acerta a ordem em 92% das músicas que aparecem nos três
+      níveis. O ritmo ainda não entra na conta.</p>`));
     corpo.append(b);
   }
 
@@ -779,6 +791,8 @@ function montarAnalise(info, dificuldade) {
     const b = document.createElement("div");
     b.className = "bloco";
     b.innerHTML = `<h3>Notas mais tocadas</h3><div class="fichas"></div>`;
+    comDica(b.querySelector("h3"), "As que mais aparecem na música. Costumam ser bons "
+      + "pontos de apoio para começar e terminar frases.");
     info.mais_tocadas.forEach(([n, q]) => b.querySelector(".fichas").append(ficha(`${n} · ${q}×`)));
     corpo.append(b);
   }
@@ -789,8 +803,10 @@ function montarAnalise(info, dificuldade) {
     const b = document.createElement("div");
     b.className = "bloco";
     b.innerHTML = `<h3>Acordes da música</h3><div class="fichas"></div>
-      <p class="aviso-campo">Lidos do arquivo. Em cada linha, as notas do acorde e a escala que cabe.</p>
       <div class="escalas"></div>`;
+    comDica(b.querySelector("h3"), "Os acordes que o arranjador escreveu acima da pauta, "
+      + "lidos direto do arquivo. Em cada linha vêm as notas que formam o acorde e a "
+      + "escala que cabe por cima dele.");
     info.cifras.forEach(c => b.querySelector(".fichas").append(ficha(c)));
     for (const it of info.escalas || []) {
       const l = document.createElement("div");
@@ -810,6 +826,9 @@ function montarAnalise(info, dificuldade) {
     b.innerHTML = `<h3></h3>
       <p class="aviso-campo"></p><div class="escalas campo"></div>`;
     b.querySelector("h3").textContent = `Campo harmônico de ${info.tom}`;
+    comDica(b.querySelector("h3"), "Os sete acordes que nascem do tom, empilhando terças "
+      + "sobre a escala. Formam o repertório que combina com a música, mesmo que ela não "
+      + "toque todos. Sem cifra na partitura, é daqui que você parte para improvisar.");
     b.querySelector(".aviso-campo").textContent = semCifra
       ? "A partitura veio sem cifra. Estes são os acordes que cabem no tom, como palpite."
       : "O que o tom comporta, para comparar com as cifras acima.";
@@ -824,17 +843,6 @@ function montarAnalise(info, dificuldade) {
     corpo.append(b);
   }
 
-  if (info.dificeis?.length) {
-    const b = document.createElement("div");
-    b.className = "bloco larga";
-    b.innerHTML = `<h3>Onde a música pesa</h3><ul class="dificeis"></ul>`;
-    for (const t of info.dificeis) {
-      const li = document.createElement("li");
-      li.textContent = `pág. ${t.pagina}, ${t.sistema}ª pauta: ${t.motivos.join(", ")}`;
-      b.querySelector("ul").append(li);
-    }
-    corpo.append(b);
-  }
   return d;
 }
 
