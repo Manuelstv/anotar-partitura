@@ -191,6 +191,8 @@
   .escalas b { font-weight: 600; }
   .escalas .notas-ac { color: var(--texto); font-variant-numeric: tabular-nums; }
   .escalas .esc { color: var(--texto-3); font-size: var(--t-xs); text-align: right; }
+  .escalas.campo b { color: var(--texto-2); font-variant-numeric: tabular-nums; }
+  .aviso-campo { font-size: var(--t-xs); color: var(--texto-3); margin: -2px 0 var(--s2); }
   @media (max-width: 480px) {
     .escalas div { grid-template-columns: 56px 1fr; }
     .escalas .esc { grid-column: 2; text-align: left; }
@@ -314,6 +316,11 @@
       <dd>As notas do acorde e a escala que cabe por cima. Ex.: <b>G7</b> = G B D F,
         mixolídio.</dd>
 
+      <dt>Campo harmônico</dt>
+      <dd>Os sete acordes que nascem do tom, empilhando terças sobre a escala. Não são os
+        acordes da música — são os que cabem nela. Quando a partitura não traz cifra, é o
+        ponto de partida para harmonizar ou improvisar.</dd>
+
       <dt>Notas mais tocadas</dt>
       <dd>As que mais aparecem — bons pontos de apoio para começar e terminar frases.</dd>
 
@@ -359,7 +366,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=9";
+    const v = "?v=10";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
@@ -472,6 +479,28 @@ function montarAnalise(info, dificuldade) {
       }
       corpo.append(e);
     }
+  }
+
+  if (info.campo?.length) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    const semCifra = !info.cifras?.length;
+    b.innerHTML = `<h3></h3>
+      <p class="aviso-campo"></p><div class="escalas campo"></div>`;
+    b.querySelector("h3").textContent = `Campo harmônico de ${info.tom}`;
+    b.querySelector(".aviso-campo").textContent = semCifra
+      ? "A partitura não traz cifra. Estes são os acordes que cabem neste tom — a base "
+        + "provável da harmonia, não a harmonia lida."
+      : "Os acordes que o tom comporta, para comparar com as cifras acima.";
+    for (const g of info.campo) {
+      const l = document.createElement("div");
+      l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
+      l.querySelector("b").textContent = `${g.grau} · ${g.cifra}`;
+      l.querySelector(".notas-ac").textContent = g.notas.join(" ");
+      l.querySelector(".esc").textContent = g.qualidade;
+      b.querySelector(".campo").append(l);
+    }
+    corpo.append(b);
   }
 
   if (info.mais_tocadas?.length) {
