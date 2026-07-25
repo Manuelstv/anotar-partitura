@@ -34,19 +34,35 @@ except ImportError:
 #   clave de sol -> linha de cima = F5 = 5*7+3 = 38
 #   clave de fa  -> linha de cima = A3 = 3*7+5 = 26
 #   clave de do  -> linha de cima = G4 = 4*7+4 = 32
+#
+# "cabecas" mapeia o codepoint para a DURACAO BASE da figura, em tempos de seminima
+# (semibreve 4, minima 2, seminima 1). Bandeirola/beam divide isso por 2 a cada nivel.
 PERFIS = {
     "smufl": {
-        "cabecas": {0xE0A0, 0xE0A1, 0xE0A2, 0xE0A3, 0xE0A4},
+        "cabecas": {0xE0A0: 8, 0xE0A1: 8, 0xE0A2: 4, 0xE0A3: 2, 0xE0A4: 1},
         "acidentes": {0xE260: 'b', 0xE261: 'n', 0xE262: '#', 0xE263: '##', 0xE264: 'bb'},
         "claves": {0xE050: 38, 0xE051: 38, 0xE052: 38, 0xE053: 38, 0xE054: 38,
                    0xE062: 26, 0xE063: 26, 0xE064: 26, 0xE065: 26, 0xE05C: 32},
+        # bandeirola -> quantos niveis (1 = colcheia, 2 = semicolcheia...). Par = cima/baixo.
+        "bandeiras": {0xE240: 1, 0xE241: 1, 0xE242: 2, 0xE243: 2, 0xE244: 3, 0xE245: 3,
+                      0xE246: 4, 0xE247: 4, 0xE248: 5, 0xE249: 5, 0xE24A: 6, 0xE24B: 6},
+        "pontos": {0xE1E7},
+        "pausas": {0xE4E2: 8, 0xE4E3: 4, 0xE4E4: 2, 0xE4E5: 1, 0xE4E6: 0.5,
+                   0xE4E7: 0.25, 0xE4E8: 0.125, 0xE4E9: 0.0625, 0xE4EA: 0.03125},
     },
     "sonata": {
         # confirmados nos PDFs de teste: 'oe'=cabeca preta, ponto=branca, w=semibreve,
         # &=clave de sol (aparece 1x por pauta), #/b/n=acidentes.
-        "cabecas": {0x153, 0x2D9, 0x77},
+        "cabecas": {0x153: 1, 0x2D9: 2, 0x77: 4},
         "acidentes": {0x62: 'b', 0x6E: 'n', 0x23: '#'},
         "claves": {0x26: 38, 0x3F: 26, 0x42: 32},   # sol confirmado; fa/do pelo layout Sonata
+        # medidos no The-chicken/Song_of_somg: minusculo = haste pra cima, MAIUSCULO = pra
+        # baixo. So entram os niveis que eu vi de fato; fusa nao foi medida, fica de fora.
+        "bandeiras": {0x6A: 1, 0x4A: 1, 0x72: 2, 0x52: 2},
+        # 0x2E no Maestro/Finale; 0x2122 e o ponto do Sibelius, que mora na fonte
+        # OpusSpecialStd — sem ele toda pausa pontuada do The-chicken saia curta.
+        "pontos": {0x2E, 0x2122},
+        "pausas": {0x2211: 4, 0xD3: 2, 0x152: 1, 0x2030: 0.5, 0x2248: 0.25},
     },
 }
 
@@ -94,8 +110,13 @@ def escala(pg):
     return pg.rect.height / 842.0
 
 
-def coletar(pg):
-    """Glifos musicais, spans de texto comum, linhas horizontais e verticais."""
+def coletar(pg, com_ritmo=False):
+    """Glifos musicais, spans de texto comum, linhas horizontais e verticais.
+
+    Com `com_ritmo`, tambem devolve os BEAMS (7o item) e inclui em `glifos` as
+    bandeirolas, os pontos de aumento e as pausas. Fica atras de uma flag porque
+    varios scripts desempacotam o resultado em 6 nomes.
+    """
     glifos, textos = [], []
     for b in pg.get_text("rawdict")["blocks"]:
         for l in b.get("lines", []):
@@ -114,16 +135,23 @@ def coletar(pg):
                     for ch in s.get("chars", []):
                         cp, bb = ord(ch["c"]), ch["bbox"]
                         if cp in P["cabecas"]:
-                            tipo, extra = "cabeca", None
+                            tipo, extra = "cabeca", P["cabecas"][cp]
                         elif cp in P["acidentes"]:
                             tipo, extra = "acc", P["acidentes"][cp]
                         elif cp in P["claves"]:
                             tipo, extra = "clave", P["claves"][cp]
+                        elif com_ritmo and cp in P["bandeiras"]:
+                            tipo, extra = "bandeira", P["bandeiras"][cp]
+                        elif com_ritmo and cp in P["pontos"]:
+                            tipo, extra = "ponto", None
+                        elif com_ritmo and cp in P["pausas"]:
+                            tipo, extra = "pausa", P["pausas"][cp]
                         else:
                             continue
                         glifos.append({"tipo": tipo, "extra": extra,
                                        "x": (bb[0] + bb[2]) / 2,
                                        "y": (bb[1] + bb[3]) / 2 + ajuste,
+                                       "sz": s.get("size", 0),
                                        "x0": bb[0], "x1": bb[2], "y0": bb[1], "y1": bb[3]})
                 else:
                     # Quebra o span em PALAVRAS: o PyMuPDF funde rotulos vizinhos num
@@ -158,7 +186,7 @@ def coletar(pg):
     comp_min = 20.0 * k           # comprimento minimo de uma horizontal
     alt_min = 4.0 * k             # altura minima de uma vertical
 
-    horiz, vert, formas, caminhos = [], [], [], []
+    horiz, vert, formas, caminhos, beams = [], [], [], [], []
     for p in pg.get_drawings():
         r = p["rect"]
         if r.height < 250 * k and r.width < 250 * k:   # hastes, beams, ligaduras, colchetes
@@ -168,6 +196,10 @@ def coletar(pg):
             caminhos.append({"x0": r.x0, "x1": r.x1, "y0": r.y0, "y1": r.y1,
                              "w": r.width, "h": r.height,
                              "curvas": sum(1 for it in p["items"] if it[0] == "c")})
+        if com_ritmo:
+            b = _beam(p)
+            if b:
+                beams.append(b)
         for it in p["items"]:
             if it[0] == "l":
                 p1, p2 = it[1], it[2]
@@ -185,7 +217,47 @@ def coletar(pg):
             elif abs(p1.x - p2.x) < 1.2 * k and abs(p2.y - p1.y) > alt_min:
                 vert.append({"x": p1.x, "y0": min(p1.y, p2.y), "y1": max(p1.y, p2.y),
                              "h": abs(p2.y - p1.y)})
+    if com_ritmo:
+        return glifos, textos, horiz, vert, formas, caminhos, beams
     return glifos, textos, horiz, vert, formas, caminhos
+
+
+def _beam(p):
+    """Barra de ligacao (beam) -> paralelogramo preenchido, fino e inclinado.
+
+    Nao da para usar a altura do bbox: um beam longo e inclinado tem bbox alto. A
+    espessura tem de ser medida NA BORDA — os dois y's que existem em x0 e em x1.
+    Devolve as duas retas de topo/base para saber onde o beam passa em cada x.
+    """
+    if p.get("fill") is None:
+        return None
+    pts = []
+    for it in p["items"]:
+        if it[0] == "l":
+            pts += [(it[1].x, it[1].y), (it[2].x, it[2].y)]
+        elif it[0] == "re":
+            r = it[1]
+            pts += [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)]
+        elif it[0] == "qu":
+            pts += [(q.x, q.y) for q in it[1]]
+        else:
+            return None                      # tem curva: e ligadura, cabeca ou pausa
+    if len(pts) < 4:
+        return None
+    xs = [q[0] for q in pts]
+    x0, x1 = min(xs), max(xs)
+    larg = x1 - x0
+    if larg <= 0:
+        return None
+    tol = max(0.02 * larg, 0.05)
+    esq = [q[1] for q in pts if q[0] <= x0 + tol]
+    dir_ = [q[1] for q in pts if q[0] >= x1 - tol]
+    if len(esq) < 2 or len(dir_) < 2:
+        return None                          # triangulo, cunha: nao e beam
+    return {"x0": x0, "x1": x1, "larg": larg,
+            "topo0": min(esq), "topo1": min(dir_),
+            "base0": max(esq), "base1": max(dir_),
+            "esp0": max(esq) - min(esq), "esp1": max(dir_) - min(dir_)}
 
 
 def _cobertura(segs):
@@ -301,6 +373,8 @@ CABECA_W = (1.05, 1.60)
 CABECA_H = (0.80, 1.35)
 ACC_W = (0.50, 1.20)
 ACC_H = (2.20, 3.10)
+CURVAS_VAZIA = 14        # cabeca vazada tem contorno de fora E de dentro: o dobro de curvas
+PONTO_D = (0.22, 0.60)   # ponto de aumento: redondinho, menos de meio espaco
 
 
 def glifos_de_contorno(caminhos, sistemas):
@@ -319,9 +393,21 @@ def glifos_de_contorno(caminhos, sistemas):
             continue
         larg_nota = sorted(c["w"] for c in cabecas)[len(cabecas) // 2]
         for c in cabecas:
-            glifos.append({"tipo": "cabeca", "extra": None,
+            # sem codepoint, o que separa minima de seminima e o buraco no meio:
+            # a cabeca vazada tem duas curvas fechadas, a preta so uma.
+            vazia = c["curvas"] >= CURVAS_VAZIA
+            glifos.append({"tipo": "cabeca", "extra": 2 if vazia else 1, "vazia": vazia,
+                           "sz": c["w"],
                            "x": (c["x0"] + c["x1"]) / 2, "y": (c["y0"] + c["y1"]) / 2,
                            "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]})
+
+        for c in aqui:
+            if (PONTO_D[0] <= c["w"] / esp <= PONTO_D[1]
+                    and PONTO_D[0] <= c["h"] / esp <= PONTO_D[1]
+                    and abs(c["w"] - c["h"]) < 0.18 * esp and c["curvas"]):
+                glifos.append({"tipo": "ponto", "extra": None, "sz": c["w"],
+                               "x": (c["x0"] + c["x1"]) / 2, "y": (c["y0"] + c["y1"]) / 2,
+                               "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]})
 
         # clave: a forma bem alta a esquerda do sistema
         claves = [c for c in aqui if c["h"] / esp > 5.5 and 1.5 < c["w"] / esp < 4.0]
@@ -431,15 +517,128 @@ def nome(idx, alt, sistema):
     return base + alt
 
 
+# -------------------------------------------------------------------- duracao
+BEAM_ESP = (0.22, 1.00)      # espessura de um beam, em espacos de pauta
+BEAM_LARG = 0.35             # largura minima (o "gancho" de nota solta e curtinho)
+
+
+def _haste_de(h, vert, esp):
+    """A haste da cabeca: vertical colada na borda esquerda (pra baixo) ou direita (pra cima).
+
+    O que define a haste e ela ENCOSTAR na cabeca: uma das pontas cai em cima do
+    centro da cabeca. Sem essa exigencia, a haste da apojatura vizinha entra como
+    candidata, ganha por ser mais comprida, e a nota perde os beams dela.
+    """
+    melhor = None
+    for v in vert:
+        if v["h"] < 1.2 * esp:
+            continue
+        sobe = (abs(v["x"] - h["x1"]) < 0.45 * esp
+                and abs(v["y1"] - h["y"]) < 0.6 * esp and v["y0"] < h["y"] - 0.9 * esp)
+        desce = (abs(v["x"] - h["x0"]) < 0.45 * esp
+                 and abs(v["y0"] - h["y"]) < 0.6 * esp and v["y1"] > h["y"] + 0.9 * esp)
+        if not (sobe or desce):
+            continue
+        if melhor is None or v["h"] > melhor["h"]:
+            melhor = v
+    return melhor
+
+
+def _niveis(hs, beams, bandeiras, esp):
+    """Quantos beams/bandeirolas cortam a haste -> 1 = colcheia, 2 = semicolcheia..."""
+    if hs is None:
+        return 0
+    sx = hs["x"]
+    n = 0
+    for b in beams:
+        if b["larg"] < BEAM_LARG * esp or not (b["x0"] - 0.3 * esp <= sx <= b["x1"] + 0.3 * esp):
+            continue
+        if not (BEAM_ESP[0] * esp <= b["esp0"] <= BEAM_ESP[1] * esp
+                and BEAM_ESP[0] * esp <= b["esp1"] <= BEAM_ESP[1] * esp):
+            continue
+        t = min(1.0, max(0.0, (sx - b["x0"]) / b["larg"]))
+        yc = (b["topo0"] + (b["topo1"] - b["topo0"]) * t
+              + b["base0"] + (b["base1"] - b["base0"]) * t) / 2
+        if hs["y0"] - 0.7 * esp <= yc <= hs["y1"] + 0.7 * esp:
+            n += 1
+    if n:
+        return n
+    for g in bandeiras:
+        if (-0.4 * esp < g["x"] - sx < 2.2 * esp
+                and hs["y0"] - 0.8 * esp <= g["y"] <= hs["y1"] + 0.8 * esp):
+            n = max(n, g["extra"])
+    return n
+
+
+GRACA = 0.85            # cabeca menor que isso x a mediana e apojatura (nao ocupa tempo)
+
+
+def _e_ritornello(p, pontos, barras, esp):
+    """Os dois pontinhos da barra de repeticao, que na fonte Sonata sao o mesmo '.'.
+
+    Assinatura: par no MESMO x, um espaco de distancia, encostado numa barra de
+    compasso. Sem isso eles viravam ponto de aumento da nota anterior.
+    """
+    if not any(abs(b - p["x"]) < 2.2 * esp for b in barras):
+        return False
+    return any(q is not p and abs(q["x"] - p["x"]) < 0.25 * esp
+               and 0.6 * esp < abs(q["y"] - p["y"]) < 1.4 * esp for q in pontos)
+
+
+def _pontos_de(alvos, pontos, esp, folga_y):
+    """Ponto de aumento -> quantos cada alvo (cabeca ou pausa) recebeu.
+
+    A amarracao e 1:1 e no sentido PONTO -> alvo, igual a dos acidentes. Contar do
+    outro lado ("tem ponto a direita?") faz o mesmo ponto valer para a nota dele e
+    para a vizinha de tras, e o compasso sai com meio tempo a mais.
+    """
+    n = collections.Counter()
+    for p in sorted(pontos, key=lambda p: p["x"]):
+        cand = [a for a in alvos if 0.15 * esp < p["x"] - a["x1"] < 2.6 * esp
+                and abs(p["y"] - a["y"]) < folga_y * esp]
+        if cand:
+            n[id(max(cand, key=lambda a: a["x1"]))] += 1
+    return n
+
+
+def duracao_das(cabecas, pausas, vert, beams, bandeiras, pontos, barras, esp):
+    """(duracao das cabecas, duracao das pausas), em tempos de seminima.
+
+    cabecas: id -> (duracao, e_apojatura).  pausas: id -> duracao.
+    """
+    # apojatura vem em corpo reduzido: comparar TAMANHO DE FONTE, nao largura da
+    # cabeca — semibreve e mais larga que minima, e a minima virava apojatura.
+    tam = sorted(h.get("sz") or 0 for h in cabecas)
+    med = tam[len(tam) // 2] if tam else 0
+    pontos = [p for p in pontos if not _e_ritornello(p, pontos, barras, esp)]
+    n_pontos = _pontos_de(list(cabecas) + list(pausas), pontos, esp, 1.4)
+    out = {}
+    for h in cabecas:
+        graca = bool(med) and (h.get("sz") or 0) < GRACA * med
+        base = h.get("extra") or 1
+        if base <= 1:
+            base = base / (2 ** _niveis(_haste_de(h, vert, esp), beams, bandeiras, esp))
+        elif h.get("vazia") and _haste_de(h, vert, esp) is None:
+            base = 4          # cabeca vazada SEM haste so pode ser semibreve
+        d = n_pontos.get(id(h), 0)
+        out[id(h)] = (base * (2 - 0.5 ** d) if d else base, graca)
+    out_p = {id(p): p["extra"] * (2 - 0.5 ** n_pontos[id(p)]) if n_pontos.get(id(p))
+             else p["extra"] for p in pausas}
+    return out, out_p
+
+
 # --------------------------------------------------------------------- leitura
-def ler_notas(pg, sistema):
-    """Retorna (rotulos, existentes). rotulos = [{x, y_base, texto, ordem}]."""
-    glifos, textos, horiz, vert, formas, caminhos = coletar(pg)
+def ler_notas(pg, sistema, com_pausas=False):
+    """Retorna (rotulos, existentes) — ou (rotulos, existentes, pausas) com `com_pausas`.
+
+    Cada rotulo leva `dur`, a duracao lida em tempos de seminima.
+    """
+    glifos, textos, horiz, vert, formas, caminhos, beams = coletar(pg, com_ritmo=True)
     sistemas = pautas(horiz, pg.rect.width, pg.rect.height)
-    if not glifos and sistemas:
+    if not any(g["tipo"] == "cabeca" for g in glifos) and sistemas:
         # PDF com os simbolos convertidos em curvas: le pela geometria
         glifos = glifos_de_contorno(caminhos, sistemas)
-    rotulos, existentes = [], []
+    rotulos, existentes, pausas = [], [], []
 
     centros = [(s[0] + s[-1]) / 2 for s in sistemas]
 
@@ -458,6 +657,19 @@ def ler_notas(pg, sistema):
                          key=lambda g: (g["x"], g["y"]))
         if not cabecas:
             continue
+        # Mesma cabeca desenhada DUAS vezes no mesmo ponto: ha edicoes que poem uma
+        # cabeca vazada por cima da preta para abrir o buraco onde vai o nome da nota.
+        # E uma nota so — e a figura e a preta, nao a vazada.
+        unicas = []
+        for h in cabecas:
+            gemea = next((u for u in unicas
+                          if abs(u["x"] - h["x"]) < 0.04 * span
+                          and abs(u["y"] - h["y"]) < 0.08 * span), None)
+            if gemea is None:
+                unicas.append(h)
+            elif (h.get("extra") or 1) < (gemea.get("extra") or 1):
+                gemea.update(extra=h.get("extra"), vazia=h.get("vazia", False))
+        cabecas = unicas
 
         claves = [g for g in glifos if g["tipo"] == "clave" and na_pauta(g, 1.4)]
         topo_ref = min(claves, key=lambda g: g["x"])["extra"] if claves else 38
@@ -479,6 +691,14 @@ def ler_notas(pg, sistema):
         barras = sorted(v["x"] for v in vert
                         if v["y0"] <= topo + 0.2 * span and v["y1"] >= base_l - 0.2 * span
                         and v["h"] >= span * 0.9 and not eh_haste(v))
+
+        descansos = sorted((g for g in glifos if g["tipo"] == "pausa" and na_pauta(g, 1.2)),
+                           key=lambda g: g["x"])
+        dur_de, dur_pausa = duracao_das(
+            cabecas, descansos, vert, beams,
+            [g for g in glifos if g["tipo"] == "bandeira" and na_pauta(g)],
+            [g for g in glifos if g["tipo"] == "ponto" and na_pauta(g)],
+            barras, span / 4.0)
 
         # ---- casa cada acidente com a cabeca mais proxima a sua DIREITA.
         # Amarrar no sentido acidente->nota (e nao nota->acidente) da atribuicao 1:1
@@ -538,10 +758,20 @@ def ler_notas(pg, sistema):
         if y_base > teto:
             y_base = max(teto, base_l + span * 0.62)
 
+        if com_pausas:
+            i_barra = 0
+            for g in descansos:
+                while i_barra < len(barras) and barras[i_barra] < g["x0"]:
+                    i_barra += 1
+                pausas.append({"x": g["x"], "dur": dur_pausa[id(g)],
+                               "sistema": sidx, "compasso": i_barra})
+
         for ordem, (h, txt, idx, alt, cmp_) in enumerate(notas):
             rotulos.append({"x": (h["x0"] + h["x1"]) / 2, "y_base": y_base,
                             "y_nota": h["y"], "texto": txt, "corpo": corpo, "ordem": ordem,
                             "idx": idx, "alt": alt, "midi": midi_de(idx, alt),
+                            "dur": dur_de.get(id(h), (1, False))[0],
+                            "graca": dur_de.get(id(h), (1, False))[1],
                             "sistema": sidx, "compasso": cmp_,
                             "armadura": (len(alt_armadura)
                                          * (1 if '#' in alt_armadura.values() else -1)
@@ -558,6 +788,8 @@ def ler_notas(pg, sistema):
                     and "Chord" not in t["fonte"] and RE_NOME_NOTA.match(t["txt"])
                     and any(abs(cx - xh) < 1.1 * span for xh in xs_cabeca)):
                 existentes.append(t)
+    if com_pausas:
+        return rotulos, existentes, pausas
     return rotulos, existentes
 
 
@@ -575,6 +807,41 @@ def escrever(pg, rotulos, cor):
         ocupado[fila] = x0 + larg
         pg.insert_text((x0, r["y_base"] + fila * r["corpo"] * 1.05),
                        r["texto"], fontname=FONTE, fontsize=r["corpo"], color=cor)
+
+
+def melodia(dados, limite=3000):
+    """Sequencia tocavel: [{t, midi, d}] em tempos de seminima, na ordem de leitura.
+
+    Cabecas no mesmo x sao um acorde: soam juntas e o tempo anda uma vez so. Pausa
+    nao vira evento, so empurra o relogio. Apojatura recebe uma duracao simbolica —
+    na pratica ela rouba tempo da nota seguinte, mas para ouvir a melodia basta ser
+    rapida.
+    """
+    doc = fitz.open(stream=dados, filetype="pdf")
+    ev, t = [], 0.0
+    for pg in doc:
+        rot, _, pausas = ler_notas(pg, "letras", com_pausas=True)
+        itens = [{"x": r["x"], "s": r["sistema"], "midi": r["midi"],
+                  "d": 0.125 if r["graca"] else r["dur"]} for r in rot]
+        itens += [{"x": p["x"], "s": p["sistema"], "midi": None, "d": p["dur"]}
+                  for p in pausas]
+        itens.sort(key=lambda i: (i["s"], i["x"]))
+        i = 0
+        while i < len(itens) and len(ev) < limite:
+            j = i
+            while (j + 1 < len(itens) and itens[j + 1]["s"] == itens[i]["s"]
+                   and abs(itens[j + 1]["x"] - itens[i]["x"]) < 1.0):
+                j += 1
+            grupo = itens[i:j + 1]
+            passo = max(g["d"] for g in grupo) or 0.25
+            for g in grupo:
+                if g["midi"] is not None:
+                    ev.append({"t": round(t, 4), "midi": g["midi"],
+                               "d": round(g["d"] or 0.25, 4)})
+            t += passo
+            i = j + 1
+    doc.close()
+    return {"notas": ev, "total": round(t, 4)}
 
 
 def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0)):
