@@ -250,6 +250,48 @@ def detectar_tom(notas, armadura):
     return f"{maior} maior", f"{menor} menor", armadura
 
 
+# grau -> qualidade, pelas distancias em semitons dentro da triade
+_QUAL = {(4, 3): ('', 'maior'), (3, 4): ('m', 'menor'),
+         (3, 3): ('\u00b0', 'diminuto'), (4, 4): ('+', 'aumentado')}
+_ROMANO_M = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii\u00b0']
+_ROMANO_m = ['i', 'ii\u00b0', 'III', 'iv', 'v', 'VI', 'VII']
+
+
+def campo_harmonico(tonica, modo, armadura):
+    """Os 7 acordes que cabem no tom. Teoria pura: empilha tercas sobre a escala.
+
+    Nao sao os acordes DA MUSICA — sao os que o tom comporta. Util quando a partitura
+    nao traz cifra, que e o caso da maioria dos arranjos de banda.
+    """
+    i_ton = LETRAS.index(tonica[0])
+    alt = {}
+    if armadura > 0:
+        alt = {n: 1 for n in A.ORDEM_SUSTENIDOS[:armadura]}
+    elif armadura < 0:
+        alt = {n: -1 for n in A.ORDEM_BEMOIS[:-armadura]}
+
+    # escala = 7 letras seguidas a partir da tonica, com a alteracao da armadura
+    escala = []
+    for g in range(7):
+        li = (i_ton + g) % 7
+        letra = LETRAS[li]
+        a = alt.get(letra, 0)
+        pc = (SEMI_LETRA[li] + a) % 12
+        escala.append((letra + ('#' if a > 0 else 'b' if a < 0 else ''), pc))
+
+    romanos = _ROMANO_M if modo == 'maior' else _ROMANO_m
+    saida = []
+    for g in range(7):
+        n1, p1 = escala[g]
+        n2, p2 = escala[(g + 2) % 7]
+        n3, p3 = escala[(g + 4) % 7]
+        t1, t2 = (p2 - p1) % 12, (p3 - p2) % 12
+        suf, qual = _QUAL.get((t1, t2), ('', 'maior'))
+        saida.append({"grau": romanos[g], "cifra": n1 + suf, "qualidade": qual,
+                      "notas": [n1, n2, n3]})
+    return saida
+
+
 def forma(compassos):
     """Compassos com a mesma sequencia de alturas recebem a mesma letra."""
     vistos, letras, seq = {}, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", []
@@ -281,6 +323,7 @@ def analisar(dados):
     midis = [r["midi"] for r in notas]
     arm = collections.Counter(r["armadura"] for r in notas).most_common(1)[0][0]
     tom, relativa, _ = detectar_tom(midis, arm)
+    _ton, _modo = tom.rsplit(' ', 1)
 
     # compassos mais dificeis: extensao + saltos + alteracoes dentro do compasso
     dif = []
@@ -328,6 +371,7 @@ def analisar(dados):
         "progressao": cifras[:24],
         "escalas": [{"cifra": c, "escala": escala_da_cifra(c), "notas": soletrar(c)}
                     for c in cifras_unicas[:14]],
+        "campo": campo_harmonico(_ton, _modo, arm),
         "compassos": len(compassos),
         "compassos_distintos": unicos,
         "repeticao": round(1 - unicos / max(1, len(compassos)), 2),
