@@ -130,6 +130,11 @@ O acervo de validação é o zip `sax-*.zip` do Manuel (Online Sax Academy): 114
 quais **182 vêm em versão "With Note Names"** — é o gabarito em escala. Ele é extraído em
 diretório temporário, não versionado.
 
+## Pendências
+
+`PENDENCIAS.md` tem a lista viva, em ordem de prioridade. A primeira é: **nota ligada
+deve receber um nome só, com `_`** (hoje sai `G G G` onde deveria sair `G_`).
+
 ## Limites conhecidos (não são bugs)
 
 - **PDF escaneado (imagem) não funciona.** Sem vetor não há coordenada.
