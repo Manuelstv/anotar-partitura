@@ -307,23 +307,6 @@
   .dica b { font-weight: 650; }
 
   /* --------------------------------------------------------------- fim   */
-  .glossario { margin-top: var(--s3); border: 1px solid var(--borda);
-               border-radius: var(--r-md); background: var(--sup); }
-  .glossario:first-of-type { margin-top: var(--s6); }
-  .glossario > summary {
-    padding: var(--s3) var(--s4); cursor: pointer; font-size: var(--t-sm);
-    font-weight: 620; color: var(--texto-2); list-style: none;
-    display: flex; align-items: center; gap: var(--s2);
-  }
-  .glossario > summary::-webkit-details-marker { display: none; }
-  .glossario > summary::before { content: "▸"; font-size: .7em; transition: transform .15s ease; }
-  .glossario[open] > summary::before { transform: rotate(90deg); }
-  .glossario > summary:hover { color: var(--texto); }
-  .glossario > p { padding: 0 var(--s4); font-size: var(--t-sm); color: var(--texto-2); }
-  .termos { margin: 0; padding: 0 var(--s4) var(--s4); font-size: var(--t-sm); }
-  .termos dt { font-weight: 640; margin-top: var(--s3); }
-  .termos dt:first-child { margin-top: 0; }
-  .termos dd { margin: 2px 0 0; color: var(--texto-2); }
   .nota-rodape { margin-top: var(--s6); color: var(--texto-3); font-size: var(--t-sm); }
   footer { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--borda);
            color: var(--texto-3); font-size: var(--t-sm); }
@@ -484,7 +467,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=16";
+    const v = "?v=17";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
