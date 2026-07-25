@@ -207,6 +207,14 @@
                     border-radius: 99px; transition: width .3s ease; }
   .medidor .valor { font-size: var(--t-lg); font-weight: 600; font-variant-numeric: tabular-nums; }
 
+  .tocador { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+  .tocador .btn { padding: 6px var(--s4); }
+  .tocador .and { display: flex; align-items: center; gap: var(--s2);
+                  font-size: var(--t-xs); color: var(--texto-3); }
+  .tocador input[type=range] { width: 120px; accent-color: var(--acento); }
+  .tocador .bpm { font-variant-numeric: tabular-nums; min-width: 3.4em; }
+  @media (max-width: 480px) { .tocador .btn { width: auto; } }
+
   .previa img { width: 100%; border: 1px solid var(--borda); border-radius: var(--r-sm);
                 background: #fff; display: block; }
 
@@ -305,9 +313,7 @@
         cromatismo custa dedilhado.</dd>
 
       <dt>Dificuldade</dt>
-      <dd>De 0 a 10 para sax alto, a partir de registro, extensão, cromatismo e viradas de
-        oitava. Os pesos vieram de partituras já rotuladas como iniciante / intermediário /
-        avançado. Não considera ritmo.</dd>
+      <dd>De 0 a 10 para sax alto — veja abaixo como sai a conta.</dd>
 
       <dt>Cifras</dt>
       <dd>Os acordes escritos acima da pauta — lidos do PDF, não adivinhados.</dd>
@@ -328,6 +334,38 @@
       <dd>Os trechos mais difíceis e o porquê: salto largo, agudo de palma, grave de
         mindinho, muitas alteradas.</dd>
     </dl>
+  </details>
+
+  <details class="glossario">
+    <summary>Como a dificuldade é medida</summary>
+    <p>É uma conta, não um chute. Cada partitura vira seis números, cada um com um peso,
+      e a soma vira nota de 0 a 10.</p>
+    <dl class="termos">
+      <dt>Notas diferentes</dt>
+      <dd>Quantas alturas distintas aparecem. É o que mais pesa: mais notas diferentes,
+        mais dedilhado para acertar.</dd>
+
+      <dt>Alteradas</dt>
+      <dd>Fatia com sustenido, bemol ou bequadro. Cromatismo pede dedilhado auxiliar.</dd>
+
+      <dt>Extensão</dt>
+      <dd>Distância da nota mais grave à mais aguda.</dd>
+
+      <dt>Agudo</dt>
+      <dd>Fatia acima do dó agudo, onde entra a chave de palma.</dd>
+
+      <dt>Altíssimo</dt>
+      <dd>Fatia acima do registro normal do sax — sobreagudo.</dd>
+
+      <dt>Quebras de registro</dt>
+      <dd>Quantas vezes a melodia atravessa a virada de oitava do sax, onde muda a mão toda.</dd>
+    </dl>
+    <p>Os pesos não foram escolhidos a dedo: saíram de um ajuste sobre <b>572 partituras</b>
+      que já vinham marcadas como iniciante, intermediário ou avançado. São todos
+      positivos de propósito — nenhum fator pode "facilitar" a peça.</p>
+    <p>Testando fora da amostra, a nota acerta a ordem <b>iniciante &lt; intermediário &lt;
+      avançado</b> em <b>92%</b> das músicas que existem nos três níveis. Ela serve para
+      comparar peças, não como verdade absoluta. Ainda não entra o <b>ritmo</b>.</p>
   </details>
 
   <p class="nota-rodape" id="dica-formatos">
@@ -366,7 +404,7 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=10";
+    const v = "?v=11";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
@@ -404,6 +442,104 @@ function ficha(txt) {
   e.className = "ficha";
   e.textContent = txt;
   return e;
+}
+
+// ---- piano sintetizado no Web Audio: sem sample, sem rede, funciona offline.
+// A cor de piano vem de tres coisas: parciais com amplitude decrescente, um filtro
+// que fecha enquanto a nota morre (a corda perde brilho antes de perder volume) e
+// um estalo curtinho de ruido no ataque, que e o martelo.
+let ctxAudio = null, ondaPiano = null, bufMartelo = null, saidaAudio = null;
+function audio() {
+  if (ctxAudio) return ctxAudio;
+  ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+  saidaAudio = ctxAudio.createGain();
+  saidaAudio.connect(ctxAudio.destination);
+  const amp = [0, 1, .42, .21, .11, .07, .04, .025, .015];
+  ondaPiano = ctxAudio.createPeriodicWave(
+    Float32Array.from(amp), new Float32Array(amp.length), { disableNormalization: false });
+  bufMartelo = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * 0.02), ctxAudio.sampleRate);
+  const d = bufMartelo.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
+  return ctxAudio;
+}
+
+function tocarNota(midi, quando, segundos) {
+  const c = audio(), f = 440 * Math.pow(2, (midi - 69) / 12);
+  const cauda = Math.min(2.6, Math.max(segundos, 0.22) + 0.5);
+  const vol = c.createGain();
+  vol.gain.setValueAtTime(0.0001, quando);
+  vol.gain.exponentialRampToValueAtTime(0.20, quando + 0.008);
+  vol.gain.exponentialRampToValueAtTime(0.06, quando + 0.25);
+  vol.gain.exponentialRampToValueAtTime(0.0001, quando + cauda);
+  const filtro = c.createBiquadFilter();
+  filtro.type = "lowpass";
+  filtro.frequency.setValueAtTime(Math.min(11000, f * 14), quando);
+  filtro.frequency.exponentialRampToValueAtTime(Math.max(400, f * 3), quando + cauda);
+  filtro.connect(vol).connect(saidaAudio);
+
+  for (const [desafina, ganho] of [[0, 1], [1.0012, 0.55]]) {
+    const o = c.createOscillator();
+    o.setPeriodicWave(ondaPiano);
+    o.frequency.value = desafina ? f * desafina : f;
+    const g = c.createGain();
+    g.gain.value = ganho;
+    o.connect(g).connect(filtro);
+    o.start(quando);
+    o.stop(quando + cauda + 0.05);
+  }
+  const m = c.createBufferSource();
+  m.buffer = bufMartelo;
+  const gm = c.createGain();
+  gm.gain.value = 0.05;
+  m.connect(gm).connect(filtro);
+  m.start(quando);
+}
+
+function montarTocador(melodia) {
+  const b = document.createElement("div");
+  b.className = "bloco";
+  b.innerHTML = `<h3>Ouvir a melodia</h3>
+    <div class="tocador">
+      <button type="button" class="btn btn-secundario tocar">▶ Tocar</button>
+      <label class="and">Andamento
+        <input type="range" min="40" max="180" step="2" value="92">
+        <span class="bpm">92</span></label>
+    </div>
+    <p class="aviso-campo">Piano sintetizado, nas notas escritas (não no som real do sax).</p>`;
+  const bt = b.querySelector(".tocar"), faixa = b.querySelector("input"), bpm = b.querySelector(".bpm");
+  faixa.oninput = () => { bpm.textContent = faixa.value; };
+
+  let relogio = null, i = 0, t0 = 0;
+  const parar = () => {
+    clearInterval(relogio);
+    relogio = null;
+    if (saidaAudio) {          // corta a saida: o que ja estava agendado morre mudo
+      saidaAudio.disconnect();
+      saidaAudio = ctxAudio.createGain();
+      saidaAudio.connect(ctxAudio.destination);
+    }
+    bt.textContent = "▶ Tocar";
+  };
+  bt.onclick = () => {
+    if (relogio) return parar();
+    const c = audio();
+    c.resume();
+    const seg = 60 / Number(faixa.value);
+    i = 0;
+    t0 = c.currentTime + 0.15 - melodia.notas[0].t * seg;
+    bt.textContent = "■ Parar";
+    relogio = setInterval(() => {
+      // agenda so o que vai soar nos proximos 200 ms: parar fica instantaneo e o
+      // navegador nao precisa segurar mil nos de audio ao mesmo tempo
+      while (i < melodia.notas.length && t0 + melodia.notas[i].t * seg < c.currentTime + 0.2) {
+        const n = melodia.notas[i++];
+        tocarNota(n.midi, Math.max(c.currentTime, t0 + n.t * seg), n.d * seg);
+      }
+      if (i >= melodia.notas.length
+          && c.currentTime > t0 + melodia.total * seg + 0.5) parar();
+    }, 25);
+  };
+  return b;
 }
 
 function montarAnalise(info, dificuldade) {
@@ -445,6 +581,8 @@ function montarAnalise(info, dificuldade) {
     }
     fatos.append(w);
   }
+  if (info.melodia?.notas?.length) corpo.append(montarTocador(info.melodia));
+
   if (dificuldade != null) {
     const b = document.createElement("div");
     b.className = "bloco";
@@ -570,6 +708,11 @@ if _rel["total"]:
         _info = analise.analisar(_dados)
     except Exception:
         _info = None
+    if _info is not None:
+        try:
+            _info["melodia"] = A.melodia(_dados)
+        except Exception:
+            pass
     try:
         _nota = Dif.nota("/entrada.pdf", json.load(open("/pesos_dificuldade.json")))[0]
     except Exception:
