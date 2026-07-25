@@ -62,6 +62,14 @@ meio-espaço** do valor exato. Pipeline:
 - `melodia(dados)` devolve `{notas: [{t, midi, d}], total}` em tempos de semínima — é o
   que o player de piano do site consome.
 
+### Ligadura de valor (`ligaduras_de`)
+
+Arco = path curvo preenchido, 2–4 curvas, baixo. Vira **ligadura** (e não fraseado) só
+quando liga duas cabeças **vizinhas**, de **mesma altura**, sem pausa entre elas. A
+segunda cabeça continua no relatório com `texto` vazio e `ligada: True` — a duração dela
+ainda conta para o compasso — e a primeira recebe `_` e `dur_total` somado. Quem compara
+com o gabarito usa `nome` (sem o `_`), nunca `texto`.
+
 ### Três modos de leitura de glifo
 
 | Modo | Quando | Como |
@@ -162,9 +170,8 @@ diretório temporário, não versionado.
 
 ## Pendências
 
-`PENDENCIAS.md` tem a lista viva, em ordem de prioridade. A primeira é: **nota ligada
-deve receber um nome só, com `_`** (hoje sai `G G G` onde deveria sair `G_`) — a metade
-"nota longa sem ligadura" já está destravada pela leitura de duração.
+`PENDENCIAS.md` tem a lista viva, em ordem de prioridade. A primeira aberta é **botar o
+ritmo na nota de dificuldade**, agora que a duração é lida.
 
 ## Limites conhecidos (não são bugs)
 
@@ -173,7 +180,8 @@ deve receber um nome só, com `_`** (hoje sai `G G G` onde deveria sair `G_`) �
   parte da cobertura que falta.
 - Clave de fá e de dó estão implementadas mas **não testadas** (o caso do Manuel é sax,
   sempre clave de sol).
-- Nota ligada recebe o nome repetido.
+- Ligadura que atravessa o FIM DO SISTEMA ainda repete o nome: cada metade do arco é um
+  path, e nenhuma tem as duas pontas.
 - Acorde (várias notas no mesmo x) empilha os nomes; pouco testado.
 - **No modo contorno não leio pausa** — sem codepoint, pausa de semínima e bequadro têm
   quase a mesma caixa. Por isso o ritmo do cadernin fica em 34%, contra ~100% nos PDFs
