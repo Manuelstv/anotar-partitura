@@ -4,33 +4,16 @@ Lista viva do que ficou por fazer. Ordem = prioridade.
 
 ---
 
-## 1. Nota ligada / nota longa deve receber UM nome só, com `_`
+## 1. ~~Nota ligada / nota longa com UM nome só e `_`~~ — RESOLVIDO
 
-**Hoje:** uma nota sustentada por ligadura recebe o nome repetido em cada cabeça.
-No The-chicken sai `G G G`; o certo é `G_`.
+`ligaduras_de()` acha o arco (path curvo preenchido, 2–4 curvas, baixo) entre duas
+cabeças **vizinhas e de mesma altura**, sem pausa no meio. A segunda perde o nome, a
+primeira ganha `_` e a soma das durações. Nota longa sem ligadura (`dur >= 2`) também
+recebe `_`. Funciona nos três modos de leitura, inclusive contorno.
 
-**Por quê:** o nome repetido sugere três ataques, quando é um som só. Além de poluir,
-ensina errado — o aluno lê três notas.
-
-**Como deve ficar:** o nome aparece na primeira cabeça, seguido de `_` para indicar que
-o som continua. As cabeças seguintes da mesma ligadura não recebem nome. É o padrão do
-Sibelius no próprio The-chicken, que usa traço de extensão.
-
-**Destravou:** a duração já é lida (item 2, resolvido), então a metade "nota longa sem
-ligadura" (mínima, semibreve) é imediata — basta `dur >= 2` para estampar `_`.
-
-**Falta a ligadura de valor.** Caminho provável: ligadura é um caminho **curvo** (Bézier)
-ligando duas cabeças de **mesma altura** e adjacentes. Já coleto os desenhos em
-`coletar()`, e no MuseScore ela aparece como path preenchido com exatamente 2 itens `c`
-(medido na negra: 22 desses na página). Então falta:
-
-1. filtrar arcos curvos de largura compatível, entre duas cabeças vizinhas;
-2. se as duas cabeças tiverem a mesma altura → é **ligadura de valor**: suprimir o nome
-   da segunda, marcar a primeira com `_` e somar as durações;
-3. se tiverem alturas diferentes → é **fraseado**: não mexer nos nomes.
-
-Cuidado: ligadura pode atravessar a barra de compasso e o fim do sistema (a segunda
-cabeça está na linha de baixo).
+**Falta:** ligadura que atravessa o **fim do sistema** — a segunda cabeça está na
+primeira pauta de baixo, e cada metade do arco é um path separado. Hoje nenhuma das
+duas metades acha as duas pontas, então a nota sai com nome repetido.
 
 ---
 
