@@ -175,8 +175,9 @@ def ler_cifras(pg, sistemas, textos, formas):
                 return True
         return False
 
-    # Junta o SOBRESCRITO de volta: "G7" costuma vir como span "G" + span "7" em outra
-    # linha de base, e sem juntar a cifra perderia a qualidade (e com ela a escala).
+    # Junta o SUFIXO de volta: a qualidade vem em span separado, tanto em sobrescrito
+    # ("G" + "7") quanto em letras ("A" + "maj7", "A" + "m11"). Sem juntar, Amaj7 vira
+    # "A" e a analise erra o acorde inteiro.
     acima = []
     for t in textos:
         cy = (t["bbox"][1] + t["bbox"][3]) / 2
@@ -195,8 +196,14 @@ def ler_cifras(pg, sistemas, textos, formas):
     acima.sort(key=lambda t: (t["s"], t["x0"]))
     juntos = []
     for t in acima:
-        if (juntos and juntos[-1]["s"] == t["s"]
-                and re.fullmatch(r'[#b\d()+\-]{1,6}', t["txt"])
+        # sufixo = qualidade/extensao ("maj7", "m11", "7") ou o baixo de barra ("/C")
+        eh_sufixo = bool(re.fullmatch(
+            r'(maj|Maj|MAJ|min|m|M|dim|aug|sus|add|\u00b0|\u00f8|\u0394)?[\d#b()+\-]*'
+            r'(/[A-G][#b]?)?', t["txt"])) and 0 < len(t["txt"]) <= 7
+        # o acumulado pode ja ter sufixo: "G"+"add9"+"/C" -> "Gadd9/C"
+        em_curso = juntos and re.fullmatch(r'[A-G][#b]?[A-Za-z0-9#b()+\-]{0,7}',
+                                           juntos[-1]["txt"])
+        if (juntos and juntos[-1]["s"] == t["s"] and eh_sufixo and em_curso
                 and 0 <= t["x0"] - juntos[-1]["x1"] < 0.25 * t["span"]):
             juntos[-1]["txt"] += t["txt"]
             juntos[-1]["x1"] = t["x1"]
