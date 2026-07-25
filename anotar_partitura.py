@@ -571,12 +571,19 @@ def _niveis(hs, beams, bandeiras, esp):
 
 
 GRACA = 0.85            # cabeca menor que isso x a mediana e apojatura (nao ocupa tempo)
-LIG_ALT = 2.2           # altura maxima do arco de ligadura, em espacos de pauta
-LIG_LARG = (0.55, 18.0) # largura minima e maxima do arco
+# O arco de uma ligadura longa sobe junto: com o limite em 2,2 espacos, a ligadura
+# de uma semibreve para a seguinte ficava de fora. Quem separa ligadura de fraseado
+# nao e o tamanho do arco, e sim as duas cabecas serem vizinhas e da mesma altura.
+LIG_ALT = 4.0           # altura maxima do arco, em espacos de pauta
+LIG_LARG = (0.55, 32.0) # largura minima e maxima do arco
 
 
 def ligaduras_de(caminhos, notas, esp, pausas=()):
-    """{indice da nota que so continua o som: indice da nota que comeca o som}.
+    """({continua: comeca}, entra_de_cima, sai_pro_proximo).
+
+    Os dois booleanos sao a ligadura partida no fim do sistema: o gravador desenha
+    METADE do arco saindo da ultima nota e a outra metade chegando na primeira nota
+    da pauta de baixo. Cada metade sozinha so tem uma ponta em cima de uma cabeca.
 
     Ligadura de VALOR e um arco entre duas cabecas VIZINHAS e de MESMA altura. Com
     alturas diferentes o arco e fraseado (slur) e nao muda nome nenhum. Exigir que
@@ -584,8 +591,8 @@ def ligaduras_de(caminhos, notas, esp, pausas=()):
     comeca e termina na mesma nota — sem isso, "G ... G" com meio compasso no meio
     viraria uma nota so.
     """
-    if len(notas) < 2:
-        return {}
+    if not notas:
+        return {}, False, False
     arcos = [c for c in caminhos
              if 2 <= c["curvas"] <= 4 and c["h"] <= LIG_ALT * esp
              and LIG_LARG[0] * esp <= c["w"] <= LIG_LARG[1] * esp]
@@ -596,9 +603,16 @@ def ligaduras_de(caminhos, notas, esp, pausas=()):
                 and min(abs(n[0]["y"] - c["y0"]), abs(n[0]["y"] - c["y1"])) < 1.7 * esp]
         return min(cand, key=lambda kn: abs(kn[1]["x"] - x))[0] if cand else None
 
-    out = {}
+    out, entra, sai = {}, False, False
+    ultima, primeira = notas[-1][0], notas[0][0]
     for c in arcos:
         i, j = ponta(c["x0"], c), ponta(c["x1"], c)
+        if i is None and j == 0 and c["x0"] < primeira["x"] - 1.5 * esp:
+            entra = True
+            continue
+        if j is None and i == len(notas) - 1 and c["x1"] > ultima["x"] + 1.5 * esp:
+            sai = True
+            continue
         if i is None or j is None or j != i + 1:
             continue
         if notas[i][2] != notas[j][2] or notas[i][3] != notas[j][3]:
@@ -607,7 +621,7 @@ def ligaduras_de(caminhos, notas, esp, pausas=()):
         if any(xi < p["x"] < xj for p in pausas):
             continue                       # tem pausa no meio: o som nao continua
         out[j] = i
-    return out
+    return out, entra, sai
 
 
 def _e_ritornello(p, pontos, barras, esp):
@@ -675,7 +689,7 @@ def ler_notas(pg, sistema, com_pausas=False):
     if not any(g["tipo"] == "cabeca" for g in glifos) and sistemas:
         # PDF com os simbolos convertidos em curvas: le pela geometria
         glifos = glifos_de_contorno(caminhos, sistemas)
-    rotulos, existentes, pausas = [], [], []
+    rotulos, existentes, pausas, pontas = [], [], [], []
 
     centros = [(s[0] + s[-1]) / 2 for s in sistemas]
 
@@ -772,9 +786,10 @@ def ler_notas(pg, sistema, com_pausas=False):
         # ---- ligadura de valor: a segunda cabeca nao ganha nome, e a primeira
         # recebe "_" e a duracao das duas somadas. Sem isso, uma nota so segurada
         # sai como tres ataques ("G G G") e ensina errado.
-        lig = ligaduras_de([c for c in caminhos
-                            if topo - 3 * span < (c["y0"] + c["y1"]) / 2 < base_l + 3 * span],
-                           notas, span / 4.0, descansos)
+        lig, entra_lig, sai_lig = ligaduras_de(
+            [c for c in caminhos
+             if topo - 3 * span < (c["y0"] + c["y1"]) / 2 < base_l + 3 * span],
+            notas, span / 4.0, descansos)
         segura = set(lig)
         somado = {}
         for j in sorted(lig):
@@ -818,6 +833,9 @@ def ler_notas(pg, sistema, com_pausas=False):
                 pausas.append({"x": g["x"], "dur": dur_pausa[id(g)],
                                "sistema": sidx, "compasso": i_barra})
 
+        pontas.append({"sistema": sidx, "entra": entra_lig, "sai": sai_lig,
+                       "i0": len(rotulos), "i1": len(rotulos) + len(notas) - 1})
+
         for ordem, (h, txt, idx, alt, cmp_) in enumerate(notas):
             d, gr = dur_de.get(id(h), (1, False))
             total = somado.get(ordem, d)
@@ -847,6 +865,20 @@ def ler_notas(pg, sistema, com_pausas=False):
                     and "Chord" not in t["fonte"] and RE_NOME_NOTA.match(t["txt"])
                     and any(abs(cx - xh) < 1.1 * span for xh in xs_cabeca)):
                 existentes.append(t)
+
+    # ---- costura a ligadura partida no fim do sistema: meio arco saindo da ultima
+    # nota de uma pauta, meio arco chegando na primeira da pauta seguinte.
+    for a, b in zip(pontas, pontas[1:]):
+        if not (a["sai"] and b["entra"]) or a["i1"] < a["i0"] or b["i1"] < b["i0"]:
+            continue
+        fim, ini = rotulos[a["i1"]], rotulos[b["i0"]]
+        if fim["idx"] != ini["idx"] or fim["alt"] != ini["alt"] or ini["ligada"]:
+            continue
+        ini["ligada"], ini["texto"] = True, ""
+        fim["dur_total"] += ini["dur_total"]
+        if not fim["ligada"] and not fim["texto"].endswith("_"):
+            fim["texto"] += "_"
+
     if com_pausas:
         return rotulos, existentes, pausas
     return rotulos, existentes
