@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anotar partitura — nome das notas no seu PDF</title>
-<meta name="description" content="Arraste um PDF de partitura e baixe o mesmo PDF com o nome de cada nota escrito embaixo da pauta, mais uma análise da música. Roda 100% no seu navegador.">
+<meta name="description" content="Arraste um PDF de partitura e baixe o mesmo PDF com o nome de cada nota embaixo da pauta, mais a análise da música. Roda no seu navegador.">
 <style>
   /* ---------------------------------------------------------------- tokens
      Escala tipografica com salto de ~1.25x e no maximo 3 tamanhos por bloco;
@@ -242,10 +242,9 @@
   <header>
     <h1>Anotar partitura</h1>
     <p class="apoio">
-      Arraste um PDF de partitura e baixe <strong>o mesmo PDF</strong> com o nome de cada
-      nota escrito embaixo da pauta — mais uma análise da música e o nível de
-      dificuldade no sax alto. Roda inteiro no seu navegador: o arquivo não sai do seu
-      computador.
+      Baixe <strong>o mesmo PDF</strong> com o nome de cada nota embaixo da pauta, mais a
+      análise da música e a dificuldade no sax alto. Roda no seu navegador — o arquivo não
+      sai do seu aparelho.
     </p>
   </header>
 
@@ -255,7 +254,7 @@
       <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/>
     </svg>
     <span class="titulo">Arraste os PDFs aqui</span>
-    <span class="sub">ou clique para escolher — pode soltar vários de uma vez</span>
+    <span class="sub">ou toque para escolher — vários de uma vez</span>
   </button>
   <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple tabindex="-1" aria-hidden="true">
 
@@ -269,7 +268,7 @@
     </div>
     <label class="caixa">
       <input type="checkbox" id="limpar">
-      <span>Apagar nomes já existentes</span>
+      <span>Apagar nomes antigos</span>
     </label>
   </div>
 
@@ -284,66 +283,54 @@
     <summary>O que cada número quer dizer</summary>
     <dl class="termos">
       <dt>Tom</dt>
-      <dd>A "casa" da música — o conjunto de notas que soa natural nela. Sai da armadura
-        (os sustenidos ou bemóis logo depois da clave). Maior soa mais aberto, menor mais
-        fechado; as duas dividem a mesma armadura, por isso a segunda aparece como
-        relativa.</dd>
+      <dd>A "casa" da música, dada pela armadura. Maior soa mais aberto; menor, mais
+        fechado. As duas dividem a mesma armadura.</dd>
 
       <dt>Âmbito</dt>
-      <dd>A nota mais grave e a mais aguda que aparecem, em altura <em>escrita</em> — a que
-        você lê, não a que soa. Serve para saber se a música mora na região confortável ou
-        se puxa para os extremos do instrumento.</dd>
+      <dd>A nota mais grave e a mais aguda, na altura que você lê (não na que soa).</dd>
 
       <dt>Extensão</dt>
-      <dd>A distância entre essas duas, contada em semitons (o menor passo possível, de uma
-        tecla do piano para a vizinha). 12 semitons = uma oitava. Quanto maior, mais o dedo
-        viaja.</dd>
+      <dd>A distância entre elas em semitons — 12 semitons é uma oitava.</dd>
 
       <dt>Notas</dt>
-      <dd>Quantas cabeças de nota o PDF tem ao todo, somando as páginas.</dd>
+      <dd>Quantas notas o PDF tem ao todo.</dd>
 
       <dt>Compassos</dt>
-      <dd>Quantos compassos foram detectados — os trechos entre uma barra vertical e a
-        seguinte.</dd>
+      <dd>Trechos entre uma barra vertical e a seguinte.</dd>
 
       <dt>Alteradas</dt>
-      <dd>A porcentagem de notas com sustenido, bemol ou bequadro. Quanto mais alta, mais
-        cromática é a música — e no sax cromatismo custa dedilhado.</dd>
+      <dd>Fatia de notas com sustenido, bemol ou bequadro. Mais alta = mais cromática, e
+        cromatismo custa dedilhado.</dd>
 
       <dt>Dificuldade</dt>
-      <dd>Estimativa de 0 a 10 para tocar no sax alto, a partir do registro, da extensão,
-        do cromatismo e das viradas de oitava. Os pesos foram ajustados contra partituras
-        que já vinham rotuladas como iniciante / intermediário / avançado — não são
-        chutados. Não considera ritmo, porque a duração das figuras não é lida.</dd>
+      <dd>De 0 a 10 para sax alto, a partir de registro, extensão, cromatismo e viradas de
+        oitava. Os pesos vieram de partituras já rotuladas como iniciante / intermediário /
+        avançado. Não considera ritmo.</dd>
 
       <dt>Cifras</dt>
-      <dd>Os acordes escritos acima da pauta. Não são adivinhados: quando existem no PDF,
-        são lidos de lá. Se a música não traz cifra, esta parte não aparece.</dd>
+      <dd>Os acordes escritos acima da pauta — lidos do PDF, não adivinhados.</dd>
 
       <dt>Como cada acorde é formado</dt>
-      <dd>As notas que compõem cada acorde e a escala que cabe por cima para improvisar.
-        Ex.: <b>G7</b> = G B D F, e por cima dele funciona o mixolídio.</dd>
+      <dd>As notas do acorde e a escala que cabe por cima. Ex.: <b>G7</b> = G B D F,
+        mixolídio.</dd>
 
       <dt>Notas mais tocadas</dt>
-      <dd>As alturas que mais aparecem. Costumam ser as notas de apoio da melodia — boas
-        candidatas para começar e terminar frases.</dd>
+      <dd>As que mais aparecem — bons pontos de apoio para começar e terminar frases.</dd>
 
       <dt>Onde a música pesa</dt>
-      <dd>Os trechos mais difíceis e o motivo: salto largo, agudo de chave de palma, grave
-        de mindinho, muitas alteradas ou muitas notas no mesmo compasso.</dd>
+      <dd>Os trechos mais difíceis e o porquê: salto largo, agudo de palma, grave de
+        mindinho, muitas alteradas.</dd>
     </dl>
   </details>
 
   <p class="nota-rodape" id="dica-formatos">
-    Funciona com partitura gerada por computador — MuseScore, Dorico, Sibelius, Finale —
-    inclusive quando os símbolos foram convertidos em curvas. PDF escaneado não dá: sem
-    vetor não há coordenada para ler a altura das notas.
+    Funciona com partitura feita no computador (MuseScore, Dorico, Sibelius, Finale).
+    PDF escaneado não dá — sem vetor não há como ler a altura das notas.
   </p>
 
   <footer>
-    Leitura por geometria vetorial, não OCR: as cabeças de nota já estão no PDF com
-    coordenada exata, então a altura sai por aritmética. A análise é determinística —
-    nenhuma parte dela é inferida por IA.
+    Não é OCR: as notas já estão no PDF com coordenada exata, então a altura sai por
+    aritmética. A análise é determinística, sem IA.
     <a href="https://github.com/Manuelstv/anotar-partitura">Código no GitHub</a>.
   </footer>
 </div>
@@ -368,7 +355,7 @@ let pyPromise = null;
 function pegarPy() {
   if (pyPromise) return pyPromise;
   pyPromise = (async () => {
-    progresso({ texto: "Preparando o motor de leitura (primeira vez baixa ~25 MB)", indet: true });
+    progresso({ texto: "Preparando o motor — primeira vez baixa ~25 MB", indet: true });
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
@@ -574,7 +561,7 @@ if _rel["total"]:
 function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
   const base = nome.replace(/\.pdf$/i, "");
   if (!rel.total) {
-    cartao.marcar("ruim", "nenhuma nota encontrada — provavelmente é um PDF escaneado");
+    cartao.marcar("ruim", "nenhuma nota encontrada — parece PDF escaneado");
     return;
   }
   const detalhe = [`${rel.total} notas anotadas`];
