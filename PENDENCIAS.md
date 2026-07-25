@@ -6,14 +6,18 @@ Lista viva do que ficou por fazer. Ordem = prioridade.
 
 ## 1. ~~Nota ligada / nota longa com UM nome só e `_`~~ — RESOLVIDO
 
-`ligaduras_de()` acha o arco (path curvo preenchido, 2–4 curvas, baixo) entre duas
-cabeças **vizinhas e de mesma altura**, sem pausa no meio. A segunda perde o nome, a
-primeira ganha `_` e a soma das durações. Nota longa sem ligadura (`dur >= 2`) também
-recebe `_`. Funciona nos três modos de leitura, inclusive contorno.
+`ligaduras_de()` acha o arco (path curvo preenchido, 2–4 curvas) entre duas cabeças
+**vizinhas e de mesma altura**, sem pausa no meio. A segunda perde o nome, a primeira
+ganha `_` e a soma das durações. Nota longa sem ligadura (`dur >= 2`) também recebe `_`.
+Funciona nos três modos de leitura, inclusive contorno.
 
-**Falta:** ligadura que atravessa o **fim do sistema** — a segunda cabeça está na
-primeira pauta de baixo, e cada metade do arco é um path separado. Hoje nenhuma das
-duas metades acha as duas pontas, então a nota sai com nome repetido.
+A ligadura partida no **fim do sistema** também é costurada: meio arco sai da última
+cabeça de uma pauta e meio arco chega na primeira da pauta seguinte, e `ler_notas` junta
+as duas pontas depois do laço. Medido em 150 arquivos do acervo: 4,8% das cabeças ficam
+presas por ligadura, com máximo de 28% num arranjo de bossa (que é ligadura mesmo).
+
+**Falta:** ligadura entre a última pauta de uma página e a primeira da página seguinte
+(`ler_notas` trabalha por página).
 
 ---
 
@@ -76,6 +80,9 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ## 7. Casos não cobertos (conhecidos, não são bugs)
 
+- **`--limpar` não apaga traço de extensão.** Nas partituras que já vêm com nome, o
+  traço que indica nota longa é um desenho, não texto, e a tarja branca só cobre texto.
+  Sobra um risquinho por cima do nome novo.
 - **PDF escaneado** — sem vetor não há coordenada. Precisaria de OMR (Audiveris/oemer).
 - **Pauta de ritmo (1 linha)** — não tem altura para nomear. É a maior parte do 1,15%
   de cobertura que falta. Poderia ao menos avisar "pauta de ritmo" em vez de silenciar.
