@@ -352,7 +352,7 @@ def analisar(dados):
                     "motivos": motivos or ["nada de especial"]})
     dif.sort(key=lambda d: -d["pontos"])
 
-    freq = collections.Counter(r["texto"] for r in notas)
+    freq = collections.Counter(r["nome"] for r in notas)
     seq_comp = [tuple(r["midi"] for r in v) for v in compassos.values()]
     unicos = len(set(seq_comp))
 
