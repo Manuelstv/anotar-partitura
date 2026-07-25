@@ -209,6 +209,22 @@
                 background: #fff; display: block; }
 
   /* --------------------------------------------------------------- fim   */
+  .glossario { margin-top: var(--s6); border: 1px solid var(--borda);
+               border-radius: var(--r-md); background: var(--superficie); }
+  .glossario > summary {
+    padding: var(--s3) var(--s4); cursor: pointer; font-size: var(--t-sm);
+    font-weight: 600; color: var(--texto-2); list-style: none;
+    display: flex; align-items: center; gap: var(--s2);
+  }
+  .glossario > summary::-webkit-details-marker { display: none; }
+  .glossario > summary::before { content: "▸"; font-size: .7em; transition: transform .15s ease; }
+  .glossario[open] > summary::before { transform: rotate(90deg); }
+  .glossario > summary:hover { color: var(--texto); }
+  .termos { margin: 0; padding: 0 var(--s4) var(--s5); font-size: var(--t-sm); }
+  .termos dt { font-weight: 600; margin-top: var(--s4); }
+  .termos dt:first-child { margin-top: 0; }
+  .termos dd { margin: 2px 0 0; color: var(--texto-2); }
+
   .nota-rodape { margin-top: var(--s6); color: var(--texto-3); font-size: var(--t-sm); }
   footer { margin-top: var(--s6); padding-top: var(--s5); border-top: 1px solid var(--borda);
            color: var(--texto-3); font-size: var(--t-sm); }
@@ -263,6 +279,60 @@
   </div>
 
   <div id="lista"></div>
+
+  <details class="glossario">
+    <summary>O que cada número quer dizer</summary>
+    <dl class="termos">
+      <dt>Tom</dt>
+      <dd>A "casa" da música — o conjunto de notas que soa natural nela. Sai da armadura
+        (os sustenidos ou bemóis logo depois da clave). Maior soa mais aberto, menor mais
+        fechado; as duas dividem a mesma armadura, por isso a segunda aparece como
+        relativa.</dd>
+
+      <dt>Âmbito</dt>
+      <dd>A nota mais grave e a mais aguda que aparecem, em altura <em>escrita</em> — a que
+        você lê, não a que soa. Serve para saber se a música mora na região confortável ou
+        se puxa para os extremos do instrumento.</dd>
+
+      <dt>Extensão</dt>
+      <dd>A distância entre essas duas, contada em semitons (o menor passo possível, de uma
+        tecla do piano para a vizinha). 12 semitons = uma oitava. Quanto maior, mais o dedo
+        viaja.</dd>
+
+      <dt>Notas</dt>
+      <dd>Quantas cabeças de nota o PDF tem ao todo, somando as páginas.</dd>
+
+      <dt>Compassos</dt>
+      <dd>Quantos compassos foram detectados — os trechos entre uma barra vertical e a
+        seguinte.</dd>
+
+      <dt>Alteradas</dt>
+      <dd>A porcentagem de notas com sustenido, bemol ou bequadro. Quanto mais alta, mais
+        cromática é a música — e no sax cromatismo custa dedilhado.</dd>
+
+      <dt>Dificuldade</dt>
+      <dd>Estimativa de 0 a 10 para tocar no sax alto, a partir do registro, da extensão,
+        do cromatismo e das viradas de oitava. Os pesos foram ajustados contra partituras
+        que já vinham rotuladas como iniciante / intermediário / avançado — não são
+        chutados. Não considera ritmo, porque a duração das figuras não é lida.</dd>
+
+      <dt>Cifras</dt>
+      <dd>Os acordes escritos acima da pauta. Não são adivinhados: quando existem no PDF,
+        são lidos de lá. Se a música não traz cifra, esta parte não aparece.</dd>
+
+      <dt>Como cada acorde é formado</dt>
+      <dd>As notas que compõem cada acorde e a escala que cabe por cima para improvisar.
+        Ex.: <b>G7</b> = G B D F, e por cima dele funciona o mixolídio.</dd>
+
+      <dt>Notas mais tocadas</dt>
+      <dd>As alturas que mais aparecem. Costumam ser as notas de apoio da melodia — boas
+        candidatas para começar e terminar frases.</dd>
+
+      <dt>Onde a música pesa</dt>
+      <dd>Os trechos mais difíceis e o motivo: salto largo, agudo de chave de palma, grave
+        de mindinho, muitas alteradas ou muitas notas no mesmo compasso.</dd>
+    </dl>
+  </details>
 
   <p class="nota-rodape" id="dica-formatos">
     Funciona com partitura gerada por computador — MuseScore, Dorico, Sibelius, Finale —
@@ -350,6 +420,14 @@ function montarAnalise(info, dificuldade) {
 
   const fatos = document.createElement("dl");
   fatos.className = "fatos";
+  const DICAS = {
+    "Tom": `A "casa" da música, vinda da armadura. Relativa: ${info.tom_relativo}.`,
+    "Âmbito": "Nota mais grave e mais aguda, em altura escrita.",
+    "Extensão": "Distância entre elas em semitons — 12 é uma oitava.",
+    "Notas": "Total de cabeças de nota no PDF.",
+    "Compassos": "Trechos entre uma barra vertical e a seguinte.",
+    "Alteradas": "Fatia de notas com sustenido, bemol ou bequadro.",
+  };
   const linhas = [
     ["Tom", info.tom, ""],
     ["Âmbito", `${info.grave}–${info.agudo}`, ""],
@@ -361,6 +439,7 @@ function montarAnalise(info, dificuldade) {
   for (const [rot, val, unid] of linhas) {
     const w = document.createElement("div");
     w.className = "fato";
+    w.title = DICAS[rot] || "";
     w.innerHTML = `<dt></dt><dd></dd>`;
     w.querySelector("dt").textContent = rot;
     w.querySelector("dd").textContent = val;
