@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Anotar partitura — nome das notas no seu PDF</title>
-<meta name="description" content="Arraste um PDF de partitura e baixe o mesmo PDF com o nome de cada nota embaixo da pauta, mais a análise da música. Roda no seu navegador.">
+<meta name="description" content="Arraste um PDF de partitura e receba o mesmo arquivo com o nome de cada nota embaixo da pauta, mais a análise da música. Roda no seu navegador.">
 <style>
   /* ---------------------------------------------------------------- tokens
      Escala tipografica com salto de ~1.25x, no maximo 3 tamanhos por bloco, e
@@ -327,9 +327,10 @@
     </span>
     <h1>O nome de cada nota, no seu próprio PDF</h1>
     <p class="apoio">
-      Volta o <strong>mesmo arquivo</strong> com o nome embaixo da pauta — mais a análise da
-      música, a melodia tocada ao piano e a dificuldade no sax alto. Tudo roda no navegador:
-      o PDF não sai do seu aparelho.
+      Você recebe de volta o <strong>mesmo arquivo</strong>, com o nome escrito embaixo de
+      cada nota. Junto vem uma análise da música e uma nota de dificuldade para sax alto, e
+      dá para ouvir a melodia num piano. Tudo acontece dentro do navegador, então o seu PDF
+      não sai do aparelho.
     </p>
   </header>
 
@@ -342,7 +343,7 @@
         </svg>
       </span>
       <span class="titulo">Arraste os PDFs aqui</span>
-      <span class="sub">ou toque para escolher — vários de uma vez</span>
+      <span class="sub">ou toque para escolher. Pode mandar vários de uma vez.</span>
     </button>
     <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple tabindex="-1" aria-hidden="true">
 
@@ -372,14 +373,16 @@
     <summary>Teoria e análise musical</summary>
     <dl class="termos">
       <dt>Tom</dt>
-      <dd>A "casa" da música, dada pela armadura. Maior soa mais aberto; menor, mais
-        fechado. As duas dividem a mesma armadura.</dd>
+      <dd>A armadura diz em que tom a música está. Maior costuma soar mais aberto e menor
+        mais fechado, e as duas compartilham a mesma armadura.</dd>
 
       <dt>Âmbito</dt>
-      <dd>A nota mais grave e a mais aguda, na altura que você lê (não na que soa).</dd>
+      <dd>Da nota mais grave até a mais aguda, sempre na altura escrita, que no sax alto
+        é diferente da que sai.</dd>
 
       <dt>Extensão</dt>
-      <dd>A distância entre elas em semitons — 12 semitons é uma oitava.</dd>
+      <dd>A distância entre essas duas notas, contada em semitons. Doze semitons dão
+        uma oitava.</dd>
 
       <dt>Notas</dt>
       <dd>Quantas notas o PDF tem ao todo.</dd>
@@ -388,73 +391,77 @@
       <dd>Trechos entre uma barra vertical e a seguinte.</dd>
 
       <dt>Alteradas</dt>
-      <dd>Fatia de notas com sustenido, bemol ou bequadro. Mais alta = mais cromática, e
-        cromatismo custa dedilhado.</dd>
+      <dd>Quanto da música tem sustenido, bemol ou bequadro. Quanto maior essa fatia,
+        mais cromática a peça, e cromatismo dá trabalho no dedilhado.</dd>
 
       <dt>Dificuldade</dt>
-      <dd>De 0 a 10 para sax alto — veja abaixo como sai a conta.</dd>
+      <dd>Uma nota de 0 a 10 para sax alto. A seção seguinte explica como ela sai.</dd>
 
       <dt>Cifras</dt>
-      <dd>Os acordes escritos acima da pauta — lidos do PDF, não adivinhados.</dd>
+      <dd>Os acordes que o arranjador escreveu acima da pauta, lidos direto do
+        arquivo.</dd>
 
       <dt>Como cada acorde é formado</dt>
-      <dd>As notas do acorde e a escala que cabe por cima. Ex.: <b>G7</b> = G B D F,
-        mixolídio.</dd>
+      <dd>Que notas formam o acorde e qual escala cabe por cima dele. No <b>G7</b>, por
+        exemplo, são G B D F, com escala mixolídia.</dd>
 
       <dt>Campo harmônico</dt>
-      <dd>Os sete acordes que nascem do tom, empilhando terças sobre a escala. Não são os
-        acordes da música — são os que cabem nela. Quando a partitura não traz cifra, é o
-        ponto de partida para harmonizar ou improvisar.</dd>
+      <dd>Os sete acordes que nascem do tom, empilhando terças sobre a escala. Eles
+        formam o repertório que combina com a música, mesmo que ela não toque todos. Se a
+        partitura vier sem cifra, é daqui que você parte para harmonizar ou improvisar.</dd>
 
       <dt>Notas mais tocadas</dt>
-      <dd>As que mais aparecem — bons pontos de apoio para começar e terminar frases.</dd>
+      <dd>As que mais aparecem na música. Costumam ser bons pontos de apoio para começar
+        e terminar frases.</dd>
 
       <dt>Onde a música pesa</dt>
-      <dd>Os trechos mais difíceis e o porquê: salto largo, agudo de palma, grave de
-        mindinho, muitas alteradas.</dd>
+      <dd>Os trechos mais difíceis, com o motivo de cada um: salto grande, agudo de
+        palma, grave de mindinho, acúmulo de alteradas.</dd>
     </dl>
   </details>
 
   <details class="glossario">
     <summary>Como a dificuldade é medida</summary>
-    <p>É uma conta, não um chute. Cada partitura vira seis números, cada um com um peso,
-      e a soma vira nota de 0 a 10.</p>
+    <p>Cada partitura vira seis medidas. Cada medida tem um peso, e a soma delas dá a
+      nota de 0 a 10.</p>
     <dl class="termos">
       <dt>Notas diferentes</dt>
-      <dd>Quantas alturas distintas aparecem. É o que mais pesa: mais notas diferentes,
-        mais dedilhado para acertar.</dd>
+      <dd>Quantas alturas distintas a música usa. É o fator de maior peso, porque cada
+        altura nova é mais um dedilhado para acertar.</dd>
 
       <dt>Alteradas</dt>
-      <dd>Fatia com sustenido, bemol ou bequadro. Cromatismo pede dedilhado auxiliar.</dd>
+      <dd>Quanto da música é cromática. Sustenido e bemol costumam pedir dedilhado
+        auxiliar.</dd>
 
       <dt>Extensão</dt>
       <dd>Distância da nota mais grave à mais aguda.</dd>
 
       <dt>Agudo</dt>
-      <dd>Fatia acima do dó agudo, onde entra a chave de palma.</dd>
+      <dd>A parte da música acima do dó agudo, onde entra a chave de palma.</dd>
 
       <dt>Altíssimo</dt>
-      <dd>Fatia acima do registro normal do sax — sobreagudo.</dd>
+      <dd>O que passa do registro normal do sax, lá no sobreagudo.</dd>
 
       <dt>Quebras de registro</dt>
       <dd>Quantas vezes a melodia atravessa a virada de oitava do sax, onde muda a mão toda.</dd>
     </dl>
-    <p>Os pesos não foram escolhidos a dedo: saíram de um ajuste sobre <b>572 partituras</b>
-      que já vinham marcadas como iniciante, intermediário ou avançado. São todos
-      positivos de propósito — nenhum fator pode "facilitar" a peça.</p>
+    <p>Os pesos vieram de um ajuste sobre <b>572 partituras</b> que já estavam marcadas
+      como iniciante, intermediário ou avançado. Todos ficaram positivos de propósito, para
+      que nenhum fator possa deixar a peça mais fácil.</p>
     <p>Testando fora da amostra, a nota acerta a ordem <b>iniciante &lt; intermediário &lt;
-      avançado</b> em <b>92%</b> das músicas que existem nos três níveis. Ela serve para
-      comparar peças, não como verdade absoluta. Ainda não entra o <b>ritmo</b>.</p>
+      avançado</b> em <b>92%</b> das músicas que aparecem nos três níveis. Vale como
+      comparação entre peças. O <b>ritmo</b> ainda não entra na conta.</p>
   </details>
 
   <p class="nota-rodape" id="dica-formatos">
-    Funciona com partitura feita no computador (MuseScore, Dorico, Sibelius, Finale).
-    PDF escaneado não dá — sem vetor não há como ler a altura das notas.
+    Funciona com partitura feita no computador, tipo MuseScore, Dorico, Sibelius ou
+    Finale. Partitura escaneada não funciona, porque numa imagem não existe coordenada
+    para medir a altura das notas.
   </p>
 
   <footer>
-    Não é OCR: as notas já estão no PDF com coordenada exata, então a altura sai por
-    aritmética. A análise é determinística, sem IA.
+    As notas já estão no PDF com coordenada exata, então a altura sai por aritmética em
+    cima delas. A análise toda é determinística, sem IA.
     <a href="https://github.com/Manuelstv/anotar-partitura">Código no GitHub</a>.
   </footer>
 </div>
@@ -479,11 +486,11 @@ let pyPromise = null;
 function pegarPy() {
   if (pyPromise) return pyPromise;
   pyPromise = (async () => {
-    progresso({ texto: "Preparando o motor — primeira vez baixa ~25 MB", indet: true });
+    progresso({ texto: "Preparando o motor. Na primeira vez baixa uns 25 MB.", indet: true });
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=13";
+    const v = "?v=14";
     for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
       py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
     }
@@ -613,7 +620,7 @@ function montarTocador(melodia) {
     <label class="and">Andamento
       <input type="range" class="bpm-faixa" min="40" max="180" step="2" value="92">
       <span class="bpm">92 BPM</span></label>
-    <p class="aviso-campo">Piano sintetizado, nas notas escritas — não é o som do sax.</p>`;
+    <p class="aviso-campo">Piano sintetizado, tocando as notas como estão escritas.</p>`;
 
   const bt = b.querySelector(".play"), linha = b.querySelector(".linha"),
         faixaBpm = b.querySelector(".bpm-faixa"), rotBpm = b.querySelector(".bpm"),
@@ -723,9 +730,9 @@ function montarAnalise(info, dificuldade) {
   const fatos = document.createElement("dl");
   fatos.className = "fatos larga";
   const DICAS = {
-    "Tom": `A "casa" da música, vinda da armadura. Relativa: ${info.tom_relativo}.`,
+    "Tom": `Vem da armadura. A relativa é ${info.tom_relativo}.`,
     "Âmbito": "Nota mais grave e mais aguda, em altura escrita.",
-    "Extensão": "Distância entre elas em semitons — 12 é uma oitava.",
+    "Extensão": "Distância entre elas em semitons. Doze é uma oitava.",
     "Notas": "Total de cabeças de nota no PDF.",
     "Compassos": "Trechos entre uma barra vertical e a seguinte.",
     "Alteradas": "Fatia de notas com sustenido, bemol ou bequadro.",
@@ -782,7 +789,7 @@ function montarAnalise(info, dificuldade) {
     const b = document.createElement("div");
     b.className = "bloco";
     b.innerHTML = `<h3>Acordes da música</h3><div class="fichas"></div>
-      <p class="aviso-campo">Lidos do PDF. Cada linha: as notas do acorde e a escala que cabe.</p>
+      <p class="aviso-campo">Lidos do arquivo. Em cada linha, as notas do acorde e a escala que cabe.</p>
       <div class="escalas"></div>`;
     info.cifras.forEach(c => b.querySelector(".fichas").append(ficha(c)));
     for (const it of info.escalas || []) {
@@ -804,8 +811,8 @@ function montarAnalise(info, dificuldade) {
       <p class="aviso-campo"></p><div class="escalas campo"></div>`;
     b.querySelector("h3").textContent = `Campo harmônico de ${info.tom}`;
     b.querySelector(".aviso-campo").textContent = semCifra
-      ? "Sem cifra no PDF. Estes são os acordes que cabem no tom — base provável, não lida."
-      : "Os acordes que o tom comporta, para comparar com os de cima.";
+      ? "A partitura veio sem cifra. Estes são os acordes que cabem no tom, como palpite."
+      : "O que o tom comporta, para comparar com as cifras acima.";
     for (const g of info.campo) {
       const l = document.createElement("div");
       l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
@@ -823,7 +830,7 @@ function montarAnalise(info, dificuldade) {
     b.innerHTML = `<h3>Onde a música pesa</h3><ul class="dificeis"></ul>`;
     for (const t of info.dificeis) {
       const li = document.createElement("li");
-      li.textContent = `pág. ${t.pagina}, ${t.sistema}ª pauta — ${t.motivos.join(", ")}`;
+      li.textContent = `pág. ${t.pagina}, ${t.sistema}ª pauta: ${t.motivos.join(", ")}`;
       b.querySelector("ul").append(li);
     }
     corpo.append(b);
@@ -901,7 +908,7 @@ if _rel["total"]:
 function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
   const base = nome.replace(/\.pdf$/i, "");
   if (!rel.total) {
-    cartao.marcar("ruim", "nenhuma nota encontrada — parece PDF escaneado");
+    cartao.marcar("ruim", "nenhuma nota encontrada, parece PDF escaneado");
     return;
   }
   const detalhe = [`${rel.total} notas anotadas`];
