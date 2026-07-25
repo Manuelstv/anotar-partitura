@@ -64,11 +64,20 @@ meio-espaço** do valor exato. Pipeline:
 
 ### Ligadura de valor (`ligaduras_de`)
 
-Arco = path curvo preenchido, 2–4 curvas, baixo. Vira **ligadura** (e não fraseado) só
-quando liga duas cabeças **vizinhas**, de **mesma altura**, sem pausa entre elas. A
-segunda cabeça continua no relatório com `texto` vazio e `ligada: True` — a duração dela
-ainda conta para o compasso — e a primeira recebe `_` e `dur_total` somado. Quem compara
-com o gabarito usa `nome` (sem o `_`), nunca `texto`.
+Arco = path curvo preenchido, 2–4 curvas. Vira **ligadura** (e não fraseado) só quando
+liga duas cabeças **vizinhas**, de **mesma altura**, sem pausa entre elas. A segunda
+cabeça continua no relatório com `texto` vazio e `ligada: True` (a duração dela ainda
+conta para o compasso) e a primeira recebe `_` e `dur_total` somado. Quem compara com o
+gabarito usa `nome` (sem o `_`), nunca `texto`.
+
+**Não filtrar pelo tamanho do arco.** O arco sobe junto com o comprimento: com limite de
+2,2 espaços de altura, a ligadura de uma semibreve para a seguinte ficava de fora. Quem
+separa ligadura de fraseado é a vizinhança e a altura das cabeças, não a geometria do
+arco (hoje o limite é frouxo, 4 espaços de altura por 32 de largura).
+
+No **fim do sistema** a ligadura vem partida em dois arcos, cada um com uma ponta só em
+cima de cabeça. `ligaduras_de` devolve `(ligaduras, entra, sai)` e `ler_notas` costura as
+pautas vizinhas depois do laço, usando a lista `pontas`.
 
 ### Três modos de leitura de glifo
 
