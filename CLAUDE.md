@@ -88,12 +88,22 @@ meio espaço abaixo do centro da caixa; clave altura > 5,5.
    ser o MEIO do vão. Marca de ensaio ("A", "B") casa com a regex de cifra e é separada
    por estar dentro de uma caixa desenhada. E o `7` da cifra é sobrescrito, span à parte:
    sem juntar, "G7" vira "G" e a escala sugerida sai errada.
-8. **Soletrar acorde pelo GRAU diatônico**, nunca por tabela fixa de sustenidos/bemóis:
+8. **Cifra vem partida em vários spans.** `Amaj7` = `A` + `maj7`; `Gadd9/C` = `G` +
+   `add9` + `/C`. A junção tem de aceitar sufixo com LETRAS e baixo de barra, e continuar
+   juntando sobre um acumulado que já tem sufixo. Calibrar só no The-chicken engana: lá
+   todas as cifras são numéricas (`G7`, `C7`).
+9. **Soletrar acorde pelo GRAU diatônico**, nunca por tabela fixa de sustenidos/bemóis:
    senão C7 sai "A#" em vez de "Bb". E `add9`/`6/9` não levam sétima.
-9. Na nota de dificuldade, os pesos são **não-negativos** de propósito: sem essa
+10. Na nota de dificuldade, os pesos são **não-negativos** de propósito: sem essa
    restrição a colinearidade dava peso negativo para salto, ou seja, "salto grande
    facilita". Validar sempre fora da amostra (5 folds) e pela ordenação da mesma música
    em níveis diferentes — é a métrica que importa.
+
+**Padrão que já se repetiu duas vezes:** calibrar num único arquivo e generalizar cedo
+(o deslocamento fixo das fontes Sonata; a junção de cifra só numérica). Ao criar qualquer
+regra a partir de um exemplo, rodar em pelo menos mais dois arquivos de origem diferente
+antes de considerar pronto. E depois de refatorar `analise.py`, rodar a análise num PDF
+de verdade — teste de função isolada não pega `NameError` no caminho completo.
 
 ## Como medir (fazer isso a cada mudança no núcleo)
 
