@@ -46,8 +46,21 @@ meio-espaço** do valor exato. Pipeline:
 2. glifos → clave, armadura, acidentes, cabeças (3 modos, abaixo);
 3. altura = meio-espaços acima da linha de topo + `topo_ref` da clave;
 4. armadura + acidente explícito + acidente vale até a barra de compasso;
-5. `escrever()` estampa embaixo da pauta, abaixo de hastes/ligaduras, 2ª fileira quando
+5. **duração** = figura da cabeça (codepoint) ÷ 2^(níveis de beam ou bandeirola), × ponto;
+6. `escrever()` estampa embaixo da pauta, abaixo de hastes/ligaduras, 2ª fileira quando
    colide.
+
+### Duração (`coletar(pg, com_ritmo=True)`)
+
+- **Figura base** vem do codepoint da cabeça: `PERFIS[p]["cabecas"]` mapeia para tempos de
+  semínima (semibreve 4, mínima 2, semínima 1).
+- **Beam** é geometria, não fonte: paralelogramo preenchido, sem curva, com espessura de
+  0,22–1,0 espaço medida **na borda** (`_beam`). Não dá para usar a altura do bbox — beam
+  longo e inclinado tem bbox alto.
+- **Bandeirola** é codepoint (`"bandeiras"`), usada só quando não há beam.
+- **Ponto de aumento** é amarrado 1:1 no sentido ponto→alvo, e vale para pausa também.
+- `melodia(dados)` devolve `{notas: [{t, midi, d}], total}` em tempos de semínima — é o
+  que o player de piano do site consome.
 
 ### Três modos de leitura de glifo
 
@@ -98,6 +111,18 @@ meio espaço abaixo do centro da caixa; clave altura > 5,5.
    restrição a colinearidade dava peso negativo para salto, ou seja, "salto grande
    facilita". Validar sempre fora da amostra (5 folds) e pela ordenação da mesma música
    em níveis diferentes — é a métrica que importa.
+11. **A haste tem de ENCOSTAR na cabeça** (`_haste_de`): uma ponta em cima do centro dela.
+   Sem essa exigência, a haste da apojatura vizinha entra como candidata, ganha por ser
+   mais comprida, e a nota perde os beams — a duração sai 2× ou 4× maior.
+12. **Apojatura se reconhece pelo TAMANHO DE FONTE do span, não pela largura da cabeça.**
+   Semibreve é mais larga que mínima, então a comparação por largura transformava toda
+   mínima em apojatura.
+13. **Ponto de aumento do Sibelius mora na fonte `OpusSpecialStd`, em `U+2122`** — não é
+   `.`. E na fonte Sonata os **dois pontinhos do ritornello** são o mesmo glifo do ponto
+   de aumento: separar pelo par vertical de 1 espaço encostado numa barra (`_e_ritornello`).
+14. **A mesma cabeça pode estar desenhada duas vezes no mesmo ponto** (preta + vazada por
+   cima, truque para abrir o buraco onde vai o nome da nota dentro da cabeça). É uma nota
+   só, e a figura é a preta.
 
 **Padrão que já se repetiu duas vezes:** calibrar num único arquivo e generalizar cedo
 (o deslocamento fixo das fontes Sonata; a junção de cifra só numérica). Ao criar qualquer
@@ -115,6 +140,11 @@ Há **duas** métricas, e as duas importam:
 - **Cobertura** — quantas das cabeças presentes no PDF receberam rótulo.
   `_exploracao/levantar.py <raiz> saida.csv` + `_exploracao/analisar.py saida.csv`.
   Cobertura baixa = pauta não detectada.
+- **Ritmo** — não existe gabarito impresso, então a checagem é interna: a soma de cada
+  compasso tem de fechar com a fórmula. `_exploracao/validar_ritmo.py <pdf|pasta>
+  [--detalhe]` compara com a soma **modal** do arquivo (anacruse e compasso final são
+  exceção legítima). Hoje: **100%** nos quatro de regressão, **80%** no acervo inteiro
+  (66 602 compassos) — o que falta é pausa no modo contorno e quiáltera.
 
 Para a dificuldade: `uv run dificuldade.py calibrar <raiz>` reporta R² dentro e fora da
 amostra e a taxa de ordenação. Hoje: R²cv 0,445 e **91,7%** de ordenação correta. O que
@@ -133,7 +163,8 @@ diretório temporário, não versionado.
 ## Pendências
 
 `PENDENCIAS.md` tem a lista viva, em ordem de prioridade. A primeira é: **nota ligada
-deve receber um nome só, com `_`** (hoje sai `G G G` onde deveria sair `G_`).
+deve receber um nome só, com `_`** (hoje sai `G G G` onde deveria sair `G_`) — a metade
+"nota longa sem ligadura" já está destravada pela leitura de duração.
 
 ## Limites conhecidos (não são bugs)
 
@@ -144,3 +175,7 @@ deve receber um nome só, com `_`** (hoje sai `G G G` onde deveria sair `G_`).
   sempre clave de sol).
 - Nota ligada recebe o nome repetido.
 - Acorde (várias notas no mesmo x) empilha os nomes; pouco testado.
+- **No modo contorno não leio pausa** — sem codepoint, pausa de semínima e bequadro têm
+  quase a mesma caixa. Por isso o ritmo do cadernin fica em 34%, contra ~100% nos PDFs
+  com fonte musical.
+- Quiáltera (tercina) não é lida: entra como se fossem figuras inteiras.
