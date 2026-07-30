@@ -1,12 +1,12 @@
 # anotar-partitura
 
-Escreve o **nome de cada nota embaixo da pauta**, direto no PDF da partitura. O PDF de
-saída é o original + uma camada de texto: nada é re-desenhado, o layout do arranjador
-fica intacto.
+Escreve o **nome de cada nota embaixo da pauta**, direto na partitura — **PDF ou print de
+celular**. A saída é o arquivo original + uma camada de texto: nada é re-desenhado, o
+layout do arranjador fica intacto.
 
-**➜ [Usar no navegador](https://manuelstv.github.io/anotar-partitura/)** — arraste o PDF,
-baixe o anotado. Roda 100% no seu navegador (Pyodide + PyMuPDF em WebAssembly); o arquivo
-não é enviado para servidor nenhum.
+**➜ [Usar no navegador](https://manuelstv.github.io/anotar-partitura/)** — arraste o PDF ou
+a imagem, baixe o anotado (em PDF ou imagem, você escolhe). Roda 100% no seu navegador
+(Pyodide + PyMuPDF + OpenCV em WebAssembly); o arquivo não é enviado para servidor nenhum.
 
 ## Como funciona
 
@@ -36,7 +36,8 @@ página, porque o mesmo A4 aparece gravado em escalas diferentes (já vi 595×84
 | Sibelius | Opus | ✅ layout Sonata |
 | Finale | Maestro | ✅ layout Sonata |
 | Glifos convertidos em **contorno** (sem fonte) | — | ✅ leitura por geometria |
-| PDF escaneado (imagem) | — | ❌ precisa de OMR (Audiveris/oemer) |
+| **Imagem** (print de celular, JPG/PNG) | — | ✅ leitura por pixels |
+| Foto de papel (perspectiva, sombra) | — | ❌ precisa de OMR (Audiveris/oemer) |
 
 Clave de sol, fá e dó. Só a de sol foi testada de fato (é o caso de sax).
 Pauta de **ritmo** (1 linha) não recebe nome — não há altura para ler.
