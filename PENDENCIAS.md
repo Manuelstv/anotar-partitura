@@ -48,46 +48,63 @@ novas colunas e conferir se a taxa de ordenação passa dos 92%.
 
 ---
 
-## 4. Modo SCREENSHOT — aceitar print de celular (PNG/JPG)
+## 4. ~~Aceitar IMAGEM além de PDF (print de celular, JPG/PNG)~~ — NO AR
 
-**Estado: protótipo medido, nada integrado.** O site rejeita imagem antes de tentar
-(`index.html`, validação da extensão), o núcleo não tem uma linha de bitmap, e o protótipo
-vive só na CLI: `_exploracao/mock_bitmap.py` + `_exploracao/banco_templates.py`.
+**Requisito (decidido com o Manuel):** os dois formatos, **coexistindo**. Imagem é entrada
+de **primeira classe**, não fallback — o tipo é decidido **na porta**, pelo mime/extensão,
+nunca por fracasso de detecção de vetor. Fallback silencioso faz um PDF ruim ser lido como
+imagem e ninguém entende por quê. Saída: **PDF ou imagem, com botão de escolha**,
+independente do formato de entrada.
 
-Medido no protótipo (601 notas, 4 arquivos, treino em 2 obras diferentes):
-**96,7% das cabeças, 100% de grau diatônico, 1,7% de falso positivo** — sem CNN. Análise
-completa em `MOCK-SCREENSHOT-ANALISE.md`, resumo em `PESQUISA-SCREENSHOT.md`.
+**Implementado e no ar.** `bitmap.py` (novo) + `templates_bitmap.json` (banco de 89 KB) +
+ramo de imagem no `anotar_bytes()`. As quatro combinações entrada×saída funcionam, na CLI
+e no site.
 
-Falta, nesta ordem:
+Medido pelo caminho de PRODUÇÃO (`_exploracao/validar_bitmap.py`, 6 arquivos, 780 notas,
+gabarito = leitura vetorial do mesmo arquivo):
 
-1. **Consertar a referência de escala em `pautas()`.** Hoje `k = altura_pagina / 842`, que
-   não significa nada num screenshot. Derivar o `k` do passo medido entre as linhas, que
-   sai da própria projeção horizontal. Sintoma atual: 3 páginas do cadernin devolvem
-   **zero pauta** mesmo com 31 níveis de linha detectados. **Cuidado: `pautas()` serve o
-   modo vetor também** — a mudança tem de passar pelos quatro casos de regressão.
-2. **Portar o modo bitmap para o núcleo.** `coletar()` aceitando imagem e produzindo
-   `horiz` + `caminhos` (é o contrato que o mock injeta por monkeypatch, documentado na
-   §2.3 da análise), a imagem virando PDF de uma página, e o `escrever()` estampando em
-   cima como sempre. O modo contorno consome isso sem mudança.
-3. **Aceitar imagem no site.** `accept`, a validação de extensão, e
-   `loadPackage("opencv-python")` — +11 MB no primeiro uso, então carregar só quando a
-   entrada for imagem, nunca no caminho do PDF.
-4. **Testar com print de celular DE VERDADE.** O protótipo nunca viu um: ele renderiza o
-   PDF com PyMuPDF e trata essa imagem como screenshot. Print real tem subpixel rendering
-   da tela, escala fracionária, barra de status e recorte — nada disso está coberto.
+| entrada | cabeças | grau | nome | falso positivo |
+|---|---|---|---|---|
+| PNG limpo | **96,8%** | **100%** | 97,4% | 1,5% |
+| JPEG q60 | 91,3% | **100%** | 96,5% | 1,0% |
 
-Limites já conhecidos do modo:
+Confirmado no navegador: `cv2 4.11.0` importa no Pyodide 0.28.3 (3,7 s de download +
+0,75 s de import) e `matchTemplate`, `connectedComponentsWithStats`, `findContours`,
+`morphologyEx`, `resize` e `floodFill` todos funcionam.
+
+**Zero regressão no modo vetor**: 14 casos comparados contra a versão publicada anterior,
+mesma contagem de sistemas e de rótulos em todos, `Song_of_somg` mantendo o `E#` da 1ª
+nota. E quem manda PDF **não baixa o opencv** — verificado interceptando o `fetch`.
+
+O que ainda falta:
+
+1. **Testar com print de celular DE VERDADE.** Tudo acima usa PDF renderizado como se
+   fosse print. Print real tem subpixel rendering da tela, escala fracionária, barra de
+   status e recorte — nada disso está coberto. **Depende de o Manuel mandar 2–3 prints.**
+2. **Semibreve.** O treino do banco tem 1 semibreve, e ela se perde no recorte. Hoje quem
+   separa semibreve de mínima é a **largura medida** (≥1,55 espaço), não o banco — funciona,
+   mas o recall em música com muita semibreve fica em ~83% (Song_of_somg). Resolver é
+   aumentar o treino a partir do acervo.
+3. **Alteração (sustenido/bemol) em imagem: 94–97%**, contra 100% no vetor. O acidente vem
+   da geometria do blob e às vezes sai trocado. O grau nunca erra, só a alteração.
+4. **Ritmo em imagem** — `beams` volta vazio, então o `_` de nota longa e o player de piano
+   não valem no modo imagem.
+5. **PDF de várias páginas com saída em imagem** entrega só a 1ª página (a interface avisa).
+   Zip ficou de fora.
+
+**Ganho de graça:** com o ramo de bitmap pronto, **PDF escaneado passa a funcionar** —
+rasteriza e entra pelo mesmo caminho. Scan costuma vir em 150–300 dpi, o que dá 20+ px por
+espaço de pauta, folgado sobre o piso de 10. Deixa de ser limite permanente (ver seção 8).
+
+Limites do modo, por desenho (não são pendência):
 
 - **Exige ~10 px por espaço de pauta** (A4 inteiro com largura ≥ ~1100 px). Com 6 px o
-  recall cai para 44%. Avisar pelo `esp` medido, não pelo formato do arquivo.
-- **A `analise.py` não funciona em imagem** — cifra, tom, escala sugerida e `--limpar`
-  dependem de span de texto, que não existe num bitmap. Modo screenshot entrega nome de
-  nota, não entrega análise musical.
-- **Ritmo não foi avaliado** (o mock não produz beam nem pausa).
-- **Semibreve é o gargalo de recall** — o banco de templates tem 1 amostra dela. Resolver
-  é aumentar o treino a partir do acervo, não mexer no método.
-- **Foto de papel continua fora.** Perspectiva e sombra são outro problema; o que foi
-  medido é screenshot, que não tem nenhum dos dois.
+  recall cai para 44%. O `bitmap.ESP_MINIMO` corta em 5 px e a interface avisa.
+- **A `analise.py` não existe em imagem** — cifra, tom, escala sugerida, dificuldade e
+  `--limpar` dependem de span de texto, que um bitmap não tem. `rel["tem_analise"]` diz
+  isso à interface, que mostra o aviso.
+- **Foto de papel continua fora.** Perspectiva e sombra são outro problema; o que está
+  implementado é screenshot, que não tem nenhum dos dois.
 
 ---
 
