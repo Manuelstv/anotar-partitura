@@ -273,12 +273,34 @@ def _cobertura(segs):
     return total
 
 
+def _passo_dominante(ys, limite):
+    """Vao mais REPETIDO entre niveis vizinhos — o passo da pauta, sem escala externa.
+
+    As 5 linhas de uma pauta geram 4 vaos iguais, entao o vao de pauta e o mais
+    frequente por construcao. A tolerancia e RELATIVA ao proprio vao (8%), o que torna a
+    estimativa livre de escala: serve para o A4 em pontos e para o screenshot em pixels.
+    Antes isso saia de `altura/842`, que supoe a proporcao do A4 — e numa pagina de outra
+    proporcao a faixa plausivel escorregava e a pauta simplesmente nao se formava.
+    """
+    vaos = [b - a for a, b in zip(ys, ys[1:]) if 0 < b - a <= limite]
+    if not vaos:
+        return None
+    melhor, quantos = None, 0
+    for v in vaos:
+        grupo = [x for x in vaos if abs(x - v) <= 0.08 * v]
+        # empate vai para o MENOR: o vao entre linhas e menor que o vao entre sistemas
+        if len(grupo) > quantos or (len(grupo) == quantos and v < melhor):
+            melhor, quantos = sum(grupo) / len(grupo), len(grupo)
+    return melhor
+
+
 def pautas(horiz, largura_pagina, altura_pagina):
     """Agrupa as linhas horizontais em pautas: 5 linhas longas e igualmente espacadas.
 
     Filtra por comprimento (linha de pauta atravessa o sistema; beam/crescendo nao) e
     exige espacamento uniforme, senao um beam colado na pauta entra no lugar de uma linha.
-    Os limiares sao fracoes da pagina: o mesmo A4 aparece em escalas bem diferentes.
+    Os limiares de COMPRIMENTO sao fracoes da pagina; os de ALTURA saem do proprio passo
+    medido entre as linhas, porque o passo de pauta nao acompanha o tamanho da pagina.
     """
     niveis = {}
     for y, x0, x1 in horiz:
@@ -290,8 +312,13 @@ def pautas(horiz, largura_pagina, altura_pagina):
     # regras importam aqui: a cobertura do grupo e a UNIAO dos segmentos (somando, um
     # punhado de tracos curtos empilhados virava "linha longa" fantasma), e o y do
     # grupo e o do nivel de MAIOR cobertura (a linha real), nao o primeiro.
-    k = altura_pagina / 842.0
-    junta_max = 1.2 * k
+    # A JUNCAO continua ancorada na pagina, nao no passo estimado: derivar `junta_max` do
+    # passo dominante dos niveis BRUTOS e circular e falha feio — quando o palpite bruto
+    # sai grande, a juncao come as linhas vizinhas e a pauta deixa de existir (medido: o
+    # cadernin caiu de 4 sistemas para 1). Aqui um valor pequeno e conservador basta,
+    # porque juntar de menos e barato: a busca por periodicidade tolera nivel repetido.
+    teto_vao = 0.25 * altura_pagina
+    junta_max = 1.2 * altura_pagina / 842.0
     grupos = []
     for y, segs in sorted(niveis.items()):
         c = _cobertura(segs)
@@ -311,16 +338,12 @@ def pautas(horiz, largura_pagina, altura_pagina):
         return []
     ys = [y for y, _ in longas]
 
-    # Passo tipico entre linhas de pauta = moda dos vaos plausiveis, refinada numa
-    # janela ESTREITA: vao de colchete (~3/4 do passo) contamina a media e desalinha
-    # a progressao o suficiente para escolher a linha errada la na 5a.
-    gaps = [b - a for a, b in zip(ys, ys[1:]) if 2.0 * k <= b - a <= 14.0 * k]
-    if not gaps:
+    # Passo tipico entre linhas de pauta = vao mais repetido entre as linhas LONGAS,
+    # com tolerancia relativa: vao de colchete (~3/4 do passo) contamina a media e
+    # desalinha a progressao o suficiente para escolher a linha errada la na 5a.
+    d = _passo_dominante(ys, teto_vao)
+    if not d:
         return []
-    faixa = 0.25 * k
-    modo = collections.Counter(round(g / faixa) for g in gaps).most_common(1)[0][0] * faixa
-    perto = [g for g in gaps if abs(g - modo) <= max(0.5 * k, 0.06 * modo)] or [modo]
-    d = sum(perto) / len(perto)
     tol = 0.28 * d
 
     # Procura 5 linhas em PROGRESSAO de passo d — por periodicidade, nao por
@@ -679,12 +702,17 @@ def duracao_das(cabecas, pausas, vert, beams, bandeiras, pontos, barras, esp):
 
 
 # --------------------------------------------------------------------- leitura
-def ler_notas(pg, sistema, com_pausas=False):
+def ler_notas(pg, sistema, com_pausas=False, dados=None):
     """Retorna (rotulos, existentes) — ou (rotulos, existentes, pausas) com `com_pausas`.
 
     Cada rotulo leva `dur`, a duracao lida em tempos de seminima.
+
+    Com `dados`, usa uma coleta ja feita em vez de chamar `coletar(pg)` — e o que permite
+    ao modo IMAGEM entregar os mesmos sete campos vindos de pixels. A pagina continua
+    sendo usada para as dimensoes (`pg.rect`).
     """
-    glifos, textos, horiz, vert, formas, caminhos, beams = coletar(pg, com_ritmo=True)
+    glifos, textos, horiz, vert, formas, caminhos, beams = (
+        dados if dados is not None else coletar(pg, com_ritmo=True))
     sistemas = pautas(horiz, pg.rect.width, pg.rect.height)
     if not any(g["tipo"] == "cabeca" for g in glifos) and sistemas:
         # PDF com os simbolos convertidos em curvas: le pela geometria
@@ -946,17 +974,65 @@ def melodia(dados, limite=3000):
     return {"notas": ev, "total": round(t, 4)}
 
 
-def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0)):
-    """Anota um PDF em memoria e devolve os bytes do PDF novo + um relatorio.
+EXTS_IMAGEM = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic")
 
-    Mesmo nucleo usado pela linha de comando; existe separado para a versao web,
-    que nao tem sistema de arquivos.
+
+def e_imagem(dados):
+    """Descobre pelo CABECALHO, nao pela extensao: o print vem de mil lugares."""
+    if dados[:4] == b"%PDF":
+        return False
+    assinaturas = (b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n", b"GIF8", b"BM", b"II*\x00",
+                   b"MM\x00*")
+    if any(dados.startswith(a) for a in assinaturas):
+        return True
+    return dados[:4] == b"RIFF" and dados[8:12] == b"WEBP"
+
+
+def imagem_para_pdf(dados, largura, altura):
+    """Imagem -> PDF de uma pagina em escala 1:1, isto e, 1 pixel = 1 ponto.
+
+    A escala 1:1 nao e detalhe: com ela as coordenadas em pixel que o modo bitmap devolve
+    JA sao as coordenadas do PDF, e o `escrever()` estampa em cima sem conversao nenhuma.
+
+    A pagina e montada a mao, com as dimensoes em PIXEL da imagem, em vez de usar
+    `convert_to_pdf()`: aquele decide o tamanho por conta e o 1:1 deixa de valer.
     """
-    doc = fitz.open(stream=dados, filetype="pdf")
+    pdf = fitz.open()
+    pg = pdf.new_page(width=largura, height=altura)
+    pg.insert_image(fitz.Rect(0, 0, largura, altura), stream=dados)
+    return pdf
+
+
+def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pdf",
+                 dpi_saida=None):
+    """Anota um PDF **ou uma imagem** em memoria e devolve os bytes + um relatorio.
+
+    `saida`: "pdf" (padrao) ou "imagem" — no segundo caso devolve PNG da primeira pagina,
+    nas dimensoes da entrada quando a entrada foi imagem.
+
+    Mesmo nucleo usado pela linha de comando; existe separado para a versao web, que nao
+    tem sistema de arquivos.
+    """
+    imagem = e_imagem(dados)
+    pixels = None
+    if imagem:
+        import bitmap
+        pixels = bitmap.decodificar(dados)          # pixels ORIGINAIS, nao rasterizados
+        doc = imagem_para_pdf(dados, pixels.shape[1], pixels.shape[0])
+    else:
+        doc = fitz.open(stream=dados, filetype="pdf")
     total, existentes_tot, limpos = 0, 0, 0
-    por_pagina = []
+    por_pagina, avisos = [], []
     for pg in doc:
-        rotulos, existentes = ler_notas(pg, sistema)
+        pre = None
+        if imagem:
+            try:
+                pre = bitmap.coletar_da_imagem(pixels, com_ritmo=True)
+            except bitmap.ImagemIlegivel as e:
+                avisos.append(str(e))
+                por_pagina.append(0)
+                continue
+        rotulos, existentes = ler_notas(pg, sistema, dados=pre)
         existentes_tot += len(existentes)
         if limpar:
             fam = collections.Counter(familia(t["txt"]) for t in existentes)
@@ -972,26 +1048,66 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0)):
         escrever(pg, rotulos, cor)
         total += len(rotulos)
         por_pagina.append(len(rotulos))
-    saida = doc.tobytes(garbage=3, deflate=True)
+    if saida == "imagem":
+        # dpi 72 mantem 1 pixel = 1 ponto, ou seja, devolve no tamanho que entrou
+        bytes_saida = doc[0].get_pixmap(dpi=dpi_saida or 72).tobytes("png")
+    else:
+        bytes_saida = doc.tobytes(garbage=3, deflate=True)
     doc.close()
-    return saida, {"total": total, "por_pagina": por_pagina,
-                   "existentes": existentes_tot, "limpos": limpos}
+    return bytes_saida, {"total": total, "por_pagina": por_pagina,
+                         "existentes": existentes_tot, "limpos": limpos,
+                         "modo": "imagem" if imagem else "pdf",
+                         "formato": "png" if saida == "imagem" else "pdf",
+                         "avisos": avisos,
+                         # em imagem nao existe span de texto: sem cifra, sem tom, sem
+                         # escala sugerida. A interface tem de dizer isso.
+                         "tem_analise": not imagem}
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Escreve o nome das notas embaixo da pauta, no PDF original.")
-    ap.add_argument("pdf")
-    ap.add_argument("-o", "--out", default=None, help="PDF de saida (default: <nome>_notas.pdf)")
+    ap = argparse.ArgumentParser(
+        description="Escreve o nome das notas embaixo da pauta, no arquivo original "
+                    "(PDF ou imagem).")
+    ap.add_argument("pdf", help="PDF ou imagem (jpg, png, print de celular)")
+    ap.add_argument("-o", "--out", default=None, help="saida (default: <nome>_notas.<ext>)")
     ap.add_argument("--sistema", choices=["letras", "dore"], default="letras",
                     help="letras = C D E F G A B (default) | dore = Do Re Mi Fa Sol La Si")
     ap.add_argument("--limpar", action="store_true",
                     help="apaga os nomes de nota que ja existem na partitura")
     ap.add_argument("--cor", default="0,0,0", help="cor R,G,B em 0-1 (default preto)")
+    ap.add_argument("--formato", choices=["pdf", "imagem"], default=None,
+                    help="formato da saida (default: o mesmo da entrada)")
     a = ap.parse_args()
 
     cor = tuple(float(v) for v in a.cor.split(","))
-    saida = a.out or os.path.splitext(a.pdf)[0] + "_notas.pdf"
 
+    with open(a.pdf, "rb") as fp:
+        bruto = fp.read()
+
+    # IMAGEM (ou saida em imagem pedida): passa pelo mesmo caminho que a web usa, que ja
+    # cobre os dois formatos. O caminho de PDF abaixo fica intacto de proposito — e o que
+    # esta em 99,51% e tem as mensagens por pagina e as travas do --limpar.
+    entrada_imagem = e_imagem(bruto)
+    if entrada_imagem or a.formato == "imagem":
+        formato = a.formato or ("imagem" if entrada_imagem else "pdf")
+        bytes_saida, rel = anotar_bytes(bruto, a.sistema, a.limpar, cor, saida=formato)
+        ext = ".png" if formato == "imagem" else ".pdf"
+        destino = a.out or os.path.splitext(a.pdf)[0] + "_notas" + ext
+        with open(destino, "wb") as fp:
+            fp.write(bytes_saida)
+        for aviso in rel["avisos"]:
+            print(f"  [aviso] {aviso}")
+        print(f"{rel['total']} notas anotadas ({rel['modo']}) -> {destino}")
+        if rel["modo"] == "imagem":
+            print("  [nota] em imagem nao ha texto: sem cifra, tom ou escala sugerida.")
+        if rel["total"] == 0:
+            print("[erro] nenhuma nota encontrada. Se for print, confira se a partitura "
+                  "esta grande na tela: preciso de ~10 pixels por espaco de pauta.",
+                  file=sys.stderr)
+            return 1
+        return 0
+
+    saida = a.out or os.path.splitext(a.pdf)[0] + "_notas.pdf"
     doc = fitz.open(a.pdf)
     total, achados_existentes, limpos = 0, 0, 0
     for pg in doc:
