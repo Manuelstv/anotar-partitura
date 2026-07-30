@@ -438,6 +438,57 @@ modo contorno e uma fonte diferente (Sonata) das do treino. Uma CNN provavelment
 melhoraria o recall, mas custaria o `onnxruntime` — que não existe no Pyodide — e portanto
 o "um `.py` só para CLI e web".
 
+## 5.7 Do protótipo à produção — o que mudou no caminho
+
+O mock virou `bitmap.py` + `templates_bitmap.json` (89 KB) e está no ar. Cinco coisas
+mudaram entre o laboratório e o código de verdade, e vale registrar porque nenhuma delas
+era previsível a partir da medição:
+
+1. **`cv2` no navegador: confirmado.** `cv2 4.11.0` importa no Pyodide 0.28.3 — 3,7 s de
+   download + 0,75 s de import — e `matchTemplate`, `connectedComponentsWithStats`,
+   `findContours`, `morphologyEx`, `resize` e `floodFill` todos rodam. Era o risco que
+   invalidaria o resto; morreu primeiro.
+2. **Não passar a imagem por um PDF para LER.** A primeira versão convertia a imagem em
+   PDF e rasterizava de volta para obter os pixels. Isso reamostra o desenho, e a linha de
+   pauta tem 1 pixel: ela borra, o Otsu perde a fileira densa e **nenhuma pauta é
+   encontrada**. Os pixels têm de vir do `imdecode` dos bytes originais; o PDF serve só
+   para estampar.
+3. **A página de saída é montada à mão.** `convert_to_pdf()` escolhe o tamanho da página
+   por conta própria e o 1:1 (1 pixel = 1 ponto) deixa de valer — com ele, todo rótulo
+   sairia deslocado. `new_page(width=W, height=H)` + `insert_image` resolve.
+4. **`junta_max` derivado do passo é circular e quebra.** Tentei tornar `pautas()`
+   completamente livre de escala, inclusive a junção de níveis coincidentes. Quando o
+   palpite bruto do passo sai grande, a junção come as linhas vizinhas: **o cadernin caiu
+   de 4 sistemas para 1**. A junção ficou ancorada na página (como era) e só o *passo* virou
+   escala-invariante. Isso também desmentiu meu diagnóstico da §5.4: as páginas 0/3/10 do
+   cadernin dão zero pauta **nas duas versões** — elas não têm pauta (capa, índice). A
+   escala não era a causa.
+5. **Um zoom no treino do banco, não três.** Gerar templates em 1,6/1,97/2,6 deixa as
+   classes `outro` e `texto` genéricas demais e elas **engolem cabeça**: recall 96,8% →
+   94,5%, cadernin 98% → 88%. Um zoom só, e `K_RUIDO` em 8.
+
+E uma troca de dependência: **quem separa semibreve de mínima passou a ser a largura
+medida** (≥1,55 espaço), não o banco. Com 1 amostra de semibreve no treino, a classe não
+existe de fato — e largura é geometria, funciona sem exemplo.
+
+### Números do caminho de produção
+
+`_exploracao/validar_bitmap.py` — gera a imagem, joga em `anotar_bytes()` como bytes (o
+mesmo que o site faz) e compara com a leitura vetorial do mesmo arquivo:
+
+| entrada | cabeças | grau | nome | FP |
+|---|---|---|---|---|
+| PNG limpo | 96,8% | **100%** | 97,4% | 1,5% |
+| JPEG q60 | 91,3% | **100%** | 96,5% | 1,0% |
+
+Ressalva de protocolo: `The-chicken` e `Strasbourg` estão nessa bateria **e** no treino do
+banco, então os números deles são otimistas. Os quatro limpos: Marlon 100%, Paso 99,6%,
+cadernin 98,0%, Song 82,8%.
+
+**Zero regressão no vetor**: 14 casos comparados contra a versão publicada anterior, mesma
+contagem de sistemas e rótulos em todos, `Song_of_somg` mantendo o `E#`. E quem manda PDF
+não baixa o opencv — verificado interceptando o `fetch` no navegador.
+
 ## 6. O que NÃO foi testado
 
 Lacunas honestas, em ordem de risco:
