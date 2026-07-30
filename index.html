@@ -348,10 +348,11 @@
           <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M3 15v3a3 3 0 0 0 3 3h12a3 3 0 0 0 3-3v-3"/>
         </svg>
       </span>
-      <span class="titulo">Arraste os PDFs aqui</span>
-      <span class="sub">ou toque para escolher. (dica: Mande vários de uma vez.)</span>
+      <span class="titulo">Arraste PDF ou print aqui</span>
+      <span class="sub">ou toque para escolher. PDF, JPG ou PNG — pode mandar vários.</span>
     </button>
-    <input type="file" id="arquivo" accept="application/pdf,.pdf" multiple tabindex="-1" aria-hidden="true">
+    <input type="file" id="arquivo" accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.webp,.bmp,.heic"
+           multiple tabindex="-1" aria-hidden="true">
 
     <div class="opcoes">
       <div class="grupo">
@@ -359,6 +360,14 @@
         <div class="segmento" role="radiogroup" aria-labelledby="rot-nomes">
           <label><input type="radio" name="sistema" value="letras" checked><span>C D E</span></label>
           <label><input type="radio" name="sistema" value="dore"><span>Dó Ré Mi</span></label>
+        </div>
+      </div>
+      <div class="grupo">
+        <span id="rot-saida">Baixar como</span>
+        <div class="segmento" role="radiogroup" aria-labelledby="rot-saida">
+          <label><input type="radio" name="saida" value="igual" checked><span>Igual à entrada</span></label>
+          <label><input type="radio" name="saida" value="pdf"><span>PDF</span></label>
+          <label><input type="radio" name="saida" value="imagem"><span>Imagem</span></label>
         </div>
       </div>
       <label class="caixa">
@@ -452,6 +461,8 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
+const V = "?v=18";
+
 function pegarPy() {
   if (pyPromise) return pyPromise;
   pyPromise = (async () => {
@@ -459,14 +470,29 @@ function pegarPy() {
     const { loadPyodide } = await import("https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.mjs");
     const py = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.28.3/full/" });
     await py.loadPackage("pymupdf");
-    const v = "?v=17";
-    for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py", "pesos_dificuldade.json"]) {
-      py.FS.writeFile("/" + arq, await (await fetch(arq + v)).text());
+    for (const arq of ["anotar_partitura.py", "analise.py", "dificuldade.py",
+                       "bitmap.py", "pesos_dificuldade.json"]) {
+      py.FS.writeFile("/" + arq, await (await fetch(arq + V)).text());
     }
     py.runPython("import sys; sys.path.insert(0, '/')\nimport anotar_partitura, analise, dificuldade");
     return py;
   })();
   return pyPromise;
+}
+
+// O opencv e o banco de templates custam ~11 MB, e SO servem para imagem. Quem manda
+// PDF nao paga por eles — por isso a carga e sob demanda, e uma vez so.
+let cvPromise = null;
+function prepararImagem(py) {
+  if (cvPromise) return cvPromise;
+  cvPromise = (async () => {
+    progresso({ texto: "Primeira imagem: baixando o leitor de pixels (11 MB).", indet: true });
+    await py.loadPackage("opencv-python");
+    py.FS.writeFile("/templates_bitmap.json",
+                    await (await fetch("templates_bitmap.json" + V)).text());
+    py.runPython("import bitmap; bitmap.carregar_banco('/templates_bitmap.json')");
+  })();
+  return cvPromise;
 }
 
 // ---- um cartao por arquivo, criado ANTES de processar
@@ -825,26 +851,34 @@ async function processar(arquivos) {
   const todos = [...arquivos];
   if (!todos.length) return;
 
-  // valida antes de qualquer download pesado
+  // valida antes de qualquer download pesado. O TIPO e decidido aqui, na porta, e nao
+  // por fracasso de leitura mais adiante: fallback silencioso faz um PDF ruim ser lido
+  // como imagem e ninguem entende o motivo.
   const fila = [];
   for (const f of todos) {
     const cartao = criarCartao(f.name);
-    if (!/\.pdf$/i.test(f.name) && f.type !== "application/pdf") {
-      cartao.marcar("ruim", "não é um PDF");
+    const ehPdf = /\.pdf$/i.test(f.name) || f.type === "application/pdf";
+    const ehImg = /\.(jpe?g|png|webp|bmp|tiff?|heic)$/i.test(f.name)
+                  || (f.type || "").startsWith("image/");
+    if (!ehPdf && !ehImg) {
+      cartao.marcar("ruim", "não é PDF nem imagem");
     } else if (f.size > MAX_MB * 1024 * 1024) {
       cartao.marcar("ruim", `maior que ${MAX_MB} MB`);
     } else {
-      fila.push({ f, cartao });
+      fila.push({ f, cartao, imagem: !ehPdf });
     }
   }
   if (!fila.length) { progresso({ on: false }); return; }
 
   const py = await pegarPy();
   const sistema = document.querySelector('input[name=sistema]:checked').value;
+  const escolhaSaida = document.querySelector('input[name=saida]:checked').value;
   const limpar = $("#limpar").checked;
+  // so a ENTRADA em imagem precisa do opencv; saida em PNG e rasterizacao do PyMuPDF
+  if (fila.some(x => x.imagem)) await prepararImagem(py);
 
   for (let i = 0; i < fila.length; i++) {
-    const { f, cartao } = fila[i];
+    const { f, cartao, imagem } = fila[i];
     progresso({ texto: `Lendo ${f.name}`, feito: i, total: fila.length });
     cartao.marcar("trabalhando", "lendo…");
     await new Promise(r => setTimeout(r, 20));
@@ -852,29 +886,36 @@ async function processar(arquivos) {
       py.FS.writeFile("/entrada.pdf", new Uint8Array(await f.arrayBuffer()));
       py.globals.set("_sistema", sistema);
       py.globals.set("_limpar", limpar);
+      py.globals.set("_saida_fmt", escolhaSaida === "igual"
+                                   ? (imagem ? "imagem" : "pdf") : escolhaSaida);
       const res = py.runPython(`
 import json, anotar_partitura as A, analise, dificuldade as Dif, pymupdf
 _dados = open("/entrada.pdf","rb").read()
-_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar)
+_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar, saida=_saida_fmt)
 _previa = b""
 _info, _nota = None, None
 if _rel["total"]:
-    _d = pymupdf.open(stream=_saida, filetype="pdf")
-    _previa = _d[0].get_pixmap(dpi=96).tobytes("png")
-    _d.close()
-    try:
-        _info = analise.analisar(_dados)
-    except Exception:
-        _info = None
-    if _info is not None:
+    if _rel["formato"] == "png":
+        _previa = _saida                      # a saida JA e a imagem: serve de previa
+    else:
+        _d = pymupdf.open(stream=_saida, filetype="pdf")
+        _previa = _d[0].get_pixmap(dpi=96).tobytes("png")
+        _d.close()
+    # analise, tom, cifra e dificuldade dependem de span de TEXTO, que imagem nao tem
+    if _rel["tem_analise"]:
         try:
-            _info["melodia"] = A.melodia(_dados)
+            _info = analise.analisar(_dados)
         except Exception:
-            pass
-    try:
-        _nota = Dif.nota("/entrada.pdf", json.load(open("/pesos_dificuldade.json")))[0]
-    except Exception:
-        _nota = None
+            _info = None
+        if _info is not None:
+            try:
+                _info["melodia"] = A.melodia(_dados)
+            except Exception:
+                pass
+        try:
+            _nota = Dif.nota("/entrada.pdf", json.load(open("/pesos_dificuldade.json")))[0]
+        except Exception:
+            _nota = None
 (_saida, _previa, json.dumps({"rel": _rel, "info": _info, "nota": _nota}))
 `);
       const [pdfOut, previaOut, extra] = res.toJs({ create_proxies: false });
@@ -889,13 +930,17 @@ if _rel["total"]:
 }
 
 function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
-  const base = nome.replace(/\.pdf$/i, "");
+  const base = nome.replace(/\.[^.]+$/, "");
   if (!rel.total) {
-    cartao.marcar("ruim", "nenhuma nota encontrada =(");
+    cartao.marcar("ruim", rel.modo === "imagem"
+      ? "não achei pauta: a partitura precisa estar grande na imagem"
+      : "nenhuma nota encontrada =(");
     return;
   }
   const detalhe = [`${rel.total} notas anotadas`];
   if (rel.por_pagina.length > 1) detalhe.push(`${rel.por_pagina.length} páginas`);
+  // imagem e um arquivo de UMA pagina: com PDF de varias, o resto nao cabe na saida
+  if (rel.formato === "png" && rel.por_pagina.length > 1) detalhe.push("imagem só da 1ª página");
   if (rel.limpos) detalhe.push(`${rel.limpos} nomes antigos cobertos`);
   cartao.marcar("bom", detalhe.join(" · "));
 
@@ -908,14 +953,22 @@ function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
     cartao.topo.append(selo);
   }
 
+  const png = rel.formato === "png";
   const a = document.createElement("a");
   a.className = "btn btn-primario";
-  a.href = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-  a.download = base + "_notas.pdf";
-  a.textContent = "Baixar PDF";
+  a.href = URL.createObjectURL(new Blob([bytes], { type: png ? "image/png" : "application/pdf" }));
+  a.download = base + "_notas." + (png ? "png" : "pdf");
+  a.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(a);
 
   if (info) cartao.raiz.append(montarAnalise(info, nota));
+  if (!rel.tem_analise) {
+    const p = document.createElement("p");
+    p.className = "nota-rodape";
+    p.textContent = "Print não tem texto embutido, então dessa vez não dá para ler "
+                  + "cifra, tom, escala nem calcular a dificuldade — só o nome das notas.";
+    cartao.raiz.append(p);
+  }
 
   if (previa?.length) {
     const d = document.createElement("details");
