@@ -50,11 +50,15 @@ novas colunas e conferir se a taxa de ordenação passa dos 92%.
 
 ## 4. ~~Aceitar IMAGEM além de PDF (print de celular, JPG/PNG)~~ — NO AR
 
-**Requisito (decidido com o Manuel):** os dois formatos, **coexistindo**. Imagem é entrada
-de **primeira classe**, não fallback — o tipo é decidido **na porta**, pelo mime/extensão,
-nunca por fracasso de detecção de vetor. Fallback silencioso faz um PDF ruim ser lido como
-imagem e ninguém entende por quê. Saída: **PDF ou imagem, com botão de escolha**,
-independente do formato de entrada.
+**Requisito (decidido com o Manuel):** os dois formatos de entrada, **coexistindo**.
+Imagem é entrada de **primeira classe**, não fallback — o tipo é decidido **na porta**, pelo
+mime/extensão, nunca por fracasso de detecção de vetor. Fallback silencioso faz um PDF ruim
+ser lido como imagem e ninguém entende por quê.
+
+**Saída: sempre no mesmo formato da entrada**, sem opção na interface (PDF entra, PDF sai;
+print entra, PNG sai). Houve um botão de escolha com três opções; foi removido por decisão
+do Manuel — opção demais para pouca diferença. O `anotar_bytes(saida=...)` continua
+aceitando os dois, e a CLI expõe isso em `--formato`.
 
 **Implementado e no ar.** `bitmap.py` (novo) + `templates_bitmap.json` (banco de 89 KB) +
 ramo de imagem no `anotar_bytes()`. As quatro combinações entrada×saída funcionam, na CLI
