@@ -58,8 +58,53 @@ menos. **C** está fora do escopo do projeto (a ferramenta estampa uma camada de
 No **modo screenshot** ([[PESQUISA-SCREENSHOT.md]]) a acurácia cai em relação ao modo
 vetor. Ali o corretor deixa de ser conveniência e passa a ser o que torna o modo usável.
 
-## Decisão pendente
+## Decisão tomada — B, e a razão inverteu o que este doc previa
 
-**Escolher entre A e B depende de qual erro aparece na prática nos PDFs do Manuel: nota
-solta ou trecho inteiro deslocado?** Sem esse dado concreto, a escolha seria por
-estatística de acervo, não por experiência de uso. Responder isso antes de implementar.
+**Implementado o editor de nota (B), não o corretor de régua (A).** No ar desde 2026-07-31.
+
+A recomendação original deste doc (A primeiro, porque o erro típico é o sistema inteiro
+deslocado) valia como hipótese e **não sobreviveu à medição**. Com o modo imagem
+instrumentado, o **grau diatônico saiu 100% em toda condição testada** — a régua nunca
+escorrega. O que sobra é pontual: ~2% de nome espúrio e ~1% de nota faltando. Erro pontual
+pede ferramenta pontual.
+
+### Como ficou
+
+A prévia passou a vir **sem** os nomes, e os nomes viraram um **SVG por cima**, em unidades
+de ponto da página — assim o overlay escala junto com a imagem sem nenhuma conta de zoom, e
+cada nome é um alvo de clique de verdade.
+
+- **tocar num nome** → campo inline: corrige, ou apaga se deixar vazio
+- **tocar no vazio** → acrescenta um nome ali
+- **o download é gerado no clique**, já com as edições (por isso é um botão, não um link)
+
+### Duas peças novas no núcleo
+
+- `escrever(..., desenhar=False)` devolve onde cada nome **ficou** (`x0`, `y`), inclusive a
+  2ª fileira que ele cria quando dois nomes colidem. Sem isso o overlay mostraria uma coisa
+  e o PDF escreveria outra.
+- `estampar_bytes(dados, rotulos, ...)` é o caminho de volta: recebe a lista editada e só
+  põe tinta, sem reler nada. `anotar_bytes(estampar=False)` é a ida.
+
+### Armadilhas que apareceram na implementação
+
+1. **Acento grave dentro do Python inline.** O `.py` que o site executa vive numa template
+   string do JS; um `` ` `` num comentário Python **fecha a string** e o arquivo todo deixa
+   de parsear. Custou um erro de sintaxe difícil de ler.
+2. **`.corpo` é um grid.** Pôr o palco e a legenda como dois filhos criou duas *colunas* e a
+   partitura encolheu para metade da largura. Precisa `grid-column: 1 / -1`.
+3. **`currentColor` no overlay.** O fundo ali é a partitura branca, mas o tema escuro passa
+   cinza-claro: os nomes ficavam ilegíveis. Preto fixo, que é o que o PDF estampa.
+4. **Posicionar o campo pelo `<text>` não funciona para nome novo** — rótulo recém-criado
+   tem texto vazio, então não existe elemento para medir. A posição sai da matriz do SVG
+   (`getScreenCTM`), que serve nos dois casos.
+5. **Revogar o blob URL no mesmo tick do `click()`** pode abortar o download antes de ele
+   começar.
+
+### Limites
+
+- **Só a 1ª página é editável** (é a única com prévia). Num PDF de várias páginas as outras
+  saem como foram lidas — os rótulos delas continuam na lista e são estampados.
+- **Não move nem arrasta**: corrige, apaga, acrescenta. Mover ficou de fora.
+- O corretor de régua (A) **não** foi implementado e provavelmente não precisa, enquanto o
+  grau continuar em 100%.
