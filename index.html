@@ -362,14 +362,6 @@
           <label><input type="radio" name="sistema" value="dore"><span>Dó Ré Mi</span></label>
         </div>
       </div>
-      <div class="grupo">
-        <span id="rot-saida">Baixar como</span>
-        <div class="segmento" role="radiogroup" aria-labelledby="rot-saida">
-          <label><input type="radio" name="saida" value="igual" checked><span>Igual à entrada</span></label>
-          <label><input type="radio" name="saida" value="pdf"><span>PDF</span></label>
-          <label><input type="radio" name="saida" value="imagem"><span>Imagem</span></label>
-        </div>
-      </div>
       <label class="caixa">
         <input type="checkbox" id="limpar">
         <span>Apagar nomes antigos</span>
@@ -461,7 +453,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=19";
+const V = "?v=21";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -872,7 +864,6 @@ async function processar(arquivos) {
 
   const py = await pegarPy();
   const sistema = document.querySelector('input[name=sistema]:checked').value;
-  const escolhaSaida = document.querySelector('input[name=saida]:checked').value;
   const limpar = $("#limpar").checked;
   // so a ENTRADA em imagem precisa do opencv; saida em PNG e rasterizacao do PyMuPDF
   if (fila.some(x => x.imagem)) await prepararImagem(py);
@@ -886,8 +877,8 @@ async function processar(arquivos) {
       py.FS.writeFile("/entrada.pdf", new Uint8Array(await f.arrayBuffer()));
       py.globals.set("_sistema", sistema);
       py.globals.set("_limpar", limpar);
-      py.globals.set("_saida_fmt", escolhaSaida === "igual"
-                                   ? (imagem ? "imagem" : "pdf") : escolhaSaida);
+      // sem opcao para escolher: sai no mesmo formato que entrou
+      py.globals.set("_saida_fmt", imagem ? "imagem" : "pdf");
       const res = py.runPython(`
 import json, anotar_partitura as A, analise, dificuldade as Dif, pymupdf
 _dados = open("/entrada.pdf","rb").read()
@@ -955,11 +946,25 @@ function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
 
   const png = rel.formato === "png";
   const a = document.createElement("a");
-  a.className = "btn btn-primario";
+  a.className = "btn btn-secundario";
   a.href = URL.createObjectURL(new Blob([bytes], { type: png ? "image/png" : "application/pdf" }));
   a.download = base + "_notas." + (png ? "png" : "pdf");
   a.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(a);
+
+  // A previa vem ABERTA e ANTES da analise. Aberta porque o resultado e o que se quer
+  // ver; antes porque a analise e comprida e empurraria a pagina anotada para longe.
+  if (previa?.length) {
+    const d = document.createElement("details");
+    d.className = "analise";
+    d.open = true;
+    d.innerHTML = `<summary>Página anotada</summary><div class="corpo previa"></div>`;
+    const img = document.createElement("img");
+    img.alt = "Primeira página anotada de " + base;
+    img.src = URL.createObjectURL(new Blob([previa], { type: "image/png" }));
+    d.querySelector(".corpo").append(img);
+    cartao.raiz.append(d);
+  }
 
   if (info) cartao.raiz.append(montarAnalise(info, nota));
   if (!rel.tem_analise) {
@@ -970,17 +975,6 @@ function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
     cartao.raiz.append(p);
   }
 
-  if (previa?.length) {
-    const d = document.createElement("details");
-    d.className = "analise";
-    d.innerHTML = `<summary>Ver primeira página</summary><div class="corpo previa"></div>`;
-    const img = document.createElement("img");
-    img.alt = "Primeira página anotada de " + base;
-    img.loading = "lazy";
-    img.src = URL.createObjectURL(new Blob([previa], { type: "image/png" }));
-    d.querySelector(".corpo").append(img);
-    cartao.raiz.append(d);
-  }
 }
 
 function falhar(cartao, f, e) {
