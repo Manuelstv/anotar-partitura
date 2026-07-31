@@ -913,10 +913,16 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None):
 
 
 # ------------------------------------------------------------------- escrita
-def escrever(pg, rotulos, cor):
-    """Estampa os rotulos, empurrando para uma 2a fileira quando colidem."""
+def escrever(pg, rotulos, cor, desenhar=True):
+    """Estampa os rotulos, empurrando para uma 2a fileira quando colidem.
+
+    Devolve onde cada nome FICOU: `[{x0, y, texto, corpo}]`. Com `desenhar=False` so
+    calcula, sem tocar na pagina — e o que o editor usa para desenhar por cima da previa
+    exatamente onde o PDF vai escrever, inclusive a 2a fileira.
+    """
     FONTE = "helv"
     por_linha = {}
+    postos = []
     for r in sorted((r for r in rotulos if r["texto"]),
                     key=lambda r: (r["y_base"], r["x"])):
         # O "_" de nota segurada corre PARA A DIREITA, sobre o espaco da cabeca que
@@ -930,8 +936,13 @@ def escrever(pg, rotulos, cor):
         while ocupado.get(fila, -1e9) > x0 - 0.08 * r["corpo"]:
             fila += 1
         ocupado[fila] = x0 + larg
-        pg.insert_text((x0, r["y_base"] + fila * r["corpo"] * 1.05),
-                       base + cauda, fontname=FONTE, fontsize=r["corpo"], color=cor)
+        y = r["y_base"] + fila * r["corpo"] * 1.05
+        if desenhar:
+            pg.insert_text((x0, y), base + cauda, fontname=FONTE,
+                           fontsize=r["corpo"], color=cor)
+        postos.append({"x0": x0, "y": y, "texto": base + cauda, "corpo": r["corpo"],
+                       "x": r["x"], "y_base": r["y_base"]})
+    return postos
 
 
 def melodia(dados, limite=3000):
@@ -1003,8 +1014,39 @@ def imagem_para_pdf(dados, largura, altura):
     return pdf
 
 
+def estampar_bytes(dados, rotulos, cor=(0, 0, 0), saida="pdf", dpi_saida=None,
+                   dpi_previa=None):
+    """Estampa rotulos JA DEFINIDOS — o caminho de volta do editor.
+
+    `anotar_bytes(estampar=False)` devolve a lista de rotulos e a pagina limpa; o editor
+    mexe nessa lista (corrige o texto, apaga, acrescenta) e manda de volta para ca. Nenhuma
+    leitura acontece aqui: e so tinta sobre o arquivo original.
+
+    Cada rotulo precisa de `pagina`, `x`, `y_base`, `corpo` e `texto`.
+    """
+    imagem = e_imagem(dados)
+    if imagem:
+        import bitmap
+        px = bitmap.decodificar(dados)
+        doc = imagem_para_pdf(dados, px.shape[1], px.shape[0])
+    else:
+        doc = fitz.open(stream=dados, filetype="pdf")
+    total = 0
+    for pg in doc:
+        desta = [r for r in rotulos if int(r.get("pagina", 0)) == pg.number and r.get("texto")]
+        escrever(pg, desta, cor)
+        total += len(desta)
+    if saida == "imagem":
+        bytes_saida = doc[0].get_pixmap(dpi=dpi_saida or 72).tobytes("png")
+    else:
+        bytes_saida = doc.tobytes(garbage=3, deflate=True)
+    doc.close()
+    return bytes_saida, {"total": total,
+                         "formato": "png" if saida == "imagem" else "pdf"}
+
+
 def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pdf",
-                 dpi_saida=None):
+                 dpi_saida=None, estampar=True, dpi_previa=None):
     """Anota um PDF **ou uma imagem** em memoria e devolve os bytes + um relatorio.
 
     `saida`: "pdf" (padrao) ou "imagem" — no segundo caso devolve PNG da primeira pagina,
@@ -1022,7 +1064,7 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
     else:
         doc = fitz.open(stream=dados, filetype="pdf")
     total, existentes_tot, limpos = 0, 0, 0
-    por_pagina, avisos = [], []
+    por_pagina, avisos, editaveis = [], [], []
     for pg in doc:
         pre = None
         if imagem:
@@ -1045,9 +1087,18 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
                                            t["x1"] + 0.5, t["base_y"] + 0.10 * c),
                                  color=None, fill=(1, 1, 1), width=0)
                 limpos += len(alvos)
-        escrever(pg, rotulos, cor)
+        postos = escrever(pg, rotulos, cor, desenhar=estampar)
+        # a lista que o editor recebe: ja com a posicao FINAL (2a fileira inclusa) e as
+        # medidas da pagina, para o overlay cair no lugar certo por cima da previa
+        for p in postos:
+            editaveis.append({"pagina": pg.number, "x": round(p["x"], 2),
+                              "y_base": round(p["y_base"], 2),
+                              "corpo": round(p["corpo"], 2), "texto": p["texto"],
+                              "x0": round(p["x0"], 2), "y": round(p["y"], 2)})
         total += len(rotulos)
         por_pagina.append(len(rotulos))
+    paginas = [{"largura": round(p.rect.width, 2), "altura": round(p.rect.height, 2)}
+               for p in doc]
     if saida == "imagem":
         # dpi 72 mantem 1 pixel = 1 ponto, ou seja, devolve no tamanho que entrou
         bytes_saida = doc[0].get_pixmap(dpi=dpi_saida or 72).tobytes("png")
@@ -1058,7 +1109,7 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
                          "existentes": existentes_tot, "limpos": limpos,
                          "modo": "imagem" if imagem else "pdf",
                          "formato": "png" if saida == "imagem" else "pdf",
-                         "avisos": avisos,
+                         "avisos": avisos, "rotulos": editaveis, "paginas": paginas,
                          # em imagem nao existe span de texto: sem cifra, sem tom, sem
                          # escala sugerida. A interface tem de dizer isso.
                          "tem_analise": not imagem}
