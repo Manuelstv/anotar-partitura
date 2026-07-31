@@ -281,9 +281,45 @@
      nome e um alvo de clique de verdade. */
   /* o .corpo e um grid: sem isso o palco e a dica virariam duas COLUNAS e a partitura
      encolhia para caber ao lado da legenda */
-  .palco, .dica-editor { grid-column: 1 / -1; }
-  .palco { position: relative; display: block; }
+  .palco, .dica-editor, .barra-previa { grid-column: 1 / -1; }
+
+  /* A pagina tem 760px para o texto ficar legivel, mas o RESULTADO quer todo o espaco que
+     houver: a lista de cartoes escapa do container e se centra numa faixa mais larga. E o
+     cartao inteiro que se alarga, e nao um filho dele — filho vazando e recortado pelo
+     cartao e ainda cria rolagem horizontal. */
+  #lista.largo { width: min(1320px, calc(100vw - 2.5rem));
+                 margin-left: 50%; transform: translateX(-50%); }
+  /* abaixo disso a faixa larga sairia MENOR que a coluna normal: nao alarga nada */
+  @media (max-width: 860px) {
+    #lista.largo { width: auto; margin-left: 0; transform: none; }
+  }
+
+
+  .palco { position: relative; display: block; border-radius: var(--r-md);
+           overflow: hidden; box-shadow: var(--sombra); }
+  .palco > img { display: block; width: 100%; height: auto; border: 0; border-radius: 0; }
   .palco svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .barra-previa { display: flex; align-items: center; gap: var(--s3);
+                  margin-bottom: var(--s2); }
+  .barra-previa .rot { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
+                       letter-spacing: .02em; }
+  .barra-previa .esticar { margin-left: auto; }
+  .btn-mini { padding: .3rem .6rem; font-size: var(--t-xs); border-radius: var(--r-sm);
+              background: var(--sup2); color: var(--texto-2);
+              border: 1px solid var(--borda); cursor: pointer; }
+  .btn-mini:hover { background: var(--sup3); color: var(--texto); }
+
+  /* Ampliado maximiza a LARGURA e rola na vertical. Limitar pela altura da tela era pior
+     que nao ampliar: a pagina e retrato, a tela e paisagem, e a partitura saia mais estreita
+     do que no tamanho normal. O palco encolhe para o tamanho da imagem e o SVG, que e 100%
+     do palco, acompanha sem conta extra. */
+  .lupa { position: fixed; inset: 0; z-index: 60; display: grid; justify-items: center;
+          align-items: start; padding: var(--s2) var(--s2) var(--s7);
+          overflow: auto; background: var(--bg); }
+  .lupa .palco { width: fit-content; max-width: none; border-radius: var(--r-sm); }
+  .lupa .palco > img { width: min(1900px, calc(100vw - 2 * var(--s2))); height: auto; }
+  .lupa-fechar { position: fixed; top: var(--s3); right: var(--s3); z-index: 61; }
   /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema escuro
      herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o que o PDF estampa,
      entao o overlay mostra o resultado de verdade. */
@@ -478,7 +514,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=22";
+const V = "?v=23";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -961,10 +997,14 @@ function montarEditor(cartao, ctx) {
   cx.className = "analise";
   cx.open = true;
   cx.innerHTML = `<summary>Página anotada — toque num nome para corrigir</summary>
-    <div class="corpo previa"><div class="palco"></div>
+    <div class="corpo previa">
+      <div class="barra-previa">
+        <button type="button" class="btn-mini esticar" data-lupa>Ampliar</button>
+      </div>
+      <div class="palco"></div>
       <div class="dica-editor">
-        <span class="chip">toque num nome</span> corrige ou apaga
-        <span class="chip">toque no vazio</span> acrescenta
+        <span class="chip">num nome</span> corrige, ou apaga se esvaziar
+        <span class="chip">no vazio</span> acrescenta um nome
       </div>
     </div>`;
   const palco = cx.querySelector(".palco");
@@ -1043,6 +1083,30 @@ function montarEditor(cartao, ctx) {
     abrir(ctx.rotulos.length - 1);
   });
 
+  // AMPLIAR: move o proprio palco para um overlay em tela cheia e devolve no fim. Mover um
+  // no no DOM preserva os listeners, entao o editor continua funcionando lá dentro — nada e
+  // recriado nem duplicado.
+  const btLupa = cx.querySelector("[data-lupa]");
+  btLupa.addEventListener("click", () => {
+    fechar();
+    const lupa = document.createElement("div");
+    lupa.className = "lupa";
+    const sair = document.createElement("button");
+    sair.type = "button";
+    sair.className = "btn btn-secundario lupa-fechar";
+    sair.textContent = "Fechar (Esc)";
+    const volta = () => {
+      cx.querySelector(".barra-previa").after(palco);
+      lupa.remove(); sair.remove();
+      document.removeEventListener("keydown", naTecla);
+    };
+    const naTecla = ev => { if (ev.key === "Escape") volta(); };
+    lupa.append(palco);
+    document.body.append(lupa, sair);
+    sair.addEventListener("click", volta);
+    document.addEventListener("keydown", naTecla);
+  });
+
   redesenhar();
   cartao.raiz.append(cx);
   return ctx;
@@ -1118,6 +1182,7 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   let ctx = null;
   if (previa?.length) {
     ctx = montarEditor(cartao, { ...extra, rel, previa, nome, base });
+    $("#lista").classList.add("largo");
   }
   bt.addEventListener("click", () => baixar(bt, ctx || { ...extra, rel, base,
                                                         rotulos: rel.rotulos }));
