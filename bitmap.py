@@ -333,6 +333,14 @@ def cabecas(cena, vert_haste):
         # CABECA_W = (1,05, 1,60) e descartava toda semibreve logo depois de ela passar por
         # aqui — 14 notas de um arquivo so, e o diagnostico dizia que estavam passando.
         # A largura real ja fez o trabalho dela (decidir que era semibreve) acima.
+        #
+        # EFEITO COLATERAL CONHECIDO: `glifos_de_contorno` usa a mediana da largura das
+        # cabecas (`larg_nota`) para separar bemol de bequadro numa armadura sem nota
+        # vizinha. Com a largura nominal essa referencia fica deslocada e o bemol de 0,81
+        # espaco cai do lado errado: no Strasbourg a armadura de 1 bemol nao e vista e 8
+        # notas saem B em vez de Bb. Emitir a largura medida no lugar NAO resolve (a medida
+        # inclui a haste, entao a mediana continua alta); o conserto de verdade e em
+        # `glifos_de_contorno`, que serve o modo vetor e nao vale arriscar por isso.
         w = 1.30 * esp
         out.append({"x0": cx - w / 2, "x1": cx + w / 2,
                     "y0": cy - 0.53 * esp, "y1": cy + 0.53 * esp,
