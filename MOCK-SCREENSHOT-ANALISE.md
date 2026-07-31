@@ -489,6 +489,61 @@ cadernin 98,0%, Song 82,8%.
 contagem de sistemas e rótulos em todos, `Song_of_somg` mantendo o `E#`. E quem manda PDF
 não baixa o opencv — verificado interceptando o `fetch` no navegador.
 
+## 5.8 Rodada de recall — 96,8% → 99,2%
+
+Depois do primeiro deploy o Manuel relatou notas não anotadas em print.
+`_exploracao/diag_recall.py` localiza cada nota perdida e diz **em que etapa** ela morreu.
+Quatro causas, todas corrigidas:
+
+| causa | perdas | correção |
+|---|---|---|
+| largura medida na altura do centro | 7 | numa **semibreve o centro é o miolo vazado**: a largura dava 0,00, ela não era reconhecida como semibreve, caía na regra da haste (que ela não tem) e morria. A janela vertical passou a cobrir a cabeça inteira (±0,5 espaço) |
+| caixa emitida com 1,75 espaço | 14 | `glifos_de_contorno` filtra por `CABECA_W = (1,05, 1,60)` e **descartava toda semibreve depois de ela passar pelo detector** — o diagnóstico dizia 98,9% e o validador media 82,8%. A caixa passou a sair com a largura nominal (1,30) |
+| haste reprovada por largura | 4 | a haste sai gorda quando encosta em beam ou na vizinha: **7 px contra o limite de 3,4**. Agora são duas listas de verticais — estreita para `ler_notas` achar barra de compasso, frouxa só para o teste de haste |
+| margem avaliada antes da largura | 3 | mancha larga e vazada é semibreve por geometria; o banco (1 amostra no treino) chutava "texto" nela. A largura passou a ser avaliada **antes** da margem |
+
+E `LIMIAR_CAND` de 0,40 para 0,34, que recuperou 2 mínimas no The-chicken (94,8% → 98,3%).
+
+**Lição de método:** o diagnóstico e o validador discordavam (98,9% contra 82,8%) e a
+discordância era o achado — o filtro do detector aprovava a nota e um filtro *a jusante* a
+descartava. Medir só a ponta esconde isso.
+
+### Armadura fantasma: pausa de semínima virando sustenido
+
+O nome do Marlon estava em 94,2%, errando `F -> F#`, `C -> C#`, `A -> A#`. Causa: a **pausa
+de semínima** mede ~1,0 × 2,9 espaços — a mesma caixa de um sustenido. Caindo antes da
+primeira nota, virava **armadura fantasma** e o sistema inteiro saía alterado. É a armadilha
+que o `CLAUDE.md` já registrava para o modo contorno ("não leio pausa"), aqui com
+consequência pior.
+
+Duas tentativas falharam antes:
+
+1. **Filtrar pelo banco** (rejeitar mancha classificada como `texto`/`outro`): a classe `acc`
+   tem 6 templates de 2 obras e passou a rejeitar acidente legítimo — **nome caiu de 97,4%
+   para 87,2%**, com Paso Corto indo a 70,5%.
+2. **Regra do par vertical** (a fórmula de compasso são dois dígitos alinhados em x):
+   correta para a fórmula, mas o culpado não era ela. Ficou no código, sem custo.
+
+O que funcionou: **acidente tem haste vertical, pausa é zigzag diagonal**. Medindo a fração
+da altura coberta pela maior coluna contígua de tinta:
+
+| classe | mínimo | mediana | máximo |
+|---|---|---|---|
+| acidente real | 0,79 | 0,96 | 1,00 |
+| pausa real | 0,35 | 0,86 | **0,93** |
+
+Corte em **0,94**: Marlon de 94,2% → **100%** de nome; total 97,4% → 98,1%.
+
+### Estado atual
+
+| entrada | cabeças | grau | nome | FP |
+|---|---|---|---|---|
+| PNG limpo | **99,2%** | **100%** | **98,1%** | 2,1% |
+| JPEG q60 | 94,1% | **100%** | 96,7% | 1,8% |
+
+Falta: a armadura de 1 bemol do Strasbourg não é detectada (8 notas saem `B` em vez de
+`Bb`) — erro oposto ao da armadura fantasma, ainda não diagnosticado.
+
 ## 6. O que NÃO foi testado
 
 Lacunas honestas, em ordem de risco:
