@@ -275,6 +275,31 @@
   .and input[type=range] { width: 108px; accent-color: var(--acento); }
   .and .bpm { font-variant-numeric: tabular-nums; min-width: 4.4em; }
 
+  /* ------------------------------------------------------------------ editor
+     A previa vem SEM os nomes e os nomes sao um SVG por cima, em unidades de PONTO da
+     pagina. Assim o overlay escala junto com a imagem sem nenhuma conta de zoom, e cada
+     nome e um alvo de clique de verdade. */
+  /* o .corpo e um grid: sem isso o palco e a dica virariam duas COLUNAS e a partitura
+     encolhia para caber ao lado da legenda */
+  .palco, .dica-editor { grid-column: 1 / -1; }
+  .palco { position: relative; display: block; }
+  .palco svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema escuro
+     herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o que o PDF estampa,
+     entao o overlay mostra o resultado de verdade. */
+  .palco svg text { cursor: pointer; fill: #111;
+                    font-family: Helvetica, Arial, sans-serif; }
+  .palco svg text:hover { fill: #4f46e5; }
+  .palco svg text.sel { fill: #4f46e5; font-weight: 700; }
+  .palco.pondo { cursor: crosshair; }
+  .campo { position: absolute; z-index: 5; width: 5.2rem; padding: .2rem .35rem;
+           font: inherit; font-size: var(--t--1); text-align: center;
+           background: var(--sup1); color: var(--texto);
+           border: 1px solid var(--acento); border-radius: var(--r-sm); }
+  .dica-editor { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
+                 margin-top: var(--s3); font-size: var(--t--1); color: var(--texto-2); }
+  .dica-editor .chip { padding: .12rem .45rem; border: 1px solid var(--borda);
+                       border-radius: 999px; }
   .previa img { width: 100%; border: 1px solid var(--borda); border-radius: var(--r-sm);
                 background: #fff; display: block; }
   .previa { padding: 0 var(--s5) var(--s5); }
@@ -453,7 +478,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=21";
+const V = "?v=22";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -874,7 +899,9 @@ async function processar(arquivos) {
     cartao.marcar("trabalhando", "lendo…");
     await new Promise(r => setTimeout(r, 20));
     try {
+      const noFS = "/entrada_" + i + ".bin";
       py.FS.writeFile("/entrada.pdf", new Uint8Array(await f.arrayBuffer()));
+      py.FS.writeFile(noFS, py.FS.readFile("/entrada.pdf"));
       py.globals.set("_sistema", sistema);
       py.globals.set("_limpar", limpar);
       // sem opcao para escolher: sai no mesmo formato que entrou
@@ -882,7 +909,12 @@ async function processar(arquivos) {
       const res = py.runPython(`
 import json, anotar_partitura as A, analise, dificuldade as Dif, pymupdf
 _dados = open("/entrada.pdf","rb").read()
-_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar, saida=_saida_fmt)
+# estampar=False: a previa sai LIMPA e os nomes vem na lista rel["rotulos"], para o
+# editor desenhar por cima. O arquivo final so e gerado quando o usuario clica em baixar,
+# ja com as edicoes dele. (Sem acento grave aqui dentro: isso vive numa template string
+# do JS e um acento grave fecharia a string no meio do Python.)
+_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar,
+                              saida=_saida_fmt, estampar=False)
 _previa = b""
 _info, _nota = None, None
 if _rel["total"]:
@@ -911,7 +943,7 @@ if _rel["total"]:
 `);
       const [pdfOut, previaOut, extra] = res.toJs({ create_proxies: false });
       res.destroy?.();
-      concluir(cartao, f.name, pdfOut, previaOut, JSON.parse(extra));
+      concluir(cartao, f.name, previaOut, JSON.parse(extra), { py, noFS });
     } catch (e) {
       falhar(cartao, f, e);
     }
@@ -920,7 +952,135 @@ if _rel["total"]:
   setTimeout(() => progresso({ on: false }), 1200);
 }
 
-function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
+// ------------------------------------------------------------------- editor
+// Os nomes nao estao na imagem: a previa e a pagina limpa e cada nome e um <text> de um
+// SVG por cima, posicionado em PONTOS da pagina. O SVG cuida da escala sozinho.
+function montarEditor(cartao, ctx) {
+  const pg = ctx.rel.paginas[0] || { largura: 595, altura: 842 };
+  const cx = document.createElement("details");
+  cx.className = "analise";
+  cx.open = true;
+  cx.innerHTML = `<summary>Página anotada — toque num nome para corrigir</summary>
+    <div class="corpo previa"><div class="palco"></div>
+      <div class="dica-editor">
+        <span class="chip">toque num nome</span> corrige ou apaga
+        <span class="chip">toque no vazio</span> acrescenta
+      </div>
+    </div>`;
+  const palco = cx.querySelector(".palco");
+  const img = document.createElement("img");
+  img.alt = "Página de " + ctx.nome;
+  img.src = URL.createObjectURL(new Blob([ctx.previa], { type: "image/png" }));
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${pg.largura} ${pg.altura}`);
+  palco.append(img, svg);
+
+  // so a 1a pagina e editavel (e a unica com previa); as outras seguem como foram lidas
+  ctx.rotulos = ctx.rel.rotulos.map(r => ({ ...r }));
+  let sel = null, campo = null;
+
+  const redesenhar = () => {
+    svg.textContent = "";
+    ctx.rotulos.forEach((r, k) => {
+      if (r.pagina !== 0 || !r.texto) return;
+      const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      if (r.novo) {                       // sem x0 vindo do Python: centra no x, como o PDF
+        el.setAttribute("x", r.x);
+        el.setAttribute("text-anchor", "middle");
+      } else {
+        el.setAttribute("x", r.x0);
+      }
+      el.setAttribute("y", r.y);
+      el.setAttribute("font-size", r.corpo);
+      el.textContent = r.texto;
+      el.dataset.k = k;
+      if (k === sel) el.classList.add("sel");
+      el.addEventListener("click", ev => { ev.stopPropagation(); abrir(k); });
+      svg.append(el);
+    });
+  };
+
+  const fechar = () => { campo?.remove(); campo = null; sel = null; redesenhar(); };
+
+  const abrir = (k) => {
+    campo?.remove();
+    sel = k;
+    redesenhar();
+    // posicao pela MATRIZ do proprio SVG, e nao pelo <text>: um rotulo recem-criado tem
+    // texto vazio, entao nao ha elemento nenhum para medir
+    const r = ctx.rotulos[k];
+    const pt = svg.createSVGPoint();
+    pt.x = r.x; pt.y = r.y;
+    const tela = pt.matrixTransform(svg.getScreenCTM());
+    const pr = palco.getBoundingClientRect();
+    campo = document.createElement("input");
+    campo.className = "campo";
+    campo.value = r.texto;
+    campo.style.left = Math.max(2, Math.min(pr.width - 86, tela.x - pr.left - 42)) + "px";
+    campo.style.top = Math.min(pr.height - 30, tela.y - pr.top + 6) + "px";
+    campo.title = "Enter aplica, vazio apaga, Esc cancela";
+    campo.addEventListener("keydown", ev => {
+      if (ev.key === "Enter") { ctx.rotulos[k].texto = campo.value.trim(); fechar(); }
+      if (ev.key === "Escape") fechar();
+      ev.stopPropagation();
+    });
+    campo.addEventListener("blur", () => { ctx.rotulos[k].texto = campo.value.trim(); fechar(); });
+    palco.append(campo);
+    campo.focus(); campo.select();
+  };
+
+  // clique no vazio: acrescenta um nome ali. Converte o ponto da tela para PONTO da
+  // pagina pela matriz do proprio SVG — sem conta de zoom na mao.
+  svg.addEventListener("click", ev => {
+    if (campo) { fechar(); return; }
+    const pt = svg.createSVGPoint();
+    pt.x = ev.clientX; pt.y = ev.clientY;
+    const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    const corpo = ctx.rotulos.find(r => r.pagina === 0)?.corpo || 8;
+    ctx.rotulos.push({ pagina: 0, x: p.x, y_base: p.y, y: p.y, corpo, texto: "",
+                       novo: true });
+    redesenhar();
+    abrir(ctx.rotulos.length - 1);
+  });
+
+  redesenhar();
+  cartao.raiz.append(cx);
+  return ctx;
+}
+
+async function baixar(botao, ctx) {
+  const antes = botao.textContent;
+  botao.textContent = "gerando…";
+  botao.disabled = true;
+  try {
+    ctx.py.globals.set("_rot", JSON.stringify(ctx.rotulos.filter(r => r.texto)));
+    ctx.py.globals.set("_fs", ctx.noFS);
+    ctx.py.globals.set("_fmt", ctx.rel.formato === "png" ? "imagem" : "pdf");
+    const res = ctx.py.runPython(`
+import json, anotar_partitura as A
+_b, _r = A.estampar_bytes(open(_fs,"rb").read(), json.loads(_rot), saida=_fmt)
+(_b, _r["total"])
+`);
+    const [bytes, quantos] = res.toJs({ create_proxies: false });
+    res.destroy?.();
+    const png = ctx.rel.formato === "png";
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([bytes], { type: png ? "image/png" : "application/pdf" }));
+    a.download = ctx.base + "_notas." + (png ? "png" : "pdf");
+    a.click();
+    // revoga DEPOIS: revogar no mesmo tick pode abortar o download antes de comecar
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    botao.textContent = `${quantos} nomes · baixar de novo`;
+  } catch (e) {
+    botao.textContent = "erro ao gerar";
+    console.error(e);
+  } finally {
+    botao.disabled = false;
+    setTimeout(() => { if (botao.textContent.includes("baixar de novo")) botao.textContent = antes; }, 4000);
+  }
+}
+
+function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   const base = nome.replace(/\.[^.]+$/, "");
   if (!rel.total) {
     cartao.marcar("ruim", rel.modo === "imagem"
@@ -945,26 +1105,22 @@ function concluir(cartao, nome, bytes, previa, { rel, info, nota }) {
   }
 
   const png = rel.formato === "png";
-  const a = document.createElement("a");
-  a.className = "btn btn-secundario";
-  a.href = URL.createObjectURL(new Blob([bytes], { type: png ? "image/png" : "application/pdf" }));
-  a.download = base + "_notas." + (png ? "png" : "pdf");
-  a.textContent = png ? "Baixar imagem" : "Baixar PDF";
-  cartao.topo.append(a);
+  // O download e gerado no CLIQUE, nao agora: assim ele sempre carrega as edicoes feitas
+  // no editor. E por isso e um botao, e nao um link com href pronto.
+  const bt = document.createElement("button");
+  bt.type = "button";
+  bt.className = "btn btn-secundario";
+  bt.textContent = png ? "Baixar imagem" : "Baixar PDF";
+  cartao.topo.append(bt);
 
   // A previa vem ABERTA e ANTES da analise. Aberta porque o resultado e o que se quer
   // ver; antes porque a analise e comprida e empurraria a pagina anotada para longe.
+  let ctx = null;
   if (previa?.length) {
-    const d = document.createElement("details");
-    d.className = "analise";
-    d.open = true;
-    d.innerHTML = `<summary>Página anotada</summary><div class="corpo previa"></div>`;
-    const img = document.createElement("img");
-    img.alt = "Primeira página anotada de " + base;
-    img.src = URL.createObjectURL(new Blob([previa], { type: "image/png" }));
-    d.querySelector(".corpo").append(img);
-    cartao.raiz.append(d);
+    ctx = montarEditor(cartao, { ...extra, rel, previa, nome, base });
   }
+  bt.addEventListener("click", () => baixar(bt, ctx || { ...extra, rel, base,
+                                                        rotulos: rel.rotulos }));
 
   if (info) cartao.raiz.append(montarAnalise(info, nota));
   if (!rel.tem_analise) {
