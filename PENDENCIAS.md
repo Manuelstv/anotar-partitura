@@ -112,7 +112,22 @@ Limites do modo, por desenho (não são pendência):
 
 ---
 
-## 5. Estimar o acorde de cada compasso quando não há cifra
+## 5. ~~Editor para corrigir a transcrição~~ — NO AR
+
+Editor de **nota** (corrige / apaga / acrescenta), não corretor de régua. A prévia vem sem
+os nomes e eles viram um SVG clicável por cima, em pontos da página; o download é gerado no
+clique, já com as edições. `escrever(desenhar=False)` devolve a posição final de cada nome
+(2ª fileira inclusa) e `estampar_bytes()` é o caminho de volta.
+
+A escolha inverteu o que `PESQUISA-EDITOR.md` previa: ele apostava em erro sistemático
+(sistema inteiro deslocado) e recomendava corretor por sistema, mas o grau diatônico deu
+**100% em toda medição** — a régua não escorrega, o que sobra é pontual.
+
+**Falta:** só a 1ª página é editável (é a única com prévia); não move nem arrasta rótulo.
+
+---
+
+## 6. Estimar o acorde de cada compasso quando não há cifra
 
 Hoje, sem cifra, mostro o **campo harmônico** do tom (o que cabe). O passo seguinte é
 casar as notas de cada compasso contra os sete graus e sugerir qual acorde soa —
@@ -121,7 +136,7 @@ separado do que foi lido.
 
 ---
 
-## 6. Forma (A / B / refrão) não aparece na interface
+## 7. Forma (A / B / refrão) não aparece na interface
 
 `analise.forma()` já existe e agrupa compassos com a mesma sequência de alturas, mas o
 resultado não é exibido. Falta decidir a apresentação (uma faixa tipo `AABA`?) e tratar
@@ -129,7 +144,7 @@ repetição aproximada — hoje só casa sequência idêntica.
 
 ---
 
-## 7. Testar no iPhone de verdade
+## 8. Testar no iPhone de verdade
 
 Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
@@ -142,7 +157,7 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ---
 
-## 8. Casos não cobertos (conhecidos, não são bugs)
+## 9. Casos não cobertos (conhecidos, não são bugs)
 
 - **`--limpar` não apaga traço de extensão.** Nas partituras que já vêm com nome, o
   traço que indica nota longa é um desenho, não texto, e a tarja branca só cobre texto.
@@ -157,7 +172,7 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ---
 
-## 9. Ideias maiores (não são pendência, são direção)
+## 10. Ideias maiores (não são pendência, são direção)
 
 1. **Seguidor de partitura pelo microfone** — detectar a altura tocada e andar um cursor
    pelo PDF, marcando onde parou e o que saiu errado. Só é possível porque sei a
