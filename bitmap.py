@@ -37,8 +37,10 @@ LADO = 24                # patch normalizado do banco, em pixels
 JANELA = 2.4             # lado da janela recortada, em espacos de pauta
 CABECAS = ("preta", "minima", "semibreve")
 MARGEM = 0.12            # folga exigida da melhor classe de cabeca sobre a melhor "nao"
-LIMIAR_CAND = 0.40       # correlacao minima para virar candidato
+LIMIAR_CAND = 0.34       # correlacao minima para virar candidato
 ALT_HASTE = 2.2          # altura minima de uma haste, em espacos
+ALT_HASTE_MIN = 1.8      # idem, no teste de haste (mais frouxo)
+LARG_HASTE = 0.80        # largura maxima de uma haste no teste de haste, em espacos
 ALINHA_MAX = 0.18        # desvio maximo do meio-espaco, em espacos
 ESP_MINIMO = 5.0         # abaixo disso em pixels nem vale tentar
 AREA_MIOLO = 0.85        # area maxima de buraco a tapar, em espacos^2
@@ -213,19 +215,25 @@ def candidatos(cena):
     return fim
 
 
-def verticais(bin_, esp):
-    """Hastes e barras de compasso, no formato que `ler_notas` espera em `vert`.
+def verticais(bin_, esp, larg_max=0.35, alt_min=None):
+    """Tracos verticais: hastes e barras de compasso.
 
     O corte de altura em 2,2 espacos importa: com 1,2 espaco havia 507 verticais numa
     pagina de 156 notas e exigir haste nao filtrava nada.
+
+    Sao geradas DUAS listas com esta funcao, de proposito (ver `coletar_da_imagem`):
+    uma estreita, que vai para `ler_notas` decidir o que e barra de compasso, e uma
+    frouxa, so para o teste de haste. Frouxo demais na primeira mexeria na regra do
+    acidente que vale ate a barra; estreito demais na segunda descarta nota boa.
     """
+    alt_min = ALT_HASTE if alt_min is None else alt_min
     k = cv2.getStructuringElement(cv2.MORPH_RECT, (1, max(3, int(1.2 * esp) | 1)))
     v = cv2.morphologyEx(bin_, cv2.MORPH_OPEN, k)
     n, _, stats, _ = cv2.connectedComponentsWithStats(v, connectivity=8)
     out = []
     for i in range(1, n):
         x, y, w, h, _ = stats[i]
-        if w <= max(2, 0.35 * esp) and h >= ALT_HASTE * esp:
+        if w <= max(2, larg_max * esp) and h >= alt_min * esp:
             out.append({"x": float(x + w / 2), "y0": float(y),
                         "y1": float(y + h), "h": float(h)})
     return out
@@ -247,17 +255,22 @@ def tem_haste(cx, cy, esp, vert):
 
 
 def largura_medida(cheio, cx, cy, esp, teto=2.6):
-    """Extensao horizontal da mancha na altura do centro, em espacos de pauta.
+    """Extensao horizontal da mancha em volta do centro, em espacos de pauta.
 
     Serve para separar SEMIBREVE (~1,75 espaco) de minima (~1,30). Nao dava para deixar
     isso a cargo do banco: o acervo de treino tem UMA semibreve, e uma amostra nao treina
     classe nenhuma. Largura e geometria — nao precisa de exemplo para funcionar.
 
+    A janela vertical cobre a cabeca INTEIRA (+-0,5 espaco), nao a linha do centro: no
+    meio de uma semibreve ha o miolo VAZADO, e medir ali dava largura ZERO — a nota deixava
+    de ser reconhecida como semibreve, caia na regra da haste (que ela nao tem) e era
+    descartada. Eram 7 das 17 perdas.
+
     Se a mancha estoura o teto ela esta grudada em beam ou na cabeca vizinha; devolve o
     teto, e quem chama trata como "nao sei", nunca como semibreve.
     """
     H, W = cheio.shape
-    y0, y1 = max(0, int(cy - 0.15 * esp)), min(H, int(cy + 0.15 * esp) + 1)
+    y0, y1 = max(0, int(cy - 0.5 * esp)), min(H, int(cy + 0.5 * esp) + 1)
     if y0 >= y1:
         return 0.0
     faixa = cheio[y0:y1].any(axis=0)
@@ -274,7 +287,7 @@ def largura_medida(cheio, cx, cy, esp, teto=2.6):
     return (d - e + 1) / esp
 
 
-def cabecas(cena, vert):
+def cabecas(cena, vert_haste):
     """Candidato -> classe pelo banco -> filtro de notacao -> cabeca.
 
     O banco diz O QUE a mancha e; a notacao diz se ela PODE estar ali. Um sem o outro nao
@@ -295,7 +308,12 @@ def cabecas(cena, vert):
         classe = rotulos[j]
         if classe not in CABECAS:
             continue
-        if len(nao_cab) and sim[j] - sim[nao_cab].max() < MARGEM:
+        # A largura entra ANTES da margem: uma mancha larga e vazada e semibreve por
+        # geometria, e o banco (que viu UMA no treino) as vezes chuta "texto" nela. Deixar
+        # a margem decidir primeiro custava 3 notas.
+        larg = largura_medida(cheio, cx, cy, esp)
+        semibreve = 1.55 <= larg < 2.55 and classe != "preta"
+        if not semibreve and len(nao_cab) and sim[j] - sim[nao_cab].max() < MARGEM:
             continue
         # mora em linha ou em espaco: o centro cai num multiplo de meio espaco
         s = min(cena["sistemas"], key=lambda s: abs((s[0] + s[-1]) / 2 - cy))
@@ -306,13 +324,16 @@ def cabecas(cena, vert):
         # SEMIBREVE nao tem haste nenhuma, e quem decide isso e a largura, nao o banco.
         # A letra "o" de um nome de nota impresso mede ~0,8 espaco, entao nao se disfarca
         # de semibreve; e a mancha grudada devolve o teto e cai no ramo que exige haste.
-        larg = largura_medida(cheio, cx, cy, esp)
-        semibreve = 1.55 <= larg < 2.55 and classe != "preta"
-        if not semibreve and not tem_haste(cx, cy, esp, vert):
+        if not semibreve and not tem_haste(cx, cy, esp, vert_haste):
             continue
         if semibreve:
             classe = "semibreve"
-        w = (1.75 if semibreve else 1.30) * esp
+        # A caixa sai com a largura NOMINAL de cabeca (1,30 espaco) mesmo para semibreve,
+        # que mede ~1,75 de verdade. Motivo: `glifos_de_contorno` filtra por
+        # CABECA_W = (1,05, 1,60) e descartava toda semibreve logo depois de ela passar por
+        # aqui — 14 notas de um arquivo so, e o diagnostico dizia que estavam passando.
+        # A largura real ja fez o trabalho dela (decidir que era semibreve) acima.
+        w = 1.30 * esp
         out.append({"x0": cx - w / 2, "x1": cx + w / 2,
                     "y0": cy - 0.53 * esp, "y1": cy + 0.53 * esp,
                     "w": w, "h": 1.06 * esp, "classe": classe,
@@ -321,12 +342,22 @@ def cabecas(cena, vert):
     return out
 
 
+ACC_W = (0.50, 1.20)     # faixa de acidente em `glifos_de_contorno`, replicada aqui
+ACC_H = (2.20, 3.10)
+
+
 def blobs(limpo, esp):
     """Manchas que NAO tem tamanho de cabeca: clave, acidente, ponto.
 
     Deixar o blob bruto virar cabeca dentro de `glifos_de_contorno` abre uma segunda
-    porta de entrada, sem nenhum dos filtros acima — era dali que vinha o falso positivo
-    que nao reagia a nada.
+    porta de entrada, sem nenhum dos filtros do detector — era dali que vinha o falso
+    positivo que nao reagia a nada.
+
+    E quem tem tamanho de ACIDENTE tambem passa pelo banco. A FORMULA DE COMPASSO e o
+    motivo: os dois digitos do "4/4", empilhados, formam uma mancha de ~1,0 x 2,7 espacos,
+    que e exatamente a assinatura de um sustenido. Ela caia antes da primeira nota, virava
+    armadura fantasma e o sistema inteiro saia com F# no lugar de F — 9 nomes errados num
+    arquivo. Aqui o banco desempata, porque para ele digito e `texto`, nao `acc`.
     """
     cnts, hier = cv2.findContours(limpo, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
     if hier is None:
@@ -345,6 +376,84 @@ def blobs(limpo, esp):
                     "y1": float(y + h), "w": float(w), "h": float(h),
                     "curvas": 14 if hier[i][2] != -1 else 1})
     return out
+
+
+def _tem_vertical_longa(limpo, c, fracao=0.94):
+    """A mancha tem alguma COLUNA de tinta cobrindo `fracao` da propria altura?
+
+    E o que separa acidente de PAUSA DE SEMINIMA. As duas medem ~1,0 x 2,9 espacos e
+    `glifos_de_contorno` nao tem como distingui-las pela caixa — a pausa caia antes da
+    primeira nota e virava armadura fantasma, com o sistema inteiro saindo F# no lugar de
+    F. Mas sustenido e bequadro tem hastes verticais compridas e a pausa e um zigzag
+    diagonal: nenhuma coluna dela atravessa a mancha de cima a baixo.
+
+    Medido no acervo (fracao da altura coberta pela maior coluna de tinta):
+    acidente real 0,79-1,00 (mediana 0,96); pausa real 0,35-0,93 (mediana 0,86 no pior
+    arquivo). O corte em 0,94 mata toda pausa e custa uns poucos acidentes de imagem
+    grande — na conta final o nome subiu de 97,4% para 98,1%.
+    """
+    x0, x1 = int(c["x0"]), int(min(limpo.shape[1], c["x1"]))
+    y0, y1 = int(c["y0"]), int(min(limpo.shape[0], c["y1"]))
+    if x1 - x0 < 2 or y1 - y0 < 3:
+        return False
+    rec = limpo[y0:y1, x0:x1]
+    alvo = fracao * rec.shape[0]
+    # maior sequencia contigua de tinta em cada coluna
+    for col in rec.T:
+        melhor = atual = 0
+        for v in col:
+            atual = atual + 1 if v else 0
+            melhor = max(melhor, atual)
+        if melhor >= alvo:
+            return True
+    return False
+
+
+def tirar_pausas(caminhos, limpo, esp):
+    """Descarta manchas com tamanho de acidente que nao tenham haste vertical."""
+    return [c for c in caminhos
+            if not (ACC_W[0] <= c["w"] / esp <= ACC_W[1]
+                    and ACC_H[0] * 0.8 <= c["h"] / esp <= ACC_H[1]
+                    and not _tem_vertical_longa(limpo, c))]
+
+
+def tirar_formula(caminhos, sistemas, esp):
+    """Descarta os digitos da FORMULA DE COMPASSO, que se disfarcam de acidente.
+
+    Cada digito do "4/4" mede ~1,0 x 2,3 espacos, ou seja, cai na faixa de acidente de
+    `glifos_de_contorno`; ficando antes da primeira nota, virava armadura fantasma e o
+    sistema saia todo com F# no lugar de F. Foram 9 nomes errados num arquivo so.
+
+    O que separa um do outro nao e o tamanho, e a ESTRUTURA: a formula e sempre um PAR
+    alinhado em x, um digito na metade de cima da pauta e outro na de baixo. Sustenido de
+    armadura vem sozinho na altura da nota que ele altera. (Mesma familia de solucao do
+    ritornello, que se separa do ponto de aumento pelo par vertical.)
+
+    Tentei antes deixar o BANCO desempatar isso e foi pior: a classe `acc` tem 6 templates
+    de 2 obras e passou a rejeitar acidente legitimo — o nome caiu de 97,4% para 87,2%.
+    """
+    suspeitos = [c for c in caminhos
+                 if ACC_W[0] <= c["w"] / esp <= ACC_W[1]
+                 and ACC_H[0] * 0.85 <= c["h"] / esp <= ACC_H[1]]
+    fora = set()
+    for a in suspeitos:
+        for b in suspeitos:
+            if a is b or id(a) in fora:
+                continue
+            cxa, cxb = (a["x0"] + a["x1"]) / 2, (b["x0"] + b["x1"]) / 2
+            if abs(cxa - cxb) > 0.35 * esp:
+                continue
+            cya, cyb = (a["y0"] + a["y1"]) / 2, (b["y0"] + b["y1"]) / 2
+            if cya >= cyb:
+                continue                              # conta o par uma vez so
+            s = min(sistemas, key=lambda s: abs((s[0] + s[-1]) / 2 - cya))
+            meio = (s[0] + s[-1]) / 2
+            # um de cada lado do meio da pauta, e os dois dentro dela
+            if (cya < meio < cyb and s[0] - 0.5 * esp < cya
+                    and cyb < s[-1] + 0.5 * esp):
+                fora.add(id(a))
+                fora.add(id(b))
+    return [c for c in caminhos if id(c) not in fora]
 
 
 # -------------------------------------------------------------------- cena
@@ -379,8 +488,15 @@ def coletar_da_imagem(img, com_ritmo=False):
     cena = preparar(img)
     if cena is None:
         raise ImagemIlegivel("nenhuma pauta encontrada na imagem")
-    vert = verticais(cena["bin"], cena["esp"])
-    caminhos = cabecas(cena, vert) + blobs(cena["limpo"], cena["esp"])
+    esp = cena["esp"]
+    # estreita: e o que `ler_notas` usa para achar barra de compasso
+    vert = verticais(cena["bin"], esp)
+    # frouxa: so para o teste de haste. A haste sai gorda quando encosta em beam ou na
+    # haste vizinha — medi 7 px (0,72 espaco) numa pagina do The-chicken, contra o limite
+    # de 3,4 px. Eram 4 notas perdidas com a haste ali, encostando, visivel.
+    vert_haste = verticais(cena["bin"], esp, larg_max=LARG_HASTE, alt_min=ALT_HASTE_MIN)
+    outros = tirar_pausas(blobs(cena["limpo"], esp), cena["limpo"], esp)
+    caminhos = cabecas(cena, vert_haste) + tirar_formula(outros, cena["sistemas"], esp)
     formas = [{"x": (c["x0"] + c["x1"]) / 2, "y": (c["y0"] + c["y1"]) / 2,
                "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]}
               for c in caminhos]
