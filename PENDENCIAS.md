@@ -65,8 +65,8 @@ gabarito = leitura vetorial do mesmo arquivo):
 
 | entrada | cabeças | grau | nome | falso positivo |
 |---|---|---|---|---|
-| PNG limpo | **96,8%** | **100%** | 97,4% | 1,5% |
-| JPEG q60 | 91,3% | **100%** | 96,5% | 1,0% |
+| PNG limpo | **99,2%** | **100%** | **98,1%** | 2,1% |
+| JPEG q60 | 94,1% | **100%** | 96,7% | 1,8% |
 
 Confirmado no navegador: `cv2 4.11.0` importa no Pyodide 0.28.3 (3,7 s de download +
 0,75 s de import) e `matchTemplate`, `connectedComponentsWithStats`, `findContours`,
@@ -81,12 +81,12 @@ O que ainda falta:
 1. **Testar com print de celular DE VERDADE.** Tudo acima usa PDF renderizado como se
    fosse print. Print real tem subpixel rendering da tela, escala fracionária, barra de
    status e recorte — nada disso está coberto. **Depende de o Manuel mandar 2–3 prints.**
-2. **Semibreve.** O treino do banco tem 1 semibreve, e ela se perde no recorte. Hoje quem
-   separa semibreve de mínima é a **largura medida** (≥1,55 espaço), não o banco — funciona,
-   mas o recall em música com muita semibreve fica em ~83% (Song_of_somg). Resolver é
-   aumentar o treino a partir do acervo.
-3. **Alteração (sustenido/bemol) em imagem: 94–97%**, contra 100% no vetor. O acidente vem
-   da geometria do blob e às vezes sai trocado. O grau nunca erra, só a alteração.
+2. **Armadura de bemol no Strasbourg**: 8 notas saem `B` em vez de `Bb` — a armadura de
+   1 bemol não é detectada naquele arquivo (nome 93,3%). Erro oposto ao da armadura
+   fantasma, e ainda não diagnosticado.
+3. **Alteração em imagem: 98,1%** no total, contra 100% no vetor. O grau nunca erra, só a
+   alteração. Os arquivos que ainda erram são Strasbourg (93,3%), The-chicken (94,7%) e
+   cadernin (95,9%).
 4. **Ritmo em imagem** — `beams` volta vazio, então o `_` de nota longa e o player de piano
    não valem no modo imagem.
 5. **PDF de várias páginas com saída em imagem** entrega só a 1ª página (a interface avisa).
