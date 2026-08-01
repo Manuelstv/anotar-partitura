@@ -173,7 +173,33 @@ compasso à cifra, o núcleo teria de expor as barras que ele já calcula.
 
 ---
 
-## 7. Estimar o acorde de cada compasso quando não há cifra
+## 7. ~~Play-along: o player tocando a harmonia~~ — NO AR
+
+Entrou em 2026-08-01, junto de uma poda. `analise.acompanhamento` devolve
+`[{t, d, midi, cifra}]`: as cifras lidas, soletradas em notas MIDI, no relógio da melodia.
+
+A cifra não tem tempo, tem POSIÇÃO — o instante dela sai por **interpolação** entre os x das
+notas da mesma linha, que já passaram pelo relógio em `melodia()`. Para isso, cada evento de
+`melodia()` passou a carregar `s` (sistema global) e `x`. Linha sem nota nenhuma (intro em
+barra inclinada) fica de fora: ali não existe referência de tempo.
+
+Cada acorde dura até o próximo, que é como um acompanhamento se comporta. O timbre é
+triangular filtrado com o baixo em senoide, e pico medido de 0,064 contra 0,38 do sax — o
+acorde é chão, não protagonista. Dois botões ligam e desligam cada voz: desligando a melodia,
+sobra o acompanhamento sozinho para improvisar por cima.
+
+**Podado no mesmo dia, a pedido do Manuel:** os blocos **Ritmo**, **Respiração** e **Desenhos
+que repetem** saíram da interface. O cálculo continua em `analise.py` (a fórmula alimenta o
+fato "Compasso" e o cabeçalho da folha de cifras, e a CLI ainda reporta tudo), mas não são
+exibidos. Se voltarem, voltam como um bloco só e mais enxuto.
+
+**Falta:** o acompanhamento não tem levada — os acordes entram em bloco, no instante em que a
+cifra aparece. Um padrão rítmico simples (baixo no 1 e 3, acorde no 2 e 4) melhoraria muito, e
+agora que a fórmula de compasso é lida, dá para fazer isso sem chutar.
+
+---
+
+## 8. Estimar o acorde de cada compasso quando não há cifra
 
 Hoje, sem cifra, mostro o **campo harmônico** do tom (o que cabe). O passo seguinte é
 casar as notas de cada compasso contra os sete graus e sugerir qual acorde soa —
@@ -182,7 +208,7 @@ separado do que foi lido.
 
 ---
 
-## 8. Forma (A / B / refrão) não aparece na interface
+## 9. Forma (A / B / refrão) não aparece na interface
 
 `analise.forma()` já existe e agrupa compassos com a mesma sequência de alturas, mas o
 resultado não é exibido. Falta decidir a apresentação (uma faixa tipo `AABA`?) e tratar
@@ -190,7 +216,7 @@ repetição aproximada — hoje só casa sequência idêntica.
 
 ---
 
-## 9. Testar no iPhone de verdade
+## 10. Testar no iPhone de verdade
 
 Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
@@ -203,7 +229,7 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ---
 
-## 10. Casos não cobertos (conhecidos, não são bugs)
+## 11. Casos não cobertos (conhecidos, não são bugs)
 
 - **`--limpar` saiu da interface** (2026-08-01, a pedido do Manuel): quem quer tirar um
   nome apaga no editor. O parâmetro continua em `anotar_bytes` e na CLI. E ele nunca apagou
@@ -219,11 +245,14 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ---
 
-## 11. Ideias maiores (não são pendência, são direção)
+## 12. Ideias maiores (não são pendência, são direção)
 
-1. **Seguidor de partitura pelo microfone** — detectar a altura tocada e andar um cursor
-   pelo PDF, marcando onde parou e o que saiu errado. Só é possível porque sei a
-   coordenada de cada nota na página.
+1. **Seguidor de partitura pelo microfone** — detectar a altura tocada e rolar a página
+   sozinho. Estudado em `PESQUISA-MICROFONE.md` (2026-08-01): **viável**, e mais fácil aqui
+   que num app comum, porque a coordenada de cada nota já é dado de entrada. Sax é
+   monofônico, então autocorrelação basta; ~80 ms de latência. A armadilha: o microfone ouve
+   o som REAL e a partitura é escrita — sem transpor os 9 semitons, erra toda nota.
+   Pré-requisito: uma gravação do Manuel tocando de verdade.
 2. **Dedilhado em vez de nome** — desenhar o diagrama de chaves do sax embaixo da nota,
    pulando a tradução "nome → dedo". Mesma máquina, muda só o que é estampado.
 3. **Caderno de treino** — recortar do PDF original os compassos mais difíceis e montar
