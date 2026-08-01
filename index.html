@@ -242,6 +242,9 @@
     .escalas.comgrau div { grid-template-columns: 52px 44px 1fr; }
   }
 
+  .vozes { display: flex; gap: var(--s2); margin-top: var(--s3); }
+  .voz[aria-pressed="false"] { opacity: .42; }
+  .voz[aria-pressed="true"] { border-color: var(--acento); }
   .medidor { display: flex; align-items: center; gap: var(--s3); }
   .medidor .trilho { display: block; flex: 1; height: 8px; background: var(--sup3);
                      border-radius: 99px; overflow: hidden; }
@@ -540,7 +543,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=27";
+const V = "?v=28";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -715,6 +718,35 @@ function tocarNota(midi, quando, segundos) {
   ar.stop(fim + 0.02);
 }
 
+// Acompanhamento: onda triangular filtrada, volume baixo e ataque mole. O sax e quem tem
+// de ser ouvido — o acorde existe para dar o CHAO da harmonia, e por isso o baixo sai em
+// senoide, que ocupa a regiao grave sem embolar as vozes de cima.
+function tocarAcorde(midis, quando, segundos) {
+  const c = audio();
+  const dur = Math.max(segundos, 0.3);
+  const fim = quando + dur;
+  const vol = c.createGain();
+  vol.gain.setValueAtTime(0.0001, quando);
+  vol.gain.exponentialRampToValueAtTime(0.06, quando + 0.04);
+  vol.gain.exponentialRampToValueAtTime(0.033, quando + Math.min(0.8, dur * 0.5));
+  vol.gain.exponentialRampToValueAtTime(0.0001, fim + 0.3);
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 2200;
+  lp.Q.value = 0.6;
+  midis.forEach((m, k) => {
+    const o = c.createOscillator();
+    o.type = k === 0 ? "sine" : "triangle";
+    o.frequency.value = 440 * Math.pow(2, (m - 69) / 12);
+    const g = c.createGain();
+    g.gain.value = (k === 0 ? 0.85 : 0.55) / Math.sqrt(midis.length);
+    o.connect(g).connect(lp);
+    o.start(quando);
+    o.stop(fim + 0.35);
+  });
+  lp.connect(vol).connect(saidaAudio);
+}
+
 function cortarSaida() {
   // Derruba a saida e poe outra no lugar: o que ja estava agendado continua rodando,
   // mas desligado do alto-falante. E o unico jeito de calar na hora — Web Audio nao
@@ -725,13 +757,14 @@ function cortarSaida() {
   saidaAudio.connect(ctxAudio.destination);
 }
 
-function montarTocador(melodia) {
+function montarTocador(melodia, acomp) {
   const b = document.createElement("div");
   b.className = "bloco larga";
   const ico = (d, extra = "") => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
       aria-hidden="true">${d}</svg>${extra}`;
-  b.innerHTML = `<h3>Ouvir a melodia</h3>
+  const temHarm = !!(acomp && acomp.length);
+  b.innerHTML = `<h3>${temHarm ? "Ouvir e tocar junto" : "Ouvir a melodia"}</h3>
     <div class="tocador">
       <div class="transporte">
         <button type="button" class="icone atras" aria-label="Voltar 5 segundos">
@@ -753,10 +786,17 @@ function montarTocador(melodia) {
     </div>
     <label class="and">Andamento
       <input type="range" class="bpm-faixa" min="40" max="180" step="2" value="92">
-      <span class="bpm">92 BPM</span></label>`;
+      <span class="bpm">92 BPM</span></label>
+    <div class="vozes"${temHarm ? "" : " hidden"}>
+      <button type="button" class="btn-mini voz" data-voz="mel" aria-pressed="true">Melodia</button>
+      <button type="button" class="btn-mini voz" data-voz="harm" aria-pressed="true">Acompanhamento</button>
+    </div>`;
   comDica(b.querySelector("h3"), "Sax alto sintetizado, tocando as notas como estão "
     + "escritas — a altura é a da partitura, não a transposição do instrumento. "
-    + "Arraste a linha para pular para outro trecho.");
+    + "Arraste a linha para pular para outro trecho."
+    + (temHarm ? " O acompanhamento são as cifras da própria partitura, soletradas e "
+      + "postas no tempo da melodia. Desligue a melodia e ele fica tocando sozinho, "
+      + "para você improvisar por cima." : ""));
 
   const bt = b.querySelector(".play"), linha = b.querySelector(".linha"),
         faixaBpm = b.querySelector(".bpm-faixa"), rotBpm = b.querySelector(".bpm"),
@@ -766,7 +806,9 @@ function montarTocador(melodia) {
 
   // A posicao e guardada em TEMPOS, nao em segundos: mudar o andamento no meio nao
   // pode fazer o cursor pular de lugar na musica.
-  let pos = 0, tocando = false, arrastando = false, relogio = null, i = 0, ancora = 0;
+  let pos = 0, tocando = false, arrastando = false, relogio = null, i = 0, j = 0, ancora = 0;
+  const harm = temHarm ? acomp : [];
+  const ligado = { mel: true, harm: temHarm };
   const seg = () => 60 / Number(faixaBpm.value);
   const mmss = (s) => (s = Math.max(0, s),
     `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`);
@@ -785,6 +827,10 @@ function montarTocador(melodia) {
     ancora = c.currentTime + 0.08 - pos * seg();
     i = melodia.notas.findIndex(n => n.t >= pos - 1e-6);
     if (i < 0) i = melodia.notas.length;
+    // o acorde que ja estava soando quando se pula para o meio nao e reatacado: comeco
+    // pelo PROXIMO, senao a harmonia entra fora de lugar a cada arrastada da linha
+    j = harm.findIndex(a => a.t >= pos - 1e-6);
+    if (j < 0) j = harm.length;
   }
 
   function passo() {
@@ -792,7 +838,11 @@ function montarTocador(melodia) {
     const c = ctxAudio, s = seg();
     while (i < melodia.notas.length && ancora + melodia.notas[i].t * s < c.currentTime + 0.2) {
       const n = melodia.notas[i++];
-      tocarNota(n.midi, Math.max(c.currentTime, ancora + n.t * s), n.d * s);
+      if (ligado.mel) tocarNota(n.midi, Math.max(c.currentTime, ancora + n.t * s), n.d * s);
+    }
+    while (j < harm.length && ancora + harm[j].t * s < c.currentTime + 0.2) {
+      const a = harm[j++];
+      if (ligado.harm) tocarAcorde(a.midi, Math.max(c.currentTime, ancora + a.t * s), a.d * s);
     }
     pos = Math.min(total, Math.max(0, (c.currentTime - ancora) / s));
     if (pos >= total) { parar(); pos = 0; }
@@ -828,6 +878,13 @@ function montarTocador(melodia) {
     if (tocando) { cortarSaida(); ancorar(); }
     pintar();
   }
+
+  b.querySelectorAll(".voz").forEach(v => v.addEventListener("click", () => {
+    const alvo = v.dataset.voz;
+    ligado[alvo] = !ligado[alvo];
+    v.setAttribute("aria-pressed", String(ligado[alvo]));
+    if (tocando) { cortarSaida(); ancorar(); }   // corta o que ja estava agendado
+  }));
 
   bt.onclick = () => (tocando ? parar() : tocar());
   b.querySelector(".atras").onclick = () => buscar(pos - 5 / seg());
@@ -913,7 +970,8 @@ function montarAnalise(info, dificuldade) {
     fatos.append(w);
   }
   corpo.append(fatos);
-  if (info.melodia?.notas?.length) corpo.append(montarTocador(info.melodia));
+  if (info.melodia?.notas?.length)
+    corpo.append(montarTocador(info.melodia, info.acompanhamento));
 
   if (dificuldade != null) {
     const b = document.createElement("div");
@@ -1057,83 +1115,6 @@ function montarAnalise(info, dificuldade) {
     corpo.append(b);
   }
 
-  // RITMO: a duracao ja e lida (figura da cabeca dividida pelos beams), entao da para
-  // descrever a levada sem nenhum gabarito externo.
-  if (info.ritmo) {
-    const r = info.ritmo;
-    const b = document.createElement("div");
-    b.className = "bloco";
-    b.innerHTML = `<h3>Ritmo</h3><div class="fichas"></div>
-      <p class="aviso-campo"></p>`;
-    comDica(b.querySelector("h3"), trecho(`
-      <p>Nada aqui vem escrito no arquivo: a duração de cada nota sai da figura da cabeça
-      dividida pelos feixes que a ligam à vizinha, e o resto é conta.</p>
-      <p><b>Fora do tempo</b> é a fatia dos ataques que não cai num tempo inteiro — é o que
-      dá a sensação de levada. <b>Síncope</b> é o caso mais forte: a nota entra fora do
-      tempo e ainda atravessa o tempo seguinte.</p>
-      <p><b>Confiança</b> é a fatia dos compassos que fecham na fórmula. Quando ela cai,
-      alguma duração escapou (quiáltera, ou pausa em partitura sem fonte musical) e o resto
-      deste cartão merece desconfiança.</p>`));
-    const fs = b.querySelector(".fichas");
-    fs.append(ficha(`${r.formula}`));
-    if (r.predominante) fs.append(ficha(`figura: ${r.predominante}`));
-    fs.append(ficha(`${Math.round(r.frac_fora_do_tempo * 100)}% fora do tempo`));
-    if (r.sincopes) fs.append(ficha(`${r.sincopes} síncopes`));
-    fs.append(ficha(`${r.densidade} notas por compasso`));
-    if (r.confianca < 1) fs.append(ficha(`confiança ${Math.round(r.confianca * 100)}%`));
-    b.querySelector(".aviso-campo").textContent = (r.figuras || [])
-      .map(([n, q]) => `${n} ${q}×`).join("  ·  ");
-    corpo.append(b);
-  }
-
-  // RESPIRO e o que mais falta num material de sax: onde cabe pegar ar.
-  if (info.respiro) {
-    const s = info.respiro;
-    const b = document.createElement("div");
-    b.className = "bloco";
-    b.innerHTML = `<h3>Respiração</h3><div class="fichas"></div>
-      <p class="aviso-campo"></p>`;
-    comDica(b.querySelector("h3"), trecho(`
-      <p>Respiro contado como pausa de um tempo ou mais, ou nota de três tempos ou mais —
-      nesta dá tempo de cortar o fim dela e pegar ar. Pausa de colcheia no meio de uma
-      levada não conta: ali ela é articulação, não folga.</p>
-      <p>Uma frase acima de doze tempos corridos costuma acabar com o ar antes do fim. A
-      saída não é aguentar: é roubar uma respiração antes de precisar dela, e as frases
-      listadas aqui são as candidatas.</p>`));
-    const fs = b.querySelector(".fichas");
-    fs.append(ficha(`${s.pontos} lugares para respirar`));
-    fs.append(ficha(`frase média de ${s.media} tempos`));
-    const conf = info.ritmo?.confianca ?? 1;
-    b.querySelector(".aviso-campo").textContent = (s.longas?.length
-      ? "Sem folga por muito tempo: " + s.longas
-          .map(f => `compassos ${f.do}–${f.ao} (${f.tempos} tempos)`).join("  ·  ")
-      : "Nenhuma frase passa de doze tempos sem folga.")
-      // com duracao lida pela metade, o mapa de respiro engana: melhor dizer isso
-      + (conf < 0.9 ? `  ·  a duração fecha em ${Math.round(conf * 100)}% dos compassos, `
-                      + `então isto aqui é estimativa` : "");
-    corpo.append(b);
-  }
-
-  if (info.motivos?.length) {
-    const b = document.createElement("div");
-    b.className = "bloco";
-    b.innerHTML = `<h3>Desenhos que repetem</h3><div class="escalas"></div>`;
-    comDica(b.querySelector("h3"), "Comparando os intervalos, e não as notas: assim "
-      + "“G A B G” e “C D E C” contam como o mesmo desenho, que é como o ouvido escuta. "
-      + "Achar o desenho repetido encurta o estudo — são cinco notas para dominar, não "
-      + "trinta.");
-    for (const m of info.motivos) {
-      const l = document.createElement("div");
-      l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
-      l.querySelector("b").textContent = `${m.vezes}×`;
-      l.querySelector(".notas-ac").textContent = m.notas.join(" ");
-      l.querySelector(".esc").textContent = (m.transposto ? "também transposto · " : "")
-        + "compassos " + m.compassos.join(", ");
-      b.querySelector(".escalas").append(l);
-    }
-    corpo.append(b);
-  }
-
   if (info.real) {
     const reg = info.registro || {};
     const b = document.createElement("div");
@@ -1233,6 +1214,10 @@ if _rel["total"]:
                 _info["melodia"] = A.melodia(_dados)
             except Exception:
                 pass
+            try:
+                _info["acompanhamento"] = analise.acompanhamento(_dados, _info)
+            except Exception:
+                _info["acompanhamento"] = []
         try:
             _nota = Dif.nota("/entrada.pdf", json.load(open("/pesos_dificuldade.json")))[0]
         except Exception:
