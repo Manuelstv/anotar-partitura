@@ -943,11 +943,84 @@ def analisar(dados):
         # grade da folha de cifras: uma LINHA por sistema da partitura, na ordem de
         # leitura, com as cifras daquele sistema na ordem de x
         "grade": [{"linha": i + 1,
-                   "cifras": [{"cifra": c["cifra"], "xr": c["xr"]}
+                   "cifras": [{"cifra": c["cifra"], "xr": c["xr"], "x": round(c["x"], 2)}
                               for c in sorted(cifras, key=lambda c: c["x"])
                               if c["linha"] == i]}
                   for i in range(len(linhas_vistas))],
     }
+
+
+def _voz(cifra, base=48):
+    """Cifra -> notas MIDI para tocar: baixo uma oitava abaixo e o acorde fechado acima.
+
+    Fechado de proposito: acorde espalhado disputa a regiao do sax e embola. O baixo
+    separado e o que faz a harmonia se sustentar sozinha embaixo da melodia.
+    """
+    pcs = [_classe(n) for n in soletrar(cifra) if '(' not in n]
+    pcs = [p for p in pcs if p is not None]
+    if not pcs:
+        return []
+    raiz = base + pcs[0] % 12
+    return [raiz - 12] + [raiz + (p - pcs[0]) % 12 for p in pcs[:5]]
+
+
+def _instante(pontos, x):
+    """Interpola o tempo de um x na linha, pelos (x, t) das notas dela."""
+    if not pontos:
+        return None
+    if x <= pontos[0][0]:
+        return pontos[0][1]
+    if x >= pontos[-1][0]:
+        return pontos[-1][1]
+    for (x0, t0), (x1, t1) in zip(pontos, pontos[1:]):
+        if x0 <= x <= x1:
+            fatia = 0.0 if x1 == x0 else (x - x0) / (x1 - x0)
+            return t0 + fatia * (t1 - t0)
+    return pontos[-1][1]
+
+
+def acompanhamento(dados, info):
+    """[{t, d, midi}] — a harmonia lida, no relogio da melodia, para tocar por baixo.
+
+    A cifra nao tem tempo, tem posicao: o instante dela sai por INTERPOLACAO entre os x
+    das notas da mesma linha, que ja passaram pelo relogio em `melodia`. Linha sem nota
+    (intro em barra inclinada) nao entra — ali nao existe referencia de tempo nenhuma.
+
+    A duracao de cada acorde vai ate o proximo: e assim que um acompanhamento se comporta,
+    sustentando enquanto ninguem trocou de acorde.
+    """
+    grade = (info or {}).get("grade") or []
+    if not grade:
+        return []
+    mel = A.melodia(dados)
+    por_linha = {}
+    for e in mel["notas"]:
+        if "s" in e:
+            por_linha.setdefault(e["s"], []).append((e["x"], e["t"]))
+    for v in por_linha.values():
+        v.sort()
+    seq = []
+    for g in grade:
+        pontos = por_linha.get(g["linha"] - 1)
+        for c in g["cifras"]:
+            t = _instante(pontos, c["x"]) if pontos else None
+            if t is not None:
+                seq.append({"t": round(t, 4), "cifra": c["cifra"]})
+    seq.sort(key=lambda a: a["t"])
+    # repeticao imediata do mesmo acorde vira um so: nao ha o que reatacar
+    limpo = []
+    for a in seq:
+        if limpo and limpo[-1]["cifra"] == a["cifra"] and a["t"] - limpo[-1]["t"] < 0.5:
+            continue
+        limpo.append(a)
+    saida = []
+    for i, a in enumerate(limpo):
+        fim = limpo[i + 1]["t"] if i + 1 < len(limpo) else mel["total"]
+        d = round(fim - a["t"], 4)
+        midi = _voz(a["cifra"])
+        if d > 0.05 and midi:
+            saida.append({"t": a["t"], "d": d, "midi": midi, "cifra": a["cifra"]})
+    return saida
 
 
 def folha_de_cifras(info, titulo=''):
