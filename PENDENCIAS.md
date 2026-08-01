@@ -103,7 +103,9 @@ espaço de pauta, folgado sobre o piso de 10. Deixa de ser limite permanente (ve
 Limites do modo, por desenho (não são pendência):
 
 - **Exige ~10 px por espaço de pauta** (A4 inteiro com largura ≥ ~1100 px). Com 6 px o
-  recall cai para 44%. O `bitmap.ESP_MINIMO` corta em 5 px e a interface avisa.
+  recall cai para 44%. O `bitmap.ESP_MINIMO` corta em 5 px, e abaixo de 8,5 px a interface
+  avisa com o número medido (`rel["imagem_info"]["esp_px"]`) em vez de entregar um resultado
+  ruim em silêncio.
 - **A `analise.py` não existe em imagem** — cifra, tom, escala sugerida, dificuldade e
   `--limpar` dependem de span de texto, que um bitmap não tem. `rel["tem_analise"]` diz
   isso à interface, que mostra o aviso.
@@ -123,7 +125,12 @@ A escolha inverteu o que `PESQUISA-EDITOR.md` previa: ele apostava em erro siste
 (sistema inteiro deslocado) e recomendava corretor por sistema, mas o grau diatônico deu
 **100% em toda medição** — a régua não escorrega, o que sobra é pontual.
 
-**Falta:** só a 1ª página é editável (é a única com prévia); não move nem arrasta rótulo.
+Inclui: **alvo de toque** generoso (retângulo invisível de 1,7 × o corpo da fonte — o
+texto de 8 pt é alvo pequeno para dedo), **desfazer** (pilha de 40, botão + Ctrl+Z),
+**navegação de páginas** (`previa_de()` rasteriza a página pedida; os rótulos de todas as
+páginas já vêm da leitura) e **paleta de notas** (tocar em `G` + `♯` em vez de digitar).
+
+**Falta:** não move nem arrasta rótulo.
 
 ---
 
