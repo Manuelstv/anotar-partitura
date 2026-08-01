@@ -533,7 +533,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=25";
+const V = "?v=26";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -601,51 +601,111 @@ function ficha(txt) {
 // A cor de piano vem de tres coisas: parciais com amplitude decrescente, um filtro
 // que fecha enquanto a nota morre (a corda perde brilho antes de perder volume) e
 // um estalo curtinho de ruido no ataque, que e o martelo.
-let ctxAudio = null, ondaPiano = null, bufMartelo = null, saidaAudio = null;
+let ctxAudio = null, ondaSax = null, bufSopro = null, saidaAudio = null;
 function audio() {
   if (ctxAudio) return ctxAudio;
   ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
   saidaAudio = ctxAudio.createGain();
   saidaAudio.connect(ctxAudio.destination);
-  const amp = [0, 1, .42, .21, .11, .07, .04, .025, .015];
-  ondaPiano = ctxAudio.createPeriodicWave(
-    Float32Array.from(amp), new Float32Array(amp.length), { disableNormalization: false });
-  bufMartelo = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * 0.02), ctxAudio.sampleRate);
-  const d = bufMartelo.getChannelData(0);
-  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
+  // TIMBRE DE SAX ALTO. O sax e um tubo CONICO com palheta: soam todos os harmonicos
+  // (diferente da clarineta, cilindrica, que enfatiza os impares), com 2o e 3o fortes — e
+  // dai vem o corpo "encorpado" dele. Aqui isso e uma PeriodicWave; a parte imaginaria
+  // espalha as fases, senao a onda fica com um pico duro e soa eletronica.
+  const re = [0, 1, .72, .56, .36, .26, .175, .12, .085, .06, .042, .03, .021, .015, .011];
+  const im = re.map((a, k) => k % 2 ? a * 0.35 : -a * 0.22);
+  ondaSax = ctxAudio.createPeriodicWave(Float32Array.from(re), Float32Array.from(im),
+                                       { disableNormalization: false });
+  // ruido de SOPRO: 1,5 s em loop. Existe no ataque (o "ch" da palheta pegando) e continua
+  // baixinho no sustain, que e o que faz soar soprado em vez de sintetizado.
+  bufSopro = ctxAudio.createBuffer(1, Math.floor(ctxAudio.sampleRate * 1.5), ctxAudio.sampleRate);
+  const d = bufSopro.getChannelData(0);
+  let m = 0;
+  for (let i = 0; i < d.length; i++) {          // ruido levemente rosa: menos assobio
+    m = 0.82 * m + 0.18 * (Math.random() * 2 - 1);
+    d[i] = m * 2.2;
+  }
   return ctxAudio;
 }
 
 function tocarNota(midi, quando, segundos) {
   const c = audio(), f = 440 * Math.pow(2, (midi - 69) / 12);
-  const cauda = Math.min(2.6, Math.max(segundos, 0.22) + 0.5);
+  // Sax NAO tem cauda de ressonancia como piano: enquanto sopra soa, quando para cala.
+  // Entao a nota dura o que tem de durar, com um release curto.
+  const dur = Math.max(segundos, 0.12);
+  const rel = 0.085;
+  const fim = quando + dur + rel;
+
   const vol = c.createGain();
+  // ataque de PALHETA: ~45 ms, com um leve pico antes de assentar no sustain. Ataque
+  // instantaneo soa a orgao; lento demais soa a flauta.
   vol.gain.setValueAtTime(0.0001, quando);
-  vol.gain.exponentialRampToValueAtTime(0.20, quando + 0.008);
-  vol.gain.exponentialRampToValueAtTime(0.06, quando + 0.25);
-  vol.gain.exponentialRampToValueAtTime(0.0001, quando + cauda);
+  vol.gain.exponentialRampToValueAtTime(0.26, quando + 0.045);
+  vol.gain.exponentialRampToValueAtTime(0.195, quando + Math.min(0.16, dur * 0.5));
+  vol.gain.setValueAtTime(0.195, Math.max(quando + 0.05, quando + dur - 0.01));
+  vol.gain.exponentialRampToValueAtTime(0.0001, fim);
+
   const filtro = c.createBiquadFilter();
   filtro.type = "lowpass";
-  filtro.frequency.setValueAtTime(Math.min(11000, f * 14), quando);
-  filtro.frequency.exponentialRampToValueAtTime(Math.max(400, f * 3), quando + cauda);
-  filtro.connect(vol).connect(saidaAudio);
+  filtro.Q.value = 1.4;
+  // o brilho ENTRA junto com o ar, nao comeca aberto: cutoff sobe no ataque e recua no fim
+  // Os limites tem PISO ABSOLUTO, nao so multiplo da nota: com cutoff puramente relativo
+  // (f*8) o corte caia sobre o 7o harmonico de um la 440 e o timbre perdia o brilho — medi
+  // h7=0,06 e h8=0,02, quando o sax real ainda tem energia ali. Sax alto vive de 3 a 5 kHz.
+  filtro.frequency.setValueAtTime(Math.max(800, f * 2.4), quando);
+  filtro.frequency.linearRampToValueAtTime(Math.min(11000, Math.max(4600, f * 11)), quando + 0.07);
+  filtro.frequency.linearRampToValueAtTime(Math.min(9000, Math.max(3200, f * 7.5)), quando + dur);
+  filtro.frequency.linearRampToValueAtTime(Math.max(900, f * 3), fim);
 
-  for (const [desafina, ganho] of [[0, 1], [1.0012, 0.55]]) {
-    const o = c.createOscillator();
-    o.setPeriodicWave(ondaPiano);
-    o.frequency.value = desafina ? f * desafina : f;
-    const g = c.createGain();
-    g.gain.value = ganho;
-    o.connect(g).connect(filtro);
-    o.start(quando);
-    o.stop(quando + cauda + 0.05);
+  // FORMANTES: dois picos fixos (~700 Hz e ~1650 Hz) somados por cima. E o que da o
+  // caracter meio nasal, meio vocal do sax — sem eles o timbre fica generico.
+  const mistura = c.createGain();
+  mistura.connect(vol).connect(saidaAudio);
+  filtro.connect(mistura);
+  // O de 700 Hz vai em 0,42 e nao 0,5: com 0,5 ele cai em cima do 3o harmonico de um la
+  // grave (660 Hz) e deixava o harmonico mais forte que a fundamental — encorpado virava oco.
+  for (const [hz, q, g] of [[700, 3.0, 0.42], [1650, 4.0, 0.34]]) {
+    const bp = c.createBiquadFilter();
+    bp.type = "bandpass"; bp.frequency.value = hz; bp.Q.value = q;
+    const gg = c.createGain(); gg.gain.value = g;
+    filtro.connect(bp).connect(gg).connect(mistura);
   }
-  const m = c.createBufferSource();
-  m.buffer = bufMartelo;
-  const gm = c.createGain();
-  gm.gain.value = 0.05;
-  m.connect(gm).connect(filtro);
-  m.start(quando);
+
+  // VIBRATO: entra depois do ataque, como um saxofonista faz — vibrato desde o primeiro
+  // instante e a marca de sintetizador.
+  const lfo = c.createOscillator();
+  lfo.frequency.value = 5.2;
+  const prof = c.createGain();
+  prof.gain.setValueAtTime(0.0001, quando);
+  prof.gain.setValueAtTime(0.0001, quando + 0.18);
+  prof.gain.linearRampToValueAtTime(f * 0.008, Math.min(fim, quando + 0.55));
+  lfo.connect(prof);
+  lfo.start(quando); lfo.stop(fim);
+
+  for (const [mult, ganho] of [[1, 1], [1.0029, 0.5]]) {
+    const o = c.createOscillator();
+    o.setPeriodicWave(ondaSax);
+    o.frequency.setValueAtTime(f * mult * 0.985, quando);   // a palheta "pega" um pouco
+    o.frequency.linearRampToValueAtTime(f * mult, quando + 0.05);  // abaixo e sobe
+    prof.connect(o.frequency);
+    const g = c.createGain(); g.gain.value = ganho;
+    o.connect(g).connect(filtro);
+    o.start(quando); o.stop(fim + 0.02);
+  }
+
+  // SOPRO: forte no ataque, baixinho durante a nota inteira
+  const ar = c.createBufferSource();
+  ar.buffer = bufSopro; ar.loop = true;
+  const bp = c.createBiquadFilter();
+  bp.type = "bandpass"; bp.frequency.value = Math.min(5000, Math.max(1400, f * 4)); bp.Q.value = 0.8;
+  const ga = c.createGain();
+  ga.gain.setValueAtTime(0.0001, quando);
+  ga.gain.linearRampToValueAtTime(0.055, quando + 0.03);
+  ga.gain.linearRampToValueAtTime(0.014, quando + 0.16);
+  ga.gain.setValueAtTime(0.014, quando + dur);
+  ga.gain.linearRampToValueAtTime(0.0001, fim);
+  ar.connect(bp).connect(ga).connect(vol);
+  ar.start(quando, Math.random() * 1.2);
+  ar.stop(fim + 0.02);
 }
 
 function cortarSaida() {
@@ -687,8 +747,9 @@ function montarTocador(melodia) {
     <label class="and">Andamento
       <input type="range" class="bpm-faixa" min="40" max="180" step="2" value="92">
       <span class="bpm">92 BPM</span></label>`;
-  comDica(b.querySelector("h3"), "Piano sintetizado tocando as notas como estão escritas, "
-    + "então não é o timbre do sax. Arraste a linha para pular para outro trecho.");
+  comDica(b.querySelector("h3"), "Sax alto sintetizado, tocando as notas como estão "
+    + "escritas — a altura é a da partitura, não a transposição do instrumento. "
+    + "Arraste a linha para pular para outro trecho.");
 
   const bt = b.querySelector(".play"), linha = b.querySelector(".linha"),
         faixaBpm = b.querySelector(".bpm-faixa"), rotBpm = b.querySelector(".bpm"),
