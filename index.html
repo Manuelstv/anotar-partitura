@@ -128,8 +128,6 @@
   .segmento input:checked + span { color: var(--texto); font-weight: 620; }
   .segmento label:has(input:checked) { background: var(--sup); box-shadow: var(--sombra-1); }
   .segmento label:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 1px; }
-  .caixa { display: inline-flex; align-items: center; gap: var(--s2); cursor: pointer; }
-  .caixa input { accent-color: var(--acento); width: 16px; height: 16px; margin: 0; }
 
   /* ------------------------------------------------------------ progresso */
   #barra { margin-top: var(--s4); display: none; }
@@ -223,12 +221,25 @@
   .escalas b { font-weight: 650; }
   .escalas .notas-ac { color: var(--texto); font-variant-numeric: tabular-nums; }
   .escalas .esc { color: var(--texto-3); font-size: var(--t-xs); text-align: right; }
-  .escalas.campo b { color: var(--texto-2); font-variant-numeric: tabular-nums; }
+  .escalas.campo-tom div { grid-template-columns: 104px 1fr auto; }
+  .escalas.campo-tom b { color: var(--texto-2); font-variant-numeric: tabular-nums; }
+  .escalas.comgrau div { grid-template-columns: 66px 46px 1fr auto; }
+  .escalas .grau-ac { color: var(--texto-3); font-size: var(--t-xs);
+                      font-variant-numeric: tabular-nums; }
+  .escalas.cadencias b { font-variant-numeric: normal; }
+  .graus { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .grau { background: var(--sup2); border: 1px solid var(--borda); border-radius: var(--r-sm);
+          padding: 2px var(--s2); min-width: 44px; text-align: center; }
+  .grau b { display: block; font-size: var(--t-sm); font-weight: 650;
+            font-variant-numeric: tabular-nums; }
+  .grau i { display: block; font-style: normal; font-size: var(--t-xs); color: var(--texto-3); }
+  .grau.fora { border-color: var(--acento); }
   .aviso-campo { font-size: var(--t-xs); color: var(--texto-3); margin: var(--s2) 0 0; }
   .bloco > .aviso-campo:not(:last-child) { margin: -4px 0 var(--s3); }
   @media (max-width: 480px) {
     .escalas div { grid-template-columns: 52px 1fr; }
     .escalas .esc { grid-column: 2; text-align: left; }
+    .escalas.comgrau div { grid-template-columns: 52px 44px 1fr; }
   }
 
   .medidor { display: flex; align-items: center; gap: var(--s3); }
@@ -442,10 +453,6 @@
           <label><input type="radio" name="sistema" value="dore"><span>Dó Ré Mi</span></label>
         </div>
       </div>
-      <label class="caixa">
-        <input type="checkbox" id="limpar">
-        <span>Apagar nomes antigos</span>
-      </label>
     </div>
   </section>
 
@@ -533,7 +540,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=26";
+const V = "?v=27";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -860,7 +867,18 @@ function montarAnalise(info, dificuldade) {
   fatos.className = "fatos larga";
   const DICAS = {
     "Tom": `A armadura diz em que tom a música está. Maior costuma soar mais aberto e
-            menor mais fechado. A relativa deste é ${info.tom_relativo}.`,
+            menor mais fechado. A relativa deste é ${info.tom_relativo}.`
+           + (info.tom_por === "cifra"
+              ? " Aqui quem decidiu entre maior e menor foi a harmonia: qual acorde faz de"
+                + " tônica e, principalmente, qual acorde fecha a música."
+              : " Aqui quem decidiu entre maior e menor foi o peso das notas na melodia,"
+                + " porque a partitura não trouxe cifra."),
+    "Soa em": "O sax alto é um instrumento em Mi bemol: o que sai dele é uma sexta maior "
+              + "mais grave do que está escrito. Este é o tom que o piano ouve — é o que "
+              + "você diz para a banda quando alguém pergunta o tom da música.",
+    "Compasso": "A fórmula não vem escrita em lugar nenhum do arquivo: ela sai da soma das "
+                + "durações de cada compasso. A soma que mais aparece é a fórmula, porque "
+                + "anacruse e compasso final são exceção legítima.",
     "Âmbito": "Da nota mais grave até a mais aguda, na altura escrita, que no sax alto é "
               + "diferente da que sai.",
     "Extensão": "A distância entre essas duas notas em semitons. Doze semitons dão uma oitava.",
@@ -871,6 +889,8 @@ function montarAnalise(info, dificuldade) {
   };
   const linhas = [
     ["Tom", info.tom, ""],
+    ["Soa em", info.real?.tom || "—", ""],
+    ["Compasso", info.ritmo?.formula || "—", ""],
     ["Âmbito", `${info.grave}–${info.agudo}`, ""],
     ["Extensão", info.extensao, "semitons"],
     ["Notas", info.n_notas, ""],
@@ -937,18 +957,69 @@ function montarAnalise(info, dificuldade) {
     const b = document.createElement("div");
     b.className = "bloco";
     b.innerHTML = `<h3>Acordes da música</h3><div class="fichas"></div>
-      <div class="escalas"></div>`;
+      <div class="escalas comgrau"></div>`;
     comDica(b.querySelector("h3"), "Os acordes que o arranjador escreveu acima da pauta, "
-      + "lidos direto do arquivo. Em cada linha vêm as notas que formam o acorde e a "
-      + "escala que cabe por cima dele.");
+      + "lidos direto do arquivo. Em cada linha vêm o grau dentro do tom, as notas que "
+      + "formam o acorde e a escala que cabe por cima dele. O grau é o que permite tocar "
+      + "a mesma música em outro tom: ii-V-I é ii-V-I em qualquer lugar.");
     info.cifras.forEach(c => b.querySelector(".fichas").append(ficha(c)));
     for (const it of info.escalas || []) {
       const l = document.createElement("div");
-      l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
+      l.innerHTML = `<b></b><span class="grau-ac"></span>`
+                  + `<span class="notas-ac"></span><span class="esc"></span>`;
       l.querySelector("b").textContent = it.cifra;
+      l.querySelector(".grau-ac").textContent = it.grau || "";
       l.querySelector(".notas-ac").textContent = (it.notas || []).join(" ");
       l.querySelector(".esc").textContent = it.escala;
       b.querySelector(".escalas").append(l);
+    }
+    corpo.append(b);
+  }
+
+  // O que a harmonia esta FAZENDO — e o pulo do gato para improvisar: em vez de estudar
+  // tres acordes separados, ver que os tres sao um ii-V-I e que uma escala cobre todos.
+  if (info.cadencias?.length || info.blues) {
+    const b = document.createElement("div");
+    b.className = "bloco larga";
+    b.innerHTML = `<h3>O que a harmonia está fazendo</h3>
+      <p class="aviso-campo"></p><div class="escalas cadencias"></div>`;
+    comDica(b.querySelector("h3"), trecho(`
+      <p>Acorde não anda a esmo: ele puxa o seguinte. O caso mais comum é a fundamental
+      subir uma quarta — <b>ii-V-I</b> — e é isso que está sendo procurado aqui, pelas
+      distâncias entre as fundamentais, não pelo nome dos acordes. Por isso funciona em
+      qualquer tom e mesmo quando a música muda de tom no meio.</p>
+      <p>A coluna da direita é o que interessa na hora de tocar: <b>uma escala serve para o
+      grupo inteiro</b>. Estudar Dm7, G7 e Cmaj7 separados é estudar três vezes a mesma
+      coisa.</p>`));
+    b.querySelector(".aviso-campo").textContent = info.blues
+      || "Grupos de acordes que andam juntos, na ordem em que aparecem.";
+    for (const c of info.cadencias || []) {
+      const l = document.createElement("div");
+      l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
+      l.querySelector("b").textContent = c.nome;
+      l.querySelector(".notas-ac").textContent = c.acordes.join(" → ");
+      l.querySelector(".esc").textContent = c.escala + ` · linha ${c.linha}`;
+      b.querySelector(".cadencias").append(l);
+    }
+    corpo.append(b);
+  }
+
+  // A sequencia em GRAUS: e a musica sem o tom, que e como ela se guarda de cabeca
+  if (info.funcional?.length > 1) {
+    const b = document.createElement("div");
+    b.className = "bloco larga";
+    b.innerHTML = `<h3>A sequência em graus</h3><div class="graus"></div>`;
+    comDica(b.querySelector("h3"), "A mesma progressão escrita em números romanos, sem o "
+      + "tom. É assim que se decora uma música e se transporta na hora: o ouvido guarda "
+      + "que o segundo acorde é o V, não que ele é Sol sete.");
+    for (const it of info.funcional) {
+      const g = document.createElement("span");
+      g.className = "grau" + (it.dentro ? "" : " fora");
+      g.innerHTML = `<b></b><i></i>`;
+      g.querySelector("b").textContent = it.grau;
+      g.querySelector("i").textContent = it.cifra;
+      if (it.papel) g.title = it.papel;
+      b.querySelector(".graus").append(g);
     }
     corpo.append(b);
   }
@@ -958,11 +1029,19 @@ function montarAnalise(info, dificuldade) {
     b.className = "bloco";
     const semCifra = !info.cifras?.length;
     b.innerHTML = `<h3></h3>
-      <p class="aviso-campo"></p><div class="escalas campo"></div>`;
+      <p class="aviso-campo"></p><div class="escalas campo-tom"></div>`;
     b.querySelector("h3").textContent = `Campo harmônico de ${info.tom}`;
-    comDica(b.querySelector("h3"), "Os sete acordes que nascem do tom, empilhando terças "
-      + "sobre a escala. Formam o repertório que combina com a música, mesmo que ela não "
-      + "toque todos. Sem cifra na partitura, é daqui que você parte para improvisar.");
+    comDica(b.querySelector("h3"), trecho(`
+      <p>Os sete acordes que nascem do tom, empilhando terças sobre a escala. Formam o
+      repertório que combina com a música, mesmo que ela não toque todos. Sem cifra na
+      partitura, é daqui que você parte para improvisar.</p>
+      <p>Vêm em <b>tétrades</b>, de quatro notas, e não em tríades. O motivo é prático: a
+      sétima é justamente a nota que separa o Imaj7 do V7 — sem ela, o I e o V do tom têm o
+      mesmo desenho e a mesma cara, e é a sétima que diz qual dos dois quer resolver no
+      outro. Quem toca sozinho pode deixá-la de fora; quem improvisa, não.</p>
+      <p>Na ponta direita vem o <b>modo</b> de cada grau: a escala do tom começando naquela
+      nota. É o nome que os métodos usam (dórico, mixolídio) e serve como ponto de partida
+      sobre aquele acorde.</p>`));
     b.querySelector(".aviso-campo").textContent = semCifra
       ? "A partitura veio sem cifra. Estes são os acordes que cabem no tom, como palpite."
       : "O que o tom comporta, para comparar com as cifras acima.";
@@ -971,9 +1050,113 @@ function montarAnalise(info, dificuldade) {
       l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
       l.querySelector("b").textContent = `${g.grau} · ${g.cifra}`;
       l.querySelector(".notas-ac").textContent = g.notas.join(" ");
-      l.querySelector(".esc").textContent = g.qualidade;
-      b.querySelector(".campo").append(l);
+      l.querySelector(".esc").textContent = g.modo || g.qualidade;
+      l.title = `tríade ${g.triade} (${g.triade_qual}) · ${g.qualidade}`;
+      b.querySelector(".campo-tom").append(l);
     }
+    corpo.append(b);
+  }
+
+  // RITMO: a duracao ja e lida (figura da cabeca dividida pelos beams), entao da para
+  // descrever a levada sem nenhum gabarito externo.
+  if (info.ritmo) {
+    const r = info.ritmo;
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Ritmo</h3><div class="fichas"></div>
+      <p class="aviso-campo"></p>`;
+    comDica(b.querySelector("h3"), trecho(`
+      <p>Nada aqui vem escrito no arquivo: a duração de cada nota sai da figura da cabeça
+      dividida pelos feixes que a ligam à vizinha, e o resto é conta.</p>
+      <p><b>Fora do tempo</b> é a fatia dos ataques que não cai num tempo inteiro — é o que
+      dá a sensação de levada. <b>Síncope</b> é o caso mais forte: a nota entra fora do
+      tempo e ainda atravessa o tempo seguinte.</p>
+      <p><b>Confiança</b> é a fatia dos compassos que fecham na fórmula. Quando ela cai,
+      alguma duração escapou (quiáltera, ou pausa em partitura sem fonte musical) e o resto
+      deste cartão merece desconfiança.</p>`));
+    const fs = b.querySelector(".fichas");
+    fs.append(ficha(`${r.formula}`));
+    if (r.predominante) fs.append(ficha(`figura: ${r.predominante}`));
+    fs.append(ficha(`${Math.round(r.frac_fora_do_tempo * 100)}% fora do tempo`));
+    if (r.sincopes) fs.append(ficha(`${r.sincopes} síncopes`));
+    fs.append(ficha(`${r.densidade} notas por compasso`));
+    if (r.confianca < 1) fs.append(ficha(`confiança ${Math.round(r.confianca * 100)}%`));
+    b.querySelector(".aviso-campo").textContent = (r.figuras || [])
+      .map(([n, q]) => `${n} ${q}×`).join("  ·  ");
+    corpo.append(b);
+  }
+
+  // RESPIRO e o que mais falta num material de sax: onde cabe pegar ar.
+  if (info.respiro) {
+    const s = info.respiro;
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Respiração</h3><div class="fichas"></div>
+      <p class="aviso-campo"></p>`;
+    comDica(b.querySelector("h3"), trecho(`
+      <p>Respiro contado como pausa de um tempo ou mais, ou nota de três tempos ou mais —
+      nesta dá tempo de cortar o fim dela e pegar ar. Pausa de colcheia no meio de uma
+      levada não conta: ali ela é articulação, não folga.</p>
+      <p>Uma frase acima de doze tempos corridos costuma acabar com o ar antes do fim. A
+      saída não é aguentar: é roubar uma respiração antes de precisar dela, e as frases
+      listadas aqui são as candidatas.</p>`));
+    const fs = b.querySelector(".fichas");
+    fs.append(ficha(`${s.pontos} lugares para respirar`));
+    fs.append(ficha(`frase média de ${s.media} tempos`));
+    const conf = info.ritmo?.confianca ?? 1;
+    b.querySelector(".aviso-campo").textContent = (s.longas?.length
+      ? "Sem folga por muito tempo: " + s.longas
+          .map(f => `compassos ${f.do}–${f.ao} (${f.tempos} tempos)`).join("  ·  ")
+      : "Nenhuma frase passa de doze tempos sem folga.")
+      // com duracao lida pela metade, o mapa de respiro engana: melhor dizer isso
+      + (conf < 0.9 ? `  ·  a duração fecha em ${Math.round(conf * 100)}% dos compassos, `
+                      + `então isto aqui é estimativa` : "");
+    corpo.append(b);
+  }
+
+  if (info.motivos?.length) {
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>Desenhos que repetem</h3><div class="escalas"></div>`;
+    comDica(b.querySelector("h3"), "Comparando os intervalos, e não as notas: assim "
+      + "“G A B G” e “C D E C” contam como o mesmo desenho, que é como o ouvido escuta. "
+      + "Achar o desenho repetido encurta o estudo — são cinco notas para dominar, não "
+      + "trinta.");
+    for (const m of info.motivos) {
+      const l = document.createElement("div");
+      l.innerHTML = `<b></b><span class="notas-ac"></span><span class="esc"></span>`;
+      l.querySelector("b").textContent = `${m.vezes}×`;
+      l.querySelector(".notas-ac").textContent = m.notas.join(" ");
+      l.querySelector(".esc").textContent = (m.transposto ? "também transposto · " : "")
+        + "compassos " + m.compassos.join(", ");
+      b.querySelector(".escalas").append(l);
+    }
+    corpo.append(b);
+  }
+
+  if (info.real) {
+    const reg = info.registro || {};
+    const b = document.createElement("div");
+    b.className = "bloco";
+    b.innerHTML = `<h3>No sax alto</h3><div class="fichas"></div>
+      <p class="aviso-campo"></p>`;
+    comDica(b.querySelector("h3"), trecho(`
+      <p>O alto é um instrumento em <b>Mi bemol</b>: o dó que você lê sai como o mi bemol
+      de baixo, uma sexta maior abaixo. A armadura de concerto é a escrita menos três
+      bemóis, e é dela que sai o tom que a banda usa.</p>
+      <p>As contagens embaixo são de dedilhado, não de leitura: da chave de palma para cima
+      a mão esquerda muda de posição, e o altíssimo passa do registro normal do
+      instrumento.</p>`));
+    const fs = b.querySelector(".fichas");
+    fs.append(ficha(`soa em ${info.real.tom}`));
+    fs.append(ficha(`${info.real.grave}–${info.real.agudo} de verdade`));
+    if (reg.palma) fs.append(ficha(`${reg.palma} notas de chave de palma`));
+    if (reg.altissimo) fs.append(ficha(`${reg.altissimo} no altíssimo`));
+    if (reg.mesa) fs.append(ficha(`${reg.mesa} no grave de mindinho`));
+    const fora = (info.fora_do_tom || []).map(([n, q]) => `${n} ${q}×`).join("  ·  ");
+    b.querySelector(".aviso-campo").textContent = fora
+      ? "Notas de fora do tom (é aqui que mora o cromatismo): " + fora
+      : "A música fica inteira dentro do tom.";
     corpo.append(b);
   }
 
@@ -1005,7 +1188,6 @@ async function processar(arquivos) {
 
   const py = await pegarPy();
   const sistema = document.querySelector('input[name=sistema]:checked').value;
-  const limpar = $("#limpar").checked;
   // so a ENTRADA em imagem precisa do opencv; saida em PNG e rasterizacao do PyMuPDF
   if (fila.some(x => x.imagem)) await prepararImagem(py);
 
@@ -1019,7 +1201,7 @@ async function processar(arquivos) {
       py.FS.writeFile("/entrada.pdf", new Uint8Array(await f.arrayBuffer()));
       py.FS.writeFile(noFS, py.FS.readFile("/entrada.pdf"));
       py.globals.set("_sistema", sistema);
-      py.globals.set("_limpar", limpar);
+      py.globals.set("_titulo", f.name.replace(/\.[^.]+$/, ""));
       // sem opcao para escolher: sai no mesmo formato que entrou
       py.globals.set("_saida_fmt", imagem ? "imagem" : "pdf");
       const res = py.runPython(`
@@ -1029,10 +1211,10 @@ _dados = open("/entrada.pdf","rb").read()
 # editor desenhar por cima. O arquivo final so e gerado quando o usuario clica em baixar,
 # ja com as edicoes dele. (Sem acento grave aqui dentro: isso vive numa template string
 # do JS e um acento grave fecharia a string no meio do Python.)
-_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema, limpar=_limpar,
+_saida, _rel = A.anotar_bytes(_dados, sistema=_sistema,
                               saida=_saida_fmt, estampar=False)
 _previa = b""
-_info, _nota = None, None
+_info, _nota, _cifras = None, None, b""
 if _rel["total"]:
     if _rel["formato"] == "png":
         _previa = _saida                      # a saida JA e a imagem: serve de previa
@@ -1055,11 +1237,19 @@ if _rel["total"]:
             _nota = Dif.nota("/entrada.pdf", json.load(open("/pesos_dificuldade.json")))[0]
         except Exception:
             _nota = None
-(_saida, _previa, json.dumps({"rel": _rel, "info": _info, "nota": _nota}))
+# a folha de cifras sai AGORA, junto: e um PDF de texto, custa milissegundos, e assim o
+# botao de baixar nao precisa guardar o dicionario da analise do lado do Python
+if _info and _info.get("cifras"):
+    try:
+        _cifras = analise.folha_de_cifras(_info, _titulo) or b""
+    except Exception:
+        _cifras = b""
+(_saida, _previa, json.dumps({"rel": _rel, "info": _info, "nota": _nota}), _cifras)
 `);
-      const [pdfOut, previaOut, extra] = res.toJs({ create_proxies: false });
+      const [pdfOut, previaOut, extra, cifrasOut] = res.toJs({ create_proxies: false });
       res.destroy?.();
-      concluir(cartao, f.name, previaOut, JSON.parse(extra), { py, noFS, sistema });
+      concluir(cartao, f.name, previaOut, JSON.parse(extra),
+               { py, noFS, sistema, cifras: cifrasOut });
     } catch (e) {
       falhar(cartao, f, e);
     }
@@ -1357,7 +1547,6 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   if (rel.por_pagina.length > 1) detalhe.push(`${rel.por_pagina.length} páginas`);
   // imagem e um arquivo de UMA pagina: com PDF de varias, o resto nao cabe na saida
   if (rel.formato === "png" && rel.por_pagina.length > 1) detalhe.push("imagem só da 1ª página");
-  if (rel.limpos) detalhe.push(`${rel.limpos} nomes antigos cobertos`);
   cartao.marcar("bom", detalhe.join(" · "));
 
   if (nota != null) {
@@ -1377,6 +1566,18 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   bt.className = "btn btn-secundario";
   bt.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(bt);
+
+  // Folha de cifras: PDF proprio, so a harmonia. Ja veio pronto do Python, entao aqui e um
+  // link de verdade — nada a gerar no clique, porque o editor nao mexe em cifra.
+  if (extra.cifras?.length) {
+    const a = document.createElement("a");
+    a.className = "btn btn-secundario";
+    a.href = URL.createObjectURL(new Blob([extra.cifras], { type: "application/pdf" }));
+    a.download = base + "_cifras.pdf";
+    a.textContent = "Baixar cifras";
+    a.title = "Uma folha só com os acordes e os graus, para improvisar";
+    cartao.topo.append(a);
+  }
 
   // A previa vem ABERTA e ANTES da analise. Aberta porque o resultado e o que se quer
   // ver; antes porque a analise e comprida e empurraria a pagina anotada para longe.
@@ -1402,15 +1603,14 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
     cartao.raiz.append(p);
   }
 
-  // A partitura JA tem nomes e o usuario nao marcou apagar: o resultado sai com duas
-  // fileiras de nome, uma em cima da outra. O programa sempre soube disso (rel.existentes)
-  // mas nao dizia nada, e na previa isso parece defeito do editor.
-  if (rel.existentes && !$("#limpar").checked) {
+  // A partitura JA tem nomes proprios: o resultado sai com duas fileiras, uma em cima da
+  // outra. O programa sempre soube disso (rel.existentes) mas nao dizia nada, e na previa
+  // isso parece defeito do editor. Quem quiser so uma fileira apaga a minha no editor.
+  if (rel.existentes) {
     const p = document.createElement("p");
     p.className = "nota-rodape";
     p.innerHTML = `Esta partitura já tem <b>${rel.existentes} nomes escritos</b>, então os `
-                + `meus ficam por cima. Marque <b>“Apagar nomes antigos”</b> e mande de novo `
-                + `para ficar só um.`;
+                + `meus ficam por cima. Toque num nome meu e esvazie o campo para tirá-lo.`;
     cartao.raiz.append(p);
   }
 
