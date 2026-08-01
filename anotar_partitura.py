@@ -1086,11 +1086,12 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
         doc = fitz.open(stream=dados, filetype="pdf")
     total, existentes_tot, limpos = 0, 0, 0
     por_pagina, avisos, editaveis = [], [], []
+    metricas = {}
     for pg in doc:
         pre = None
         if imagem:
             try:
-                pre = bitmap.coletar_da_imagem(pixels, com_ritmo=True)
+                pre = bitmap.coletar_da_imagem(pixels, com_ritmo=True, metricas=metricas)
             except bitmap.ImagemIlegivel as e:
                 avisos.append(str(e))
                 por_pagina.append(0)
@@ -1131,6 +1132,7 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
                          "modo": "imagem" if imagem else "pdf",
                          "formato": "png" if saida == "imagem" else "pdf",
                          "avisos": avisos, "rotulos": editaveis, "paginas": paginas,
+                         "imagem_info": metricas or None,
                          # em imagem nao existe span de texto: sem cifra, sem tom, sem
                          # escala sugerida. A interface tem de dizer isso.
                          "tem_analise": not imagem}
