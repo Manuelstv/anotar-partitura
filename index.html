@@ -305,6 +305,10 @@
   .barra-previa .rot { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
                        letter-spacing: .02em; }
   .barra-previa .esticar { margin-left: auto; }
+  .paginacao { display: flex; align-items: center; gap: var(--s2);
+               font-size: var(--t-xs); color: var(--texto-2); }
+  .paginacao button { padding: .15rem .5rem; }
+  .paginacao button[disabled] { opacity: .35; cursor: default; }
   .btn-mini { padding: .3rem .6rem; font-size: var(--t-xs); border-radius: var(--r-sm);
               background: var(--sup2); color: var(--texto-2);
               border: 1px solid var(--borda); cursor: pointer; }
@@ -323,10 +327,14 @@
   /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema escuro
      herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o que o PDF estampa,
      entao o overlay mostra o resultado de verdade. */
-  .palco svg text { cursor: pointer; fill: #111;
-                    font-family: Helvetica, Arial, sans-serif; }
-  .palco svg text:hover { fill: #4f46e5; }
-  .palco svg text.sel { fill: #4f46e5; font-weight: 700; }
+  .palco svg text { fill: #111; font-family: Helvetica, Arial, sans-serif;
+                    pointer-events: none; }
+  /* ALVO DE TOQUE: o nome tem ~8pt de altura, alvo pequeno demais para o dedo. Quem recebe
+     o clique e um retangulo invisivel bem maior em volta; o texto fica so como desenho. */
+  .palco svg .toque { fill: transparent; cursor: pointer; }
+  .palco svg .toque:hover + text { fill: #4f46e5; }
+  .palco svg g.sel text { fill: #4f46e5; font-weight: 700; }
+  .palco svg g.sel .toque { fill: rgba(79,70,229,.12); }
   .palco.pondo { cursor: crosshair; }
   .campo { position: absolute; z-index: 5; width: 5.2rem; padding: .2rem .35rem;
            font: inherit; font-size: var(--t--1); text-align: center;
@@ -514,7 +522,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=23";
+const V = "?v=24";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -999,7 +1007,13 @@ function montarEditor(cartao, ctx) {
   cx.innerHTML = `<summary>Página anotada — toque num nome para corrigir</summary>
     <div class="corpo previa">
       <div class="barra-previa">
-        <button type="button" class="btn-mini esticar" data-lupa>Ampliar</button>
+        <span class="paginacao" data-pag hidden>
+          <button type="button" class="btn-mini" data-ant>‹</button>
+          <span data-conta></span>
+          <button type="button" class="btn-mini" data-prox>›</button>
+        </span>
+        <button type="button" class="btn-mini esticar" data-undo disabled>Desfazer</button>
+        <button type="button" class="btn-mini" data-lupa>Ampliar</button>
       </div>
       <div class="palco"></div>
       <div class="dica-editor">
@@ -1008,6 +1022,7 @@ function montarEditor(cartao, ctx) {
       </div>
     </div>`;
   const palco = cx.querySelector(".palco");
+  palco.tabIndex = -1;                    // recebe foco: e o que faz o Ctrl+Z chegar aqui
   const img = document.createElement("img");
   img.alt = "Página de " + ctx.nome;
   img.src = URL.createObjectURL(new Blob([ctx.previa], { type: "image/png" }));
@@ -1017,13 +1032,41 @@ function montarEditor(cartao, ctx) {
 
   // so a 1a pagina e editavel (e a unica com previa); as outras seguem como foram lidas
   ctx.rotulos = ctx.rel.rotulos.map(r => ({ ...r }));
+  ctx.pagina = 0;
   let sel = null, campo = null;
+  // pilha de desfazer: uma copia da lista ANTES de cada mexida. Apagar sem querer e o
+  // acidente mais provavel num editor de toque, e nao havia volta.
+  const pilha = [];
+  const guardar = () => {
+    pilha.push(ctx.rotulos.map(r => ({ ...r })));
+    if (pilha.length > 40) pilha.shift();
+    if (btUndo) btUndo.disabled = false;
+  };
+  const desfazer = () => {
+    if (!pilha.length) return;
+    ctx.rotulos = pilha.pop();
+    if (btUndo) btUndo.disabled = !pilha.length;
+    fechar();
+  };
 
+  const NS = "http://www.w3.org/2000/svg";
   const redesenhar = () => {
     svg.textContent = "";
     ctx.rotulos.forEach((r, k) => {
-      if (r.pagina !== 0 || !r.texto) return;
-      const el = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      if (r.pagina !== ctx.pagina || !r.texto) return;
+      const g = document.createElementNS(NS, "g");
+      g.dataset.k = k;
+      if (k === sel) g.classList.add("sel");
+      // retangulo de toque, generoso: ~2,2x o corpo de altura e no minimo 2,4x de largura
+      const larg = Math.max(2.4 * r.corpo, 0.62 * r.corpo * r.texto.length);
+      const alvo = document.createElementNS(NS, "rect");
+      alvo.setAttribute("class", "toque");
+      alvo.setAttribute("x", (r.novo ? r.x : r.x0 + larg / 2) - larg / 2);
+      alvo.setAttribute("y", r.y - 1.15 * r.corpo);
+      alvo.setAttribute("width", larg);
+      alvo.setAttribute("height", 1.7 * r.corpo);
+      alvo.setAttribute("rx", 3);
+      const el = document.createElementNS(NS, "text");
       if (r.novo) {                       // sem x0 vindo do Python: centra no x, como o PDF
         el.setAttribute("x", r.x);
         el.setAttribute("text-anchor", "middle");
@@ -1033,10 +1076,9 @@ function montarEditor(cartao, ctx) {
       el.setAttribute("y", r.y);
       el.setAttribute("font-size", r.corpo);
       el.textContent = r.texto;
-      el.dataset.k = k;
-      if (k === sel) el.classList.add("sel");
-      el.addEventListener("click", ev => { ev.stopPropagation(); abrir(k); });
-      svg.append(el);
+      g.append(alvo, el);
+      g.addEventListener("click", ev => { ev.stopPropagation(); abrir(k); });
+      svg.append(g);
     });
   };
 
@@ -1059,12 +1101,17 @@ function montarEditor(cartao, ctx) {
     campo.style.left = Math.max(2, Math.min(pr.width - 86, tela.x - pr.left - 42)) + "px";
     campo.style.top = Math.min(pr.height - 30, tela.y - pr.top + 6) + "px";
     campo.title = "Enter aplica, vazio apaga, Esc cancela";
+    const aplicar = () => {
+      const novo = campo.value.trim();
+      if (novo !== r.texto) { guardar(); ctx.rotulos[k].texto = novo; }
+      fechar();
+    };
     campo.addEventListener("keydown", ev => {
-      if (ev.key === "Enter") { ctx.rotulos[k].texto = campo.value.trim(); fechar(); }
+      if (ev.key === "Enter") aplicar();
       if (ev.key === "Escape") fechar();
       ev.stopPropagation();
     });
-    campo.addEventListener("blur", () => { ctx.rotulos[k].texto = campo.value.trim(); fechar(); });
+    campo.addEventListener("blur", aplicar);
     palco.append(campo);
     campo.focus(); campo.select();
   };
@@ -1076,12 +1123,59 @@ function montarEditor(cartao, ctx) {
     const pt = svg.createSVGPoint();
     pt.x = ev.clientX; pt.y = ev.clientY;
     const p = pt.matrixTransform(svg.getScreenCTM().inverse());
-    const corpo = ctx.rotulos.find(r => r.pagina === 0)?.corpo || 8;
-    ctx.rotulos.push({ pagina: 0, x: p.x, y_base: p.y, y: p.y, corpo, texto: "",
+    const corpo = ctx.rotulos.find(r => r.pagina === ctx.pagina)?.corpo || 8;
+    guardar();
+    ctx.rotulos.push({ pagina: ctx.pagina, x: p.x, y_base: p.y, y: p.y, corpo, texto: "",
                        novo: true });
     redesenhar();
     abrir(ctx.rotulos.length - 1);
   });
+
+  const btUndo = cx.querySelector("[data-undo]");
+  btUndo.addEventListener("click", desfazer);
+  palco.addEventListener("keydown", ev => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "z") { ev.preventDefault(); desfazer(); }
+  });
+
+  // PAGINAS: so a 1a tinha previa, e num PDF de 253 paginas isso deixa o editor inutil da
+  // 2a em diante. A troca rasteriza a pagina pedida em Python (barato) e refiltra o overlay
+  // — os rotulos de TODAS as paginas ja estao na lista desde a leitura.
+  const total = ctx.rel.paginas.length;
+  const cxPag = cx.querySelector("[data-pag]");
+  const conta = cx.querySelector("[data-conta]");
+  const btAnt = cx.querySelector("[data-ant]");
+  const btProx = cx.querySelector("[data-prox]");
+  const irPara = async (n) => {
+    if (n < 0 || n >= total || n === ctx.pagina || !ctx.py) return;
+    fechar();
+    conta.textContent = "…";
+    ctx.py.globals.set("_fs2", ctx.noFS);
+    ctx.py.globals.set("_pg2", n);
+    const res = ctx.py.runPython(
+      "import anotar_partitura as A, json\n"
+      + "_png, _m = A.previa_de(open(_fs2,'rb').read(), _pg2)\n"
+      + "(_png, json.dumps(_m))");
+    const [png, meta] = res.toJs({ create_proxies: false });
+    res.destroy?.();
+    const m = JSON.parse(meta);
+    ctx.pagina = m.pagina;
+    img.src = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+    svg.setAttribute("viewBox", `0 0 ${m.largura} ${m.altura}`);
+    atualizarPag();
+    redesenhar();
+  };
+  const atualizarPag = () => {
+    const nesta = ctx.rotulos.filter(r => r.pagina === ctx.pagina && r.texto).length;
+    conta.textContent = `${ctx.pagina + 1}/${total} · ${nesta} nomes`;
+    btAnt.disabled = ctx.pagina === 0;
+    btProx.disabled = ctx.pagina >= total - 1;
+  };
+  if (total > 1) {
+    cxPag.hidden = false;
+    atualizarPag();
+    btAnt.addEventListener("click", () => irPara(ctx.pagina - 1));
+    btProx.addEventListener("click", () => irPara(ctx.pagina + 1));
+  }
 
   // AMPLIAR: move o proprio palco para um overlay em tela cheia e devolve no fim. Mover um
   // no no DOM preserva os listeners, entao o editor continua funcionando lá dentro — nada e
@@ -1186,6 +1280,18 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   }
   bt.addEventListener("click", () => baixar(bt, ctx || { ...extra, rel, base,
                                                         rotulos: rel.rotulos }));
+
+  // A partitura JA tem nomes e o usuario nao marcou apagar: o resultado sai com duas
+  // fileiras de nome, uma em cima da outra. O programa sempre soube disso (rel.existentes)
+  // mas nao dizia nada, e na previa isso parece defeito do editor.
+  if (rel.existentes && !$("#limpar").checked) {
+    const p = document.createElement("p");
+    p.className = "nota-rodape";
+    p.innerHTML = `Esta partitura já tem <b>${rel.existentes} nomes escritos</b>, então os `
+                + `meus ficam por cima. Marque <b>“Apagar nomes antigos”</b> e mande de novo `
+                + `para ficar só um.`;
+    cartao.raiz.append(p);
+  }
 
   if (info) cartao.raiz.append(montarAnalise(info, nota));
   if (!rel.tem_analise) {
