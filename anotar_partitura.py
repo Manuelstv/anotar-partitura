@@ -1014,6 +1014,27 @@ def imagem_para_pdf(dados, largura, altura):
     return pdf
 
 
+def previa_de(dados, pagina=0, dpi=96):
+    """PNG de UMA pagina, sem nome nenhum — o fundo em que o editor desenha.
+
+    Existe para o editor poder trocar de pagina sem reler o arquivo: ler e caro, rasterizar
+    uma pagina nao. Em imagem o dpi e sempre 72, para manter 1 pixel = 1 ponto.
+    """
+    imagem = e_imagem(dados)
+    if imagem:
+        import bitmap
+        px = bitmap.decodificar(dados)
+        doc = imagem_para_pdf(dados, px.shape[1], px.shape[0])
+        dpi = 72
+    else:
+        doc = fitz.open(stream=dados, filetype="pdf")
+    n = max(0, min(int(pagina), doc.page_count - 1))
+    png = doc[n].get_pixmap(dpi=dpi).tobytes("png")
+    largura, altura = doc[n].rect.width, doc[n].rect.height
+    doc.close()
+    return png, {"pagina": n, "largura": round(largura, 2), "altura": round(altura, 2)}
+
+
 def estampar_bytes(dados, rotulos, cor=(0, 0, 0), saida="pdf", dpi_saida=None,
                    dpi_previa=None):
     """Estampa rotulos JA DEFINIDOS — o caminho de volta do editor.
