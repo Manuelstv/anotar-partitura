@@ -134,7 +134,46 @@ páginas já vêm da leitura) e **paleta de notas** (tocar em `G` + `♯` em vez
 
 ---
 
-## 6. Estimar o acorde de cada compasso quando não há cifra
+## 6. ~~Análise funcional, tétrades e folha de cifras~~ — NO AR
+
+Entrou em 2026-08-01. O que passou a sair de `analise.py`:
+
+- **Campo harmônico em tétrades**, com o modo de cada grau (`Imaj7` jônio, `ii7` dórico…).
+  A qualidade sai dos três intervalos empilhados, não de tabela por grau — por isso vale em
+  qualquer tom e nos dois modos. A tríade fica no `title`.
+- **Grau de cada cifra** (`ii7`, `V7`, `bVII7`) e o **papel** dela (dominante do tom,
+  dominante secundária, `subV`, ii de um ii-V, emprestado).
+- **Cadências**: ii-V-I, ii-V-i, ii-V solto, V-I e **dominantes em cadeia**, procuradas por
+  classe de altura (fundamental subindo de quarta), então funcionam em qualquer tom e num
+  trecho que modula. Cada uma vem com a escala que serve para o grupo inteiro.
+- **Som real**: o alto é em Eb, soa uma sexta maior abaixo, e a armadura de concerto é a
+  escrita menos 3 bemóis — aritmética, não tabela.
+- **Ritmo**: fórmula pela soma modal dos compassos (Take Five saiu 5/4), histograma de
+  figuras, densidade, síncope e fração de ataques fora do tempo, mais a `confianca` (fatia
+  dos compassos que fecham) para não afirmar ritmo sobre leitura ruim.
+- **Respiração**: pausa de 1 tempo ou nota de 3 contam como folga; frase acima de 12 tempos
+  corridos vira aviso. Limiar de meio tempo dava 46 "respiros" em 28 compassos.
+- **Motivos** por contorno intervalar (pega transposto), **registro** no instrumento
+  (chave de palma, mesa, altíssimo) e **notas fora do tom**.
+- **Folha de cifras em PDF** (`folha_de_cifras`): uma faixa por linha da partitura, cifra
+  grande, grau embaixo, e a posição horizontal igual à da pauta — o espaço entre duas
+  cifras conta quanto o acorde durou. Sai no site como "Baixar cifras".
+- **Maior x menor decidido pela harmonia** quando há cifra (`tom_por`), com a melodia como
+  desempate: qual acorde faz de tônica e, com peso triplo, qual fecha a música.
+
+O ganho maior não foi feature, foi **conserto**: a cifra do Sibelius vem em codepoints
+privados da fonte (`A‹7` = Am7, `GŒ„Š7` = Gmaj7, `F©Ø7` = F#m7b5) e era toda descartada.
+Medido em 59 PDFs do acervo: **47 → 56 arquivos com cifra lida, 210 → 368 cifras**, e as
+que já vinham agora vêm certas (era `A7` no lugar de `Am7`).
+
+**Falta:** o compasso de cada cifra. A cifra é situada pela LINHA da partitura, porque a
+barra de compasso recalculada em `analise.py` não é a mesma que o núcleo usa (haste longa
+entra como barra) — medi 0/26 de acerto num sistema do Strasbourg. Para dar número de
+compasso à cifra, o núcleo teria de expor as barras que ele já calcula.
+
+---
+
+## 7. Estimar o acorde de cada compasso quando não há cifra
 
 Hoje, sem cifra, mostro o **campo harmônico** do tom (o que cabe). O passo seguinte é
 casar as notas de cada compasso contra os sete graus e sugerir qual acorde soa —
@@ -143,7 +182,7 @@ separado do que foi lido.
 
 ---
 
-## 7. Forma (A / B / refrão) não aparece na interface
+## 8. Forma (A / B / refrão) não aparece na interface
 
 `analise.forma()` já existe e agrupa compassos com a mesma sequência de alturas, mas o
 resultado não é exibido. Falta decidir a apresentação (uma faixa tipo `AABA`?) e tratar
@@ -151,7 +190,7 @@ repetição aproximada — hoje só casa sequência idêntica.
 
 ---
 
-## 8. Testar no iPhone de verdade
+## 9. Testar no iPhone de verdade
 
 Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
@@ -164,11 +203,12 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ---
 
-## 9. Casos não cobertos (conhecidos, não são bugs)
+## 10. Casos não cobertos (conhecidos, não são bugs)
 
-- **`--limpar` não apaga traço de extensão.** Nas partituras que já vêm com nome, o
-  traço que indica nota longa é um desenho, não texto, e a tarja branca só cobre texto.
-  Sobra um risquinho por cima do nome novo.
+- **`--limpar` saiu da interface** (2026-08-01, a pedido do Manuel): quem quer tirar um
+  nome apaga no editor. O parâmetro continua em `anotar_bytes` e na CLI. E ele nunca apagou
+  o traço de extensão — nas partituras que já vêm com nome, o traço de nota longa é desenho,
+  não texto, e a tarja branca só cobre texto.
 - **PDF escaneado / foto de papel** — sem vetor não há coordenada, e perspectiva e
   sombra pedem OMR de verdade (Audiveris/oemer). **Screenshot é caso à parte e é
   viável** sem OMR: ver pendência 4.
@@ -179,7 +219,7 @@ Layout conferido em 390px: sem rolagem horizontal. Falta testar no aparelho:
 
 ---
 
-## 10. Ideias maiores (não são pendência, são direção)
+## 11. Ideias maiores (não são pendência, são direção)
 
 1. **Seguidor de partitura pelo microfone** — detectar a altura tocada e andar um cursor
    pelo PDF, marcando onde parou e o que saiu errado. Só é possível porque sei a
