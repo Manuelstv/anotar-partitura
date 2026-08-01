@@ -954,7 +954,7 @@ def melodia(dados, limite=3000):
     rapida.
     """
     doc = fitz.open(stream=dados, filetype="pdf")
-    ev, t = [], 0.0
+    ev, t, base = [], 0.0, 0
     for pg in doc:
         rot, _, pausas = ler_notas(pg, "letras", com_pausas=True)
         itens = [{"x": r["x"], "s": r["sistema"], "midi": r["midi"],
@@ -977,10 +977,14 @@ def melodia(dados, limite=3000):
             passo = max(g["d"] for g in grupo) or 0.25
             for g in grupo:
                 if g["midi"] is not None:
+                    # `s` (sistema GLOBAL) e `x` viajam com o evento: e o que permite casar
+                    # uma cifra, que so tem posicao na pagina, com o instante em que ela soa
                     ev.append({"t": round(t, 4), "midi": g["midi"],
-                               "d": round(g["d"] or 0.25, 4)})
+                               "d": round(g["d"] or 0.25, 4),
+                               "s": base + g["s"], "x": round(g["x"], 2)})
             t += passo
             i = j + 1
+        base += max((it["s"] for it in itens), default=-1) + 1
     doc.close()
     return {"notas": ev, "total": round(t, 4)}
 
