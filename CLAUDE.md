@@ -14,7 +14,7 @@ no código, para evitar problemas de encoding).
 | Caminho | O que é |
 |---|---|
 | `~/notes-pdf/` | este repo (dev). `anotar_partitura.py` é o núcleo |
-| `analise.py` | análise musical determinística (tom, cifras, soletração, escalas, pontos difíceis) |
+| `analise.py` | análise musical determinística: tom, cifras, grau/cadência, campo em tétrades, som real, ritmo, respiro, motivos, e `folha_de_cifras` (PDF só com a harmonia) |
 | `dificuldade.py` + `pesos_dificuldade.json` | nota 0–10 de dificuldade no sax alto; `calibrar` reajusta os pesos |
 | `~/anotar-partitura-web/` | cópia publicada: `index.html` + o mesmo `.py` |
 | `github.com/Manuelstv/anotar-partitura` | repo público, Pages no branch `master` |
@@ -140,6 +140,24 @@ meio espaço abaixo do centro da caixa; clave altura > 5,5.
 14. **A mesma cabeça pode estar desenhada duas vezes no mesmo ponto** (preta + vazada por
    cima, truque para abrir o buraco onde vai o nome da nota dentro da cabeça). É uma nota
    só, e a figura é a preta.
+15. **A cifra do Sibelius não é texto legível.** A fonte `OpusChords*` usa codepoints
+   privados: `A‹7` é Am7, `GŒ„Š7` é Gmaj7, `F©Ø7` é F#m7b5, `B¨` é Bb, `Fº` é Fdim
+   (`GLIFOS_CIFRA` em `analise.py`). Sem traduzir, sobra só cifra numérica (`G7`) e some
+   todo m7/maj7/ø — no acervo, 9 arquivos e 158 cifras. A tradução vale **só** para spans
+   dessa fonte: em `OpusStd` os mesmos codepoints são cabeça de nota e pausa (`U+0152` é a
+   pausa de semínima).
+16. **Nome de nota também aparece ACIMA da pauta, na mesma fonte da cifra** (versão "With
+   Note Names"), e então cai inteiro na faixa onde a cifra é procurada. O que separa é a
+   DENSIDADE: cifra vem uma por compasso, nome vem uma por nota — medi 26 por sistema no
+   Take Five contra 4 num lead sheet. A trava é ≥90% sem sufixo e >10 por sistema.
+17. **Não dá para dizer em que COMPASSO a cifra está.** A barra recalculada fora do núcleo
+   não é a mesma que ele usa (haste longa passa pelo filtro geométrico): medi 0/26 de
+   acerto num sistema do Strasbourg. Por isso a cifra é situada pela LINHA da partitura,
+   que é exata e igualmente útil para achar o trecho.
+
+**Colisão de classe CSS já quebrou um bloco em silêncio:** o `.campo` do campo harmônico
+casou com o `.campo { position: absolute }` do editor de nomes, e o bloco passou meses
+vazando por cima dos vizinhos. Ao criar classe nova no `index.html`, grepar o nome antes.
 
 **Padrão que já se repetiu duas vezes:** calibrar num único arquivo e generalizar cedo
 (o deslocamento fixo das fontes Sonata; a junção de cifra só numérica). Ao criar qualquer
