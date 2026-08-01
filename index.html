@@ -336,6 +336,17 @@
   .palco svg g.sel text { fill: #4f46e5; font-weight: 700; }
   .palco svg g.sel .toque { fill: rgba(79,70,229,.12); }
   .palco.pondo { cursor: crosshair; }
+  .paleta { position: absolute; z-index: 6; display: flex; flex-wrap: wrap; gap: 3px;
+            width: 13rem; padding: 4px; border-radius: var(--r-sm);
+            background: var(--sup1); border: 1px solid var(--borda);
+            box-shadow: 0 6px 18px rgba(0,0,0,.28); }
+  .paleta button { padding: .18rem .38rem; font-size: var(--t-xs); line-height: 1.1;
+                   min-width: 1.7rem; border-radius: 6px; cursor: pointer;
+                   background: var(--sup2); color: var(--texto);
+                   border: 1px solid var(--borda); }
+  .paleta button:hover { background: var(--acento); color: var(--acento-texto); }
+  .paleta .acc { font-weight: 700; }
+  .paleta .zap { margin-left: auto; color: var(--erro); }
   .campo { position: absolute; z-index: 5; width: 5.2rem; padding: .2rem .35rem;
            font: inherit; font-size: var(--t--1); text-align: center;
            background: var(--sup1); color: var(--texto);
@@ -522,7 +533,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=24";
+const V = "?v=25";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -987,7 +998,7 @@ if _rel["total"]:
 `);
       const [pdfOut, previaOut, extra] = res.toJs({ create_proxies: false });
       res.destroy?.();
-      concluir(cartao, f.name, previaOut, JSON.parse(extra), { py, noFS });
+      concluir(cartao, f.name, previaOut, JSON.parse(extra), { py, noFS, sistema });
     } catch (e) {
       falhar(cartao, f, e);
     }
@@ -1033,7 +1044,7 @@ function montarEditor(cartao, ctx) {
   // so a 1a pagina e editavel (e a unica com previa); as outras seguem como foram lidas
   ctx.rotulos = ctx.rel.rotulos.map(r => ({ ...r }));
   ctx.pagina = 0;
-  let sel = null, campo = null;
+  let sel = null, campo = null, paleta = null;
   // pilha de desfazer: uma copia da lista ANTES de cada mexida. Apagar sem querer e o
   // acidente mais provavel num editor de toque, e nao havia volta.
   const pilha = [];
@@ -1082,10 +1093,11 @@ function montarEditor(cartao, ctx) {
     });
   };
 
-  const fechar = () => { campo?.remove(); campo = null; sel = null; redesenhar(); };
+  const fechar = () => { campo?.remove(); paleta?.remove(); campo = paleta = null;
+                         sel = null; redesenhar(); };
 
   const abrir = (k) => {
-    campo?.remove();
+    campo?.remove(); paleta?.remove();
     sel = k;
     redesenhar();
     // posicao pela MATRIZ do proprio SVG, e nao pelo <text>: um rotulo recem-criado tem
@@ -1102,6 +1114,9 @@ function montarEditor(cartao, ctx) {
     campo.style.top = Math.min(pr.height - 30, tela.y - pr.top + 6) + "px";
     campo.title = "Enter aplica, vazio apaga, Esc cancela";
     const aplicar = () => {
+      // remover um campo com foco dispara blur, que chama isto de novo: sem a guarda a
+      // segunda passada acha `campo` nulo e estoura
+      if (!campo) return;
       const novo = campo.value.trim();
       if (novo !== r.texto) { guardar(); ctx.rotulos[k].texto = novo; }
       fechar();
@@ -1112,7 +1127,38 @@ function montarEditor(cartao, ctx) {
       ev.stopPropagation();
     });
     campo.addEventListener("blur", aplicar);
-    palco.append(campo);
+    // PALETA: no celular digitar "F#" e pior que tocar num botao. Os chips usam
+    // pointerdown + preventDefault para NAO roubar o foco do campo — se roubassem, o blur
+    // aplicaria e fecharia antes do clique chegar.
+    const nomes = ctx.sistema === "dore"
+      ? ["Do", "Re", "Mi", "Fa", "Sol", "La", "Si"]
+      : ["C", "D", "E", "F", "G", "A", "B"];
+    paleta = document.createElement("div");
+    paleta.className = "paleta";
+    const chip = (txt, classe, fn) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.textContent = txt;
+      if (classe) b.className = classe;
+      b.addEventListener("pointerdown", ev => { ev.preventDefault(); fn(); });
+      paleta.append(b);
+    };
+    const base = () => campo.value.replace(/[#b]+$/, "");
+    nomes.forEach(nm => chip(nm, "", () => {
+      campo.value = nm + campo.value.slice(base().length);
+      campo.focus();
+    }));
+    chip("♯", "acc", () => { campo.value = base() + "#"; campo.focus(); });
+    chip("♭", "acc", () => { campo.value = base() + "b"; campo.focus(); });
+    chip("natural", "acc", () => { campo.value = base(); campo.focus(); });
+    chip("apagar", "zap", () => { campo.value = ""; aplicar(); });
+    chip("ok", "", () => aplicar());
+    palco.append(campo, paleta);
+    // a paleta cabe embaixo do campo, ou vai para cima se nao houver espaco
+    const abaixo = parseFloat(campo.style.top) + 34;
+    const cabe = abaixo + 90 < pr.height;
+    paleta.style.left = Math.max(2, Math.min(pr.width - 212,
+                                             parseFloat(campo.style.left) - 56)) + "px";
+    paleta.style.top = (cabe ? abaixo : Math.max(2, parseFloat(campo.style.top) - 96)) + "px";
     campo.focus(); campo.select();
   };
 
@@ -1275,11 +1321,25 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   // ver; antes porque a analise e comprida e empurraria a pagina anotada para longe.
   let ctx = null;
   if (previa?.length) {
-    ctx = montarEditor(cartao, { ...extra, rel, previa, nome, base });
+    ctx = montarEditor(cartao, { ...extra, rel, previa, nome, base,
+                                 sistema: extra.sistema });
     $("#lista").classList.add("largo");
   }
   bt.addEventListener("click", () => baixar(bt, ctx || { ...extra, rel, base,
                                                         rotulos: rel.rotulos }));
+
+  // Resolucao no limite: a leitura degrada rapido abaixo de ~8 px por espaco de pauta
+  // (medido: 6 px -> 44% das cabecas). Melhor dizer isso do que entregar um resultado ruim
+  // em silencio e o usuario achar que o programa nao funciona.
+  const ii = rel.imagem_info;
+  if (ii && ii.esp_px && ii.esp_px < 8.5) {
+    const p = document.createElement("p");
+    p.className = "nota-rodape";
+    p.innerHTML = `A partitura está <b>pequena nesta imagem</b> (${ii.esp_px} px por espaço `
+                + `de pauta; o bom é 10 ou mais), então algumas notas podem ter escapado. `
+                + `Se puder, mande um print com a partitura maior na tela.`;
+    cartao.raiz.append(p);
+  }
 
   // A partitura JA tem nomes e o usuario nao marcou apagar: o resultado sai com duas
   // fileiras de nome, uma em cima da outra. O programa sempre soube disso (rel.existentes)
