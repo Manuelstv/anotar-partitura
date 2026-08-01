@@ -485,7 +485,7 @@ def preparar(img, pautas=None):
             "esp": esp, "esp_linha": esp_linha, "horiz": horiz, "W": W, "H": H}
 
 
-def coletar_da_imagem(img, com_ritmo=False):
+def coletar_da_imagem(img, com_ritmo=False, metricas=None):
     """Mesma tupla de `coletar()`, produzida a partir de pixels.
 
     `glifos` volta vazio de proposito: e o que faz `ler_notas` cair no modo contorno, que
@@ -496,6 +496,12 @@ def coletar_da_imagem(img, com_ritmo=False):
     cena = preparar(img)
     if cena is None:
         raise ImagemIlegivel("nenhuma pauta encontrada na imagem")
+    if metricas is not None:
+        # o espaco de pauta em PIXELS e a variavel que governa tudo: abaixo de ~8 px a
+        # leitura degrada rapido (medido: 6 px -> 44% das cabecas). Quem chama usa isso
+        # para avisar o usuario em vez de entregar um resultado ruim em silencio.
+        metricas.update(esp_px=round(cena["esp"], 2), sistemas=len(cena["sistemas"]),
+                        largura=cena["W"], altura=cena["H"])
     esp = cena["esp"]
     # estreita: e o que `ler_notas` usa para achar barra de compasso
     vert = verticais(cena["bin"], esp)
