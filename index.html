@@ -394,9 +394,16 @@
                        letter-spacing: .02em; }
   .barra-previa .esticar { margin-left: auto; }
   .paginacao { display: flex; align-items: center; gap: var(--s2);
-               font-size: var(--t-xs); color: var(--texto-2); }
-  .paginacao button { padding: .15rem .5rem; }
-  .paginacao button[disabled] { opacity: .35; cursor: default; }
+               font-size: var(--t-sm); font-weight: 600; color: var(--texto); }
+  .paginacao button { width: 44px; height: 44px; padding: 0; display: grid;
+                      place-items: center; font-size: 1.5rem; line-height: 1;
+                      border-radius: var(--r-md); border-color: var(--borda-forte);
+                      color: var(--texto); }
+  .paginacao button:hover:not([disabled]) { background: var(--acento-fraco);
+                                            border-color: var(--acento); }
+  .paginacao [data-conta] { min-width: 8.5ch; text-align: center;
+                            font-variant-numeric: tabular-nums; }
+  .paginacao button[disabled] { opacity: .3; cursor: default; }
   .btn-mini { padding: .3rem .6rem; font-size: var(--t-xs); border-radius: var(--r-sm);
               background: var(--sup2); color: var(--texto-2);
               border: 1px solid var(--borda); cursor: pointer; }
