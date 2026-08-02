@@ -26,7 +26,7 @@
     --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #e9edfd;
     --ok: #146c43; --erro: #b3261e;
     --pauta: rgba(23,22,20,.10);
-    --psico: .34; --psico-mix: multiply; --psico-textura: .14;
+    --psico: .30; --psico-mix: multiply; --psico-textura: .05;
     --sombra: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.07);
     --sombra-1: 0 1px 2px rgba(20,18,14,.05);
   }
@@ -37,7 +37,7 @@
     --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
     --ok: #62d69e; --erro: #ff9083;
     --pauta: rgba(241,239,235,.13);
-    --psico: .55; --psico-mix: screen; --psico-textura: .22;
+    --psico: .52; --psico-mix: screen; --psico-textura: .07;
     --sombra: none; --sombra-1: none;
   } }
   :root[data-theme="dark"] {
@@ -47,7 +47,7 @@
     --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
     --ok: #62d69e; --erro: #ff9083;
     --pauta: rgba(241,239,235,.13);
-    --psico: .55; --psico-mix: screen; --psico-textura: .22;
+    --psico: .52; --psico-mix: screen; --psico-textura: .07;
     --sombra: none; --sombra-1: none;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -77,7 +77,7 @@
       radial-gradient(38% 42% at 90% 80%, #ffb200 0%, transparent 62%),
       conic-gradient(from 200deg at 50% 50%, #0ff, #f0f, #ffe600, #0ff);
     background-blend-mode: screen, screen, screen, screen, normal;
-    filter: blur(46px) saturate(150%);
+    filter: blur(58px) saturate(140%);
     opacity: var(--psico);
     animation: psico 96s linear infinite;
   }
@@ -477,7 +477,7 @@
       </svg>
       Muse Pobre
     </h1>
-    <p class="sub-app">notas anotadas na sua partitura</p>
+    <p class="sub-app">Notas anotadas na sua partitura</p>
     <p class="beta">Funciona bem com <b>PDF</b>. Com <b>print de tela</b> também funciona,
       mas ainda em <b>beta</b>.</p>
   </header>
@@ -591,7 +591,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=28";
+const V = "?v=29";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1254,7 +1254,7 @@ if _rel["total"]:
     # analise, tom, cifra e dificuldade dependem de span de TEXTO, que imagem nao tem
     if _rel["tem_analise"]:
         try:
-            _info = analise.analisar(_dados)
+            _info = analise.analisar(_dados, sistema=_sistema)
         except Exception:
             _info = None
         if _info is not None:
