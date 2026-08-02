@@ -73,7 +73,7 @@
      bem apagada, atras do titulo — sem imagem, so gradiente repetido. */
   header { position: relative; margin-bottom: var(--s5); }
   header::before {
-    content: ""; position: absolute; inset: -14px -12px auto -12px; height: 122px;
+    content: ""; position: absolute; inset: -18px -12px auto -12px; height: 128px;
     background: repeating-linear-gradient(to bottom,
       transparent 0 13px, var(--pauta) 13px 14px, transparent 14px 27px);
     /* apaga em TODAS as direcoes: senao a pauta vira um punhado de rebarbas
@@ -85,11 +85,14 @@
     pointer-events: none; z-index: 0;
   }
   header > * { position: relative; z-index: 1; }
-  .marca { display: inline-flex; align-items: center; gap: var(--s2);
-           margin-bottom: var(--s4); color: var(--texto-2);
-           font-size: var(--t-xs); font-weight: 650; letter-spacing: .09em;
-           text-transform: uppercase; }
-  .marca svg { display: block; color: var(--acento); }
+  /* O nome e o titulo da pagina, nao uma etiqueta: cresce com a largura, mas para de
+     crescer antes de encostar na borda em tela grande. */
+  .marca { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
+           margin: 0 0 var(--s2); font-size: clamp(2.5rem, 8.5vw, 3.9rem);
+           font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .marca svg { display: block; color: var(--acento); flex: none; }
+  .sub { font-size: var(--t-lg); color: var(--texto-2); font-weight: 500;
+         margin: 0 0 var(--s3); }
 
   /* ------------------------------------------------------------- painel  */
   .painel { background: var(--sup); border: 1px solid var(--borda);
@@ -417,8 +420,8 @@
 <body>
 <div class="pagina">
   <header>
-    <span class="marca">
-      <svg width="26" height="19" viewBox="0 0 26 19" aria-hidden="true">
+    <h1 class="marca">
+      <svg width="54" height="39" viewBox="0 0 26 19" aria-hidden="true">
         <g stroke="currentColor" stroke-width="1" opacity=".5" fill="none">
           <path d="M0 2.5h26M0 6.5h26M0 10.5h26M0 14.5h26M0 18.5h26"/>
         </g>
@@ -426,8 +429,8 @@
         <path d="M11.9 12V3" stroke="currentColor" stroke-width="1.5" fill="none"/>
       </svg>
       Muse Pobre
-    </span>
-    <h1>O nome de cada nota, no seu próprio PDF</h1>
+    </h1>
+    <p class="sub">notas anotadas na sua partitura</p>
     <p class="apoio">
       Você recebe de volta o <strong>mesmo arquivo</strong>, com o nome escrito embaixo de
       cada nota.
