@@ -92,6 +92,13 @@
     opacity: var(--psico-textura);
     animation: psico-textura 140s linear infinite alternate;
   }
+  /* No celular o fundo e enxuto: uma camada, do tamanho da tela, sem blend nem animacao.
+     O efeito continua, o buffer de composicao cai para um quarto — e memoria de compositor
+     conta no mesmo orcamento que o Pyodide, que aqui e quem manda. */
+  @media (max-width: 760px), (pointer: coarse) {
+    body::before { inset: -8%; filter: blur(34px) saturate(140%); animation: none; }
+    body::after { display: none; }
+  }
   @keyframes psico { to { transform: rotate(360deg) scale(1.08); } }
   @keyframes psico-textura { to { transform: translate3d(-6%, 4%, 0) scale(1.14); } }
   /* quem pediu menos movimento continua com o fundo, so parado */
@@ -1331,6 +1338,8 @@ if _info and _info.get("leitura"):
       falhar(cartao, f, e);
     }
   }
+  // /entrada.pdf e temporario: o que o editor precisa e a copia por arquivo (noFS)
+  try { py.FS.unlink("/entrada.pdf"); } catch (e) {}
   progresso({ texto: "Pronto", feito: fila.length, total: fila.length });
   setTimeout(() => progresso({ on: false }), 1200);
 }
@@ -1364,7 +1373,14 @@ function montarEditor(cartao, ctx) {
   palco.tabIndex = -1;                    // recebe foco: e o que faz o Ctrl+Z chegar aqui
   const img = document.createElement("img");
   img.alt = "Página de " + ctx.nome;
-  img.src = URL.createObjectURL(new Blob([ctx.previa], { type: "image/png" }));
+  // um blob por pagina visitada, sem revogar, e memoria que nunca volta: o URL anterior
+  // morre antes de o novo nascer
+  const trocarImg = (bytes) => {
+    const antigo = img.src;
+    img.src = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
+    if (antigo.startsWith("blob:")) setTimeout(() => URL.revokeObjectURL(antigo), 1000);
+  };
+  trocarImg(ctx.previa);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", `0 0 ${pg.largura} ${pg.altura}`);
   palco.append(img, svg);
@@ -1533,7 +1549,7 @@ function montarEditor(cartao, ctx) {
     res.destroy?.();
     const m = JSON.parse(meta);
     ctx.pagina = m.pagina;
-    img.src = URL.createObjectURL(new Blob([png], { type: "image/png" }));
+    trocarImg(png);
     svg.setAttribute("viewBox", `0 0 ${m.largura} ${m.altura}`);
     atualizarPag();
     redesenhar();
@@ -1650,6 +1666,9 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
     const a = document.createElement("a");
     a.className = "btn btn-secundario";
     a.href = URL.createObjectURL(new Blob([extra.cifras], { type: "application/pdf" }));
+    // o blob morre com o cartao: sem isto, um PDF por arquivo processado fica preso na aba
+    a.addEventListener("click", () => setTimeout(() => URL.revokeObjectURL(a.href), 60000),
+                       { once: true });
     a.download = base + "_leitura.pdf";
     a.textContent = "Lista de notas";
     a.title = "Uma folha só com o nome das notas por extenso, na ordem, sem pauta nem ritmo";
