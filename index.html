@@ -27,6 +27,7 @@
     --ok: #146c43; --erro: #b3261e;
     --pauta: rgba(23,22,20,.10);
     --psico: .30; --psico-mix: multiply; --psico-textura: .05;
+    --halo: 0 1px 10px rgba(255,255,255,.7);
     --sombra: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.07);
     --sombra-1: 0 1px 2px rgba(20,18,14,.05);
   }
@@ -37,7 +38,8 @@
     --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
     --ok: #62d69e; --erro: #ff9083;
     --pauta: rgba(241,239,235,.13);
-    --psico: .52; --psico-mix: screen; --psico-textura: .07;
+    --psico: .78; --psico-mix: screen; --psico-textura: .07;
+    --halo: 0 1px 14px rgba(6,6,10,.66), 0 0 4px rgba(6,6,10,.5);
     --sombra: none; --sombra-1: none;
   } }
   :root[data-theme="dark"] {
@@ -64,18 +66,18 @@
      o Pyodide ja disputa a thread principal. */
   body::before, body::after {
     content: ""; position: fixed; inset: -60%; z-index: -2; pointer-events: none;
-    -webkit-mask-image: radial-gradient(34% 30% at 50% 48%,
-      transparent 0%, rgba(0,0,0,.5) 52%, #000 88%);
-            mask-image: radial-gradient(34% 30% at 50% 48%,
-      transparent 0%, rgba(0,0,0,.5) 52%, #000 88%);
+    -webkit-mask-image: radial-gradient(30% 26% at 50% 48%,
+      transparent 0%, rgba(0,0,0,.62) 50%, #000 86%);
+            mask-image: radial-gradient(30% 26% at 50% 48%,
+      transparent 0%, rgba(0,0,0,.62) 50%, #000 86%);
   }
   body::before {
     background:
-      radial-gradient(36% 40% at 16% 20%, #ff2bb0 0%, transparent 62%),
-      radial-gradient(40% 44% at 84% 16%, #16d6f5 0%, transparent 64%),
-      radial-gradient(44% 48% at 24% 86%, #7c2ff7 0%, transparent 66%),
-      radial-gradient(38% 42% at 90% 80%, #ffb200 0%, transparent 62%),
-      conic-gradient(from 200deg at 50% 50%, #0ff, #f0f, #ffe600, #0ff);
+      radial-gradient(40% 44% at 16% 20%, #ff5cc4 0%, transparent 64%),
+      radial-gradient(44% 48% at 84% 16%, #3fd8ff 0%, transparent 66%),
+      radial-gradient(48% 52% at 24% 86%, #9a6bff 0%, transparent 68%),
+      radial-gradient(42% 46% at 90% 80%, #ffc44d 0%, transparent 64%),
+      conic-gradient(from 200deg at 50% 50%, #5ff, #f7f, #ffb, #5ff);
     background-blend-mode: screen, screen, screen, screen, normal;
     filter: blur(58px) saturate(140%);
     opacity: var(--psico);
@@ -136,6 +138,7 @@
            margin: 0 0 var(--s2); font-size: clamp(2.5rem, 8.5vw, 3.9rem);
            font-weight: 700; letter-spacing: -.03em; line-height: 1; }
   .marca svg { display: block; color: var(--acento); flex: none; }
+  header .marca, header .sub-app, header .beta { text-shadow: var(--halo, none); }
   .sub-app { font-size: var(--t-lg); color: var(--texto-2); font-weight: 500;
              margin: 0 0 var(--s2); }
   .beta { font-size: var(--t-sm); color: var(--texto-3); margin: 0; }
@@ -591,7 +594,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=29";
+const V = "?v=30";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1272,9 +1275,9 @@ if _rel["total"]:
             _nota = None
 # a folha de cifras sai AGORA, junto: e um PDF de texto, custa milissegundos, e assim o
 # botao de baixar nao precisa guardar o dicionario da analise do lado do Python
-if _info and _info.get("cifras"):
+if _info and _info.get("leitura"):
     try:
-        _cifras = analise.folha_de_cifras(_info, _titulo) or b""
+        _cifras = analise.folha_de_notas(_info, _titulo) or b""
     except Exception:
         _cifras = b""
 (_saida, _previa, json.dumps({"rel": _rel, "info": _info, "nota": _nota}), _cifras)
@@ -1600,15 +1603,15 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   bt.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(bt);
 
-  // Folha de cifras: PDF proprio, so a harmonia. Ja veio pronto do Python, entao aqui e um
-  // link de verdade — nada a gerar no clique, porque o editor nao mexe em cifra.
+  // Lista de notas: PDF proprio, so os nomes na ordem, compasso por compasso. Ja veio
+  // pronto do Python, entao e um link de verdade — o editor nao mexe nesta lista.
   if (extra.cifras?.length) {
     const a = document.createElement("a");
     a.className = "btn btn-secundario";
     a.href = URL.createObjectURL(new Blob([extra.cifras], { type: "application/pdf" }));
-    a.download = base + "_cifras.pdf";
-    a.textContent = "Baixar cifras";
-    a.title = "Uma folha só com os acordes e os graus, para improvisar";
+    a.download = base + "_leitura.pdf";
+    a.textContent = "Lista de notas";
+    a.title = "Uma folha só com o nome das notas por extenso, na ordem, sem pauta nem ritmo";
     cartao.topo.append(a);
   }
 
