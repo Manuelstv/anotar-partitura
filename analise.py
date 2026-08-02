@@ -276,6 +276,73 @@ def _texto_de_cifra(txt, fonte):
     return txt
 
 
+# ------------------------------------------------- nome de nota em do-re-mi
+# O botao "Do Re Mi" da entrada manda em TODA a analise, nao so no que e estampado na
+# pauta: quem le "Lá" embaixo da nota nao quer ver "Am7" no cartao de acordes. A traducao
+# e feita na SAIDA de `analisar`, num passe unico, para que a teoria toda continue
+# trabalhando em letras — soletrar um acorde a partir de "Lá" seria reescrever tudo.
+DORE = {'C': 'Dó', 'D': 'Ré', 'E': 'Mi', 'F': 'Fá', 'G': 'Sol', 'A': 'Lá', 'B': 'Si'}
+RE_NOTA_SOLTA = re.compile(r'\b([A-G])([b#])?\b')
+
+
+def _pt_nota(n):
+    """'Bb' -> 'Sib'; 'F3' -> 'Fá3'; 'E menor' -> 'Mi menor'. So a primeira letra muda."""
+    if not n or n[0] not in DORE:
+        return n
+    return DORE[n[0]] + n[1:]
+
+
+def _pt_cifra(c):
+    """'Am7' -> 'Lám7'; 'Gadd9/C' -> 'Soladd9/Dó'. O baixo de barra tambem traduz."""
+    return '/'.join(_pt_nota(p) for p in c.split('/'))
+
+
+def _pt_frase(t):
+    """Nome de nota SOLTO dentro de uma frase ("G maior serve nos três").
+
+    So pega letra isolada: "B7" fica intacto (nao ha fronteira de palavra entre B e 7) e a
+    conjuncao "e" e minuscula, entao nunca vira nota.
+    """
+    return RE_NOTA_SOLTA.sub(lambda m: _pt_nota(m.group(0)), t) if t else t
+
+
+def _traduzir(d):
+    """Passa a saida de `analisar` para do-re-mi, campo por campo."""
+    d["tom"] = _pt_nota(d["tom"])
+    d["tom_relativo"] = _pt_nota(d["tom_relativo"])
+    d["escala_do_tom"] = [_pt_nota(n) for n in d["escala_do_tom"]]
+    d["grave"], d["agudo"] = _pt_nota(d["grave"]), _pt_nota(d["agudo"])
+    if d.get("real"):
+        for k in ("tom", "grave", "agudo"):
+            d["real"][k] = _pt_nota(d["real"][k])
+    d["mais_tocadas"] = [[_pt_nota(n), q] for n, q in d["mais_tocadas"]]
+    d["fora_do_tom"] = [[_pt_nota(n), q] for n, q in d["fora_do_tom"]]
+    d["cifras"] = [_pt_cifra(c) for c in d["cifras"]]
+    d["progressao"] = [_pt_cifra(c) for c in d["progressao"]]
+    for e in d["escalas"]:
+        e["cifra"] = _pt_cifra(e["cifra"])
+        e["notas"] = [_pt_nota(n.replace(" (baixo)", "")) + (" (baixo)" if "(baixo)" in n else "")
+                      for n in e["notas"]]
+    for it in d["funcional"]:
+        it["cifra"] = _pt_cifra(it["cifra"])
+    for c in d["cadencias"]:
+        c["acordes"] = [_pt_cifra(a) for a in c["acordes"]]
+        c["alvo"] = _pt_frase(c["alvo"])
+        c["escala"] = _pt_frase(c["escala"])
+    for g in d["campo"]:
+        g["cifra"] = _pt_cifra(g["cifra"])
+        g["triade"] = _pt_cifra(g["triade"])
+        g["notas"] = [_pt_nota(n) for n in g["notas"]]
+    for m in d["motivos"]:
+        m["notas"] = [_pt_nota(n) for n in m["notas"]]
+    for linha in d["grade"]:
+        for c in linha["cifras"]:
+            c["cifra"] = _pt_cifra(c["cifra"])
+    if d.get("blues"):
+        d["blues"] = _pt_frase(d["blues"])
+    return d
+
+
 def ler_cifras(pg, sistemas, textos, formas):
     """Cifras que estao ACIMA de alguma pauta, em ordem de leitura.
 
@@ -789,8 +856,11 @@ def forma(compassos):
     return ''.join(seq)
 
 
-def analisar(dados):
-    """Recebe bytes de PDF, devolve um dicionario de fatos medidos."""
+def analisar(dados, sistema="letras"):
+    """Recebe bytes de PDF, devolve um dicionario de fatos medidos.
+
+    Com `sistema="dore"`, os nomes de nota da saida vem em do-re-mi.
+    """
     doc = pymupdf.open(stream=dados, filetype="pdf")
     notas, cifras, compassos, linhas_vistas = [], [], {}, []
 
@@ -909,7 +979,7 @@ def analisar(dados):
     seq_mot = [(num[(r["pagina"], r["sistema"], r["compasso"])], r["midi"], r["nome"])
                for r in notas if not r["ligada"] and not r["graca"]]
 
-    return {
+    saida = {
         "n_notas": len(notas),
         "tom": tom,
         "tom_relativo": relativa,
@@ -943,11 +1013,13 @@ def analisar(dados):
         # grade da folha de cifras: uma LINHA por sistema da partitura, na ordem de
         # leitura, com as cifras daquele sistema na ordem de x
         "grade": [{"linha": i + 1,
-                   "cifras": [{"cifra": c["cifra"], "xr": c["xr"], "x": round(c["x"], 2)}
+                   "cifras": [{"cifra": c["cifra"], "xr": c["xr"], "x": round(c["x"], 2),
+                               "grau": grau_de_cifra(c["cifra"], escala_tom)}
                               for c in sorted(cifras, key=lambda c: c["x"])
                               if c["linha"] == i]}
                   for i in range(len(linhas_vistas))],
     }
+    return _traduzir(saida) if sistema == "dore" else saida
 
 
 def _voz(cifra, base=48):
@@ -1036,7 +1108,6 @@ def folha_de_cifras(info, titulo=''):
     grade = [g for g in ((info or {}).get("grade") or []) if g["cifras"]]
     if not grade or not info.get("cifras"):
         return None
-    escala = escala_do_tom(info["tom"].rsplit(' ', 1)[0], info["armadura"])
     doc = pymupdf.open()
     LARG, ALT = 595.0, 842.0
     marg, h = 46.0, 62.0
@@ -1086,7 +1157,7 @@ def folha_de_cifras(info, titulo=''):
         for x, c in zip(xs, g["cifras"]):
             pg.draw_line((x - 6, y - 20), (x - 6, y + 8), color=claro, width=0.7)
             pg.insert_text((x, y), c["cifra"], fontname='hebo', fontsize=tam, color=preto)
-            grau = grau_de_cifra(c["cifra"], escala)
+            grau = c.get("grau") or ""
             if grau:
                 pg.insert_text((x, y + 16), grau, fontname='helv', fontsize=8, color=cinza)
         pg.draw_line((LARG - marg, y - 20), (LARG - marg, y + 8), color=claro, width=0.7)
