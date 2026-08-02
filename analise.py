@@ -335,6 +335,8 @@ def _traduzir(d):
         g["notas"] = [_pt_nota(n) for n in g["notas"]]
     for m in d["motivos"]:
         m["notas"] = [_pt_nota(n) for n in m["notas"]]
+    for e in d.get("leitura", []):
+        e["n"] = _pt_nota(e["n"])
     for linha in d["grade"]:
         for c in linha["cifras"]:
             c["cifra"] = _pt_cifra(c["cifra"])
@@ -1012,6 +1014,11 @@ def analisar(dados, sistema="letras"):
         "dificeis": dif[:3],
         # grade da folha de cifras: uma LINHA por sistema da partitura, na ordem de
         # leitura, com as cifras daquele sistema na ordem de x
+        # a melodia como texto, compasso por compasso: e o que a folha de leitura estampa.
+        # Cabeca presa por ligadura fica de fora, igual ao que e escrito na pauta — ela nao
+        # e um ataque novo, e repetir o nome atrapalharia a leitura.
+        "leitura": [{"c": num[(r["pagina"], r["sistema"], r["compasso"])], "n": r["nome"]}
+                    for r in notas if not r["ligada"] and not r["graca"]],
         "grade": [{"linha": i + 1,
                    "cifras": [{"cifra": c["cifra"], "xr": c["xr"], "x": round(c["x"], 2),
                                "grau": grau_de_cifra(c["cifra"], escala_tom)}
@@ -1095,6 +1102,73 @@ def acompanhamento(dados, info):
     return saida
 
 
+def folha_de_notas(info, titulo=''):
+    """PDF NOVO com a melodia escrita por extenso, compasso por compasso.
+
+    Sem pauta, sem figura, sem duracao: so a ordem das notas. Serve para quem esta
+    aprendendo a associar nome e dedilhado e ainda tropeca na leitura da pauta — e para
+    conferir de cabeca, longe do instrumento. O nome sai no sistema que foi pedido na
+    entrada, entao com "Do Re Mi" marcado a folha toda vem em do-re-mi.
+
+    Devolve bytes de PDF, ou None se nao houver nota lida.
+    """
+    seq = (info or {}).get("leitura") or []
+    if not seq:
+        return None
+    por_compasso = []
+    for e in seq:
+        if not por_compasso or por_compasso[-1][0] != e["c"]:
+            por_compasso.append((e["c"], []))
+        por_compasso[-1][1].append(e["n"])
+
+    doc = pymupdf.open()
+    LARG, ALT = 595.0, 842.0
+    marg, h = 52.0, 23.0
+    cinza, claro, preto = (0.42, 0.42, 0.42), (0.68, 0.68, 0.68), (0, 0, 0)
+    pg, y = None, 0.0
+
+    def nova_pagina(primeira):
+        nonlocal pg, y
+        pg = doc.new_page(width=LARG, height=ALT)
+        if primeira:
+            pg.insert_text((marg, 66), titulo or 'Notas da melodia', fontname='hebo',
+                           fontsize=17)
+            meta = [info["tom"]]
+            if info.get("real"):
+                meta.append('soa em ' + info["real"]["tom"])
+            meta.append(f'{len(seq)} notas')
+            pg.insert_text((marg, 84), '  ·  '.join(meta), fontname='helv', fontsize=9.5,
+                           color=cinza)
+            y = 116.0
+        else:
+            y = 72.0
+
+    nova_pagina(True)
+    for numero, nomes in por_compasso:
+        # compasso comprido continua na linha de baixo, com o numero repetido em claro
+        pedacos, atual = [], []
+        for nm in nomes:
+            atual.append(nm)
+            if len(atual) == 12:
+                pedacos.append(atual)
+                atual = []
+        if atual:
+            pedacos.append(atual)
+        for i, pedaco in enumerate(pedacos):
+            if y + h > ALT - 52:
+                nova_pagina(False)
+            pg.insert_text((marg - 26, y), str(numero), fontname='helv', fontsize=8,
+                           color=claro if i else cinza)
+            x = marg
+            for nm in pedaco:
+                pg.insert_text((x, y), nm, fontname='hebo', fontsize=12, color=preto)
+                x += max(30.0, pymupdf.get_text_length(nm, fontname='hebo', fontsize=12) + 12)
+            y += h
+    saida = doc.tobytes()
+    doc.close()
+    return saida
+
+
 def folha_de_cifras(info, titulo=''):
     """PDF NOVO so com a harmonia: uma faixa por LINHA da partitura, com o grau embaixo.
 
@@ -1175,6 +1249,15 @@ def main():
     if not r:
         print("nenhuma nota legivel")
         return 1
+    if "--notas" in sys.argv:
+        alvo = os.path.splitext(sys.argv[1])[0] + "_leitura.pdf"
+        pdf = folha_de_notas(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
+        if not pdf:
+            print("nenhuma nota lida")
+            return 1
+        open(alvo, "wb").write(pdf)
+        print(alvo)
+        return 0
     if "--cifras" in sys.argv:
         alvo = os.path.splitext(sys.argv[1])[0] + "_cifras.pdf"
         pdf = folha_de_cifras(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
