@@ -26,6 +26,7 @@
     --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #e9edfd;
     --ok: #146c43; --erro: #b3261e;
     --pauta: rgba(23,22,20,.10);
+    --psico: .34; --psico-mix: multiply; --psico-textura: .14;
     --sombra: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.07);
     --sombra-1: 0 1px 2px rgba(20,18,14,.05);
   }
@@ -36,6 +37,7 @@
     --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
     --ok: #62d69e; --erro: #ff9083;
     --pauta: rgba(241,239,235,.13);
+    --psico: .55; --psico-mix: screen; --psico-textura: .22;
     --sombra: none; --sombra-1: none;
   } }
   :root[data-theme="dark"] {
@@ -45,10 +47,53 @@
     --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
     --ok: #62d69e; --erro: #ff9083;
     --pauta: rgba(241,239,235,.13);
+    --psico: .55; --psico-mix: screen; --psico-textura: .22;
     --sombra: none; --sombra-1: none;
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+
+
+  /* -------------------------------------------------------- fundo fractal
+     Duas camadas fixas atras de tudo: manchas de cor bem desfocadas e, por cima,
+     RUIDO FRACTAL de cinco oitavas vindo de um SVG embutido (nada de arquivo externo).
+     As duas sao mascaradas no centro: a leitura da partitura vive ali, e contraste perdido
+     no meio da pagina custa mais do que o efeito rende. A rotacao e de transform, que a
+     GPU compoe sozinha — animar `filter: blur` repintaria a tela inteira a cada quadro, e
+     o Pyodide ja disputa a thread principal. */
+  body::before, body::after {
+    content: ""; position: fixed; inset: -60%; z-index: -2; pointer-events: none;
+    -webkit-mask-image: radial-gradient(34% 30% at 50% 48%,
+      transparent 0%, rgba(0,0,0,.5) 52%, #000 88%);
+            mask-image: radial-gradient(34% 30% at 50% 48%,
+      transparent 0%, rgba(0,0,0,.5) 52%, #000 88%);
+  }
+  body::before {
+    background:
+      radial-gradient(36% 40% at 16% 20%, #ff2bb0 0%, transparent 62%),
+      radial-gradient(40% 44% at 84% 16%, #16d6f5 0%, transparent 64%),
+      radial-gradient(44% 48% at 24% 86%, #7c2ff7 0%, transparent 66%),
+      radial-gradient(38% 42% at 90% 80%, #ffb200 0%, transparent 62%),
+      conic-gradient(from 200deg at 50% 50%, #0ff, #f0f, #ffe600, #0ff);
+    background-blend-mode: screen, screen, screen, screen, normal;
+    filter: blur(46px) saturate(150%);
+    opacity: var(--psico);
+    animation: psico 96s linear infinite;
+  }
+  body::after {
+    z-index: -1;
+    background: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27900%27%20height%3D%27900%27%3E%3Cfilter%20id%3D%27p%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.0062%200.0079%27%20numOctaves%3D%275%27%20seed%3D%2711%27%20result%3D%27n%27%2F%3E%3CfeComponentTransfer%20in%3D%27n%27%3E%3CfeFuncR%20type%3D%27table%27%20tableValues%3D%270%201%200.15%200.9%200%201%27%2F%3E%3CfeFuncG%20type%3D%27table%27%20tableValues%3D%270.9%200%201%200.1%200.85%200%27%2F%3E%3CfeFuncB%20type%3D%27table%27%20tableValues%3D%270.1%200.95%201%200%200.2%201%27%2F%3E%3CfeFuncA%20type%3D%27table%27%20tableValues%3D%271%201%27%2F%3E%3C%2FfeComponentTransfer%3E%3C%2Ffilter%3E%3Crect%20width%3D%27900%27%20height%3D%27900%27%20filter%3D%27url%28%23p%29%27%2F%3E%3C%2Fsvg%3E") repeat;
+    background-size: 760px 760px;
+    mix-blend-mode: var(--psico-mix);
+    opacity: var(--psico-textura);
+    animation: psico-textura 140s linear infinite alternate;
+  }
+  @keyframes psico { to { transform: rotate(360deg) scale(1.08); } }
+  @keyframes psico-textura { to { transform: translate3d(-6%, 4%, 0) scale(1.14); } }
+  /* quem pediu menos movimento continua com o fundo, so parado */
+  @media (prefers-reduced-motion: reduce) {
+    body::before, body::after { animation: none; }
   }
 
   * { box-sizing: border-box; }
