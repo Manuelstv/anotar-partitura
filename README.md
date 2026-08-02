@@ -1,4 +1,6 @@
-# anotar-partitura
+# Muse Pobre
+
+*(`anotar-partitura` no GitHub — o repo mantém o nome antigo, e a URL com ele.)*
 
 Escreve o **nome de cada nota embaixo da pauta**, direto na partitura — **PDF ou print de
 celular**. A saída é o arquivo original + uma camada de texto: nada é re-desenhado, o
