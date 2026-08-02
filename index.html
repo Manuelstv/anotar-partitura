@@ -49,7 +49,8 @@
     --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
     --ok: #62d69e; --erro: #ff9083;
     --pauta: rgba(241,239,235,.13);
-    --psico: .52; --psico-mix: screen; --psico-textura: .07;
+    --psico: .78; --psico-mix: screen; --psico-textura: .07;
+    --halo: 0 1px 14px rgba(6,6,10,.66), 0 0 4px rgba(6,6,10,.5);
     --sombra: none; --sombra-1: none;
   }
   @media (prefers-reduced-motion: reduce) {
@@ -139,10 +140,23 @@
            font-weight: 700; letter-spacing: -.03em; line-height: 1; }
   .marca svg { display: block; color: var(--acento); flex: none; }
   header .marca, header .sub-app, header .beta { text-shadow: var(--halo, none); }
-  .sub-app { font-size: var(--t-lg); color: var(--texto-2); font-weight: 500;
+  .sub-app { font-size: var(--t-lg); color: var(--texto); font-weight: 500;
              margin: 0 0 var(--s2); }
-  .beta { font-size: var(--t-sm); color: var(--texto-3); margin: 0; }
+  .beta { font-size: var(--t-sm); color: var(--texto-2); margin: 0; }
   .beta b { color: var(--texto-2); font-weight: 650; }
+
+  /* ------------------------------------------------------------- tema
+     Fica fora do fluxo, no canto: e um controle de ambiente, nao um passo da tarefa. */
+  .btn-tema { position: fixed; top: 14px; right: 14px; z-index: 30;
+              width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
+              border-radius: 50%; cursor: pointer; color: var(--texto-2);
+              background: var(--sup); border: 1px solid var(--borda);
+              box-shadow: var(--sombra-1); }
+  .btn-tema:hover { color: var(--texto); border-color: var(--borda-forte); }
+  .btn-tema svg { display: block; }
+  .btn-tema .ic-sol { display: none; }
+  :root[data-theme="dark"] .btn-tema .ic-sol { display: block; }
+  :root[data-theme="dark"] .btn-tema .ic-lua { display: none; }
 
   /* ------------------------------------------------------------- painel  */
   .painel { background: var(--sup); border: 1px solid var(--borda);
@@ -466,8 +480,28 @@
     .corpo, .tit-analise, .previa { padding-left: var(--s4); padding-right: var(--s4); }
   }
 </style>
+<script>
+  // roda antes do corpo existir: tema salvo manda, senao vale o do sistema
+  try {
+    var _t = localStorage.getItem("tema");
+    document.documentElement.dataset.theme =
+      _t || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  } catch (e) {}
+</script>
 </head>
 <body>
+<button type="button" class="btn-tema" id="tema" aria-label="Alternar tema claro e escuro"
+        title="Alternar entre claro e escuro">
+  <svg class="ic-lua" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
+  </svg>
+  <svg class="ic-sol" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="4.2"/>
+    <path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/>
+  </svg>
+</button>
 <div class="pagina">
   <header>
     <h1 class="marca">
@@ -526,6 +560,13 @@
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
+const btTema = $("#tema");
+btTema.addEventListener("click", () => {
+  const novo = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = novo;
+  try { localStorage.setItem("tema", novo); } catch (e) {}
+});
+
 const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
 const barra = $("#barra"), barraTxt = $("#barra-txt"), barraNum = $("#barra-num"),
       barraCheio = $("#barra-cheio");
