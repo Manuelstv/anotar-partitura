@@ -20,6 +20,9 @@ no código, para evitar problemas de encoding).
 | `github.com/Manuelstv/anotar-partitura` | repo público, Pages no branch `master` |
 | `https://manuelstv.github.io/anotar-partitura/` | site — arrasta PDF, baixa anotado |
 | `C:\Users\ManuelSperanzaTorres\Anotar partitura.bat` | atalho Windows de arrastar-soltar (+ variante `(Do-Re-Mi).bat`) |
+| `PENDENCIAS.md` | lista viva do que falta, em ordem de prioridade |
+| `PESQUISA-*.md` | estudos de viabilidade **antes** de implementar. Ler o de um assunto antes de repensá-lo do zero: `SCREENSHOT` (entrada por imagem, virou o modo bitmap), `EDITOR` (correção da transcrição, virou o editor de nomes), `MICROFONE` (seguidor que rola a página ouvindo o sax — **ainda não implementado**) |
+| `MOCK-SCREENSHOT-ANALISE.md` | medições do modo imagem, condição por condição |
 
 O site carrega `anotar_partitura.py`, `analise.py`, `dificuldade.py` e
 `pesos_dificuldade.json` no Pyodide — os **mesmos** arquivos da CLI.
@@ -199,6 +202,22 @@ diretório temporário, não versionado.
 
 `PENDENCIAS.md` tem a lista viva, em ordem de prioridade. A primeira aberta é **botar o
 ritmo na nota de dificuldade**, agora que a duração é lida.
+
+A ideia grande com estudo já feito e código nenhum é o **seguidor por microfone**
+(`PESQUISA-MICROFONE.md`, 2026-08-01): ouvir o sax e rolar a partitura sozinho. Veredito:
+viável, e mais fácil aqui do que num app comum, porque a coordenada de cada nota já é dado de
+entrada. Três coisas de lá que economizam meio dia de descoberta:
+
+1. **Transpor antes de comparar.** O microfone ouve o som REAL; a partitura é a escrita. Sem
+   os 9 semitons de `TRANSPOSICAO_ALTO`, erra toda nota.
+2. **Sax é monofônico**, então autocorrelação basta — não precisa de rede nem de FFT
+   sofisticada. Janela de 2048 a 44,1 kHz cobre a nota mais grave com folga; ~80 ms de
+   latência total.
+3. **O difícil não é ouvir, é não se perder** quando a pessoa repete, respira ou improvisa.
+   Começar por janela de expectativa (na dúvida, NÃO mexer), não por DTW.
+
+E o pré-requisito que não é código: uma **gravação do Manuel tocando de verdade**. Calibrar no
+sintetizador do site é repetir o padrão que já custou caro duas vezes aqui.
 
 ## Limites conhecidos (não são bugs)
 
