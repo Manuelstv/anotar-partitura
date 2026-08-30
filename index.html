@@ -3,136 +3,164 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Muse Pobre — nome das notas no seu PDF</title>
-<meta name="description" content="Faça o upload do seu PDF de partitura e receba um arquivo com o nome de cada nota embaixo da pauta, mais a análise da música.">
+<title>Partitura Inteligente — o nome de cada nota no seu PDF</title>
+<meta name="description" content="Solte o PDF da partitura e receba o mesmo arquivo com o nome de cada nota embaixo da pauta, mais a análise da música: tom, harmonia, ritmo e dificuldade.">
+<meta name="theme-color" content="#0b0c10">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 19'%3E%3Cg stroke='%2382a4f5' stroke-width='1' opacity='.45' fill='none'%3E%3Cpath d='M0 2.5h26M0 6.5h26M0 10.5h26M0 14.5h26M0 18.5h26'/%3E%3C/g%3E%3Cellipse cx='8' cy='12.5' rx='4.6' ry='3.4' fill='%2382a4f5' transform='rotate(-18 8 12.5)'/%3E%3Cpath d='M12.2 12V2' stroke='%2382a4f5' stroke-width='1.8'/%3E%3C/svg%3E">
 <style>
-  /* ---------------------------------------------------------------- tokens
-     Escala tipografica com salto de ~1.25x, no maximo 3 tamanhos por bloco, e
-     espaco em multiplos de 4. O acento e reservado para a acao primaria, o foco
-     e o valor que o usuario veio buscar — em nenhum outro lugar.
+  /* ================================================================ fontes
+     Fraunces (SIL OFL) hospedada aqui mesmo — o site roda offline depois do
+     primeiro carregamento, e uma chamada a CDN de fonte seria a unica
+     dependencia de rede fora do Pyodide. Fonte variavel: um arquivo cobre
+     todos os pesos. Caminho RELATIVO: o site vive em /anotar-partitura/,
+     entao "/fonts/..." apontaria para a raiz do dominio, que nao existe. */
+  @font-face {
+    font-family: "Fraunces";
+    font-style: normal;
+    font-weight: 300 900;
+    font-display: swap;
+    src: url("fonts/fraunces-variable.woff2") format("woff2");
+  }
 
-     Superficie: quatro degraus (fundo -> cartao -> cartao interno -> realce).
-     No tema escuro, ELEVACAO E LUZ, nao sombra: sombra preta sobre fundo preto
-     nao aparece, entao cada nivel e um cinza um passo mais claro, com um fio de
-     borda. No tema claro vale o contrario — a sombra e que separa. */
+  /* ================================================================ tokens
+     ESCURO E O PADRAO. O tema claro entra por cima, como excecao — e o
+     contrario do que era antes, e e de proposito: a partitura anotada e uma
+     folha branca grande, e ela rende mais sobre fundo escuro do que sobre
+     fundo claro, onde a pagina toda vira uma mancha branca so.
+
+     Superficie em quatro degraus (fundo -> cartao -> cartao interno ->
+     campo). No escuro cada degrau e um cinza-azulado um passo mais claro,
+     com um fio de luz no topo (--brilho): sombra preta sobre preto nao
+     aparece. No claro e a sombra que separa, e o degrau quase nao muda.
+
+     Tipografia em duas familias: Fraunces (serifada, com eixo optico) para
+     titulo e numero grande — e o que da CARA ao site; sans do sistema para
+     o resto, que e texto de interface e tem de sumir. */
   :root {
     --t-xl: 2.125rem; --t-lg: 1.125rem; --t-md: 1rem; --t-sm: .875rem; --t-xs: .75rem;
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
-    --r-sm: 8px; --r-md: 12px; --r-lg: 18px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
 
-    --bg: #f7f5f1;  --sup: #fff;  --sup2: #f2efe9;  --sup3: #e9e5dc;
-    --texto: #171614; --texto-2: #56534c; --texto-3: #7e7a72;
-    --borda: #e5e0d7; --borda-forte: #cdc7bb;
-    --acento: #2b4acb; --acento-texto: #fff; --acento-fraco: #e9edfd;
-    --ok: #146c43; --erro: #b3261e;
-    --pauta: rgba(23,22,20,.10);
-    --psico: .30; --psico-mix: multiply; --psico-textura: .05;
-    --halo: 0 1px 10px rgba(255,255,255,.7);
-    --sombra: 0 1px 2px rgba(20,18,14,.06), 0 8px 24px rgba(20,18,14,.07);
-    --sombra-1: 0 1px 2px rgba(20,18,14,.05);
+    --fonte-exibicao: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+    --fonte-texto: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+    /* superficies */
+    --bg: #0b0c10;  --sup: #14161d;  --sup2: #191c25;  --sup3: #1f232e;
+    --borda: #242833; --borda-forte: #343a49;
+    --texto: #eceef4; --texto-2: #99a0b2; --texto-3: #6d7488;
+
+    /* acentos — os mesmos seis do Diario de Foco */
+    --acento: #82a4f5; --acento-rgb: 130, 164, 245;
+    --acento-texto: #0a0e1a;
+    --acento-fraco: rgba(130, 164, 245, .13);
+    --ok: #63c890; --erro: #ec8a7c; --atencao: #ddb45c;
+    --violeta: #b79bf0; --rosa: #f09ab4; --ciano: #5cc4cf;
+
+    /* elevacao */
+    --sombra-1: 0 1px 2px rgba(0, 0, 0, .45);
+    --sombra: 0 6px 20px -8px rgba(0, 0, 0, .6);
+    --sombra-3: 0 22px 48px -16px rgba(0, 0, 0, .75);
+    --brilho: inset 0 1px 0 rgba(255, 255, 255, .05);
+    --anel: 0 0 0 2px var(--bg), 0 0 0 4px rgba(var(--acento-rgb), .55);
+
+    /* motivo de pauta atras do titulo, e o quanto o fundo brilha */
+    --pauta: rgba(236, 238, 244, .085);
+    --aurora: .38; --grao: .05; --grao-mix: overlay;
+    --halo: 0 1px 14px rgba(6, 6, 10, .6);
+
+    color-scheme: dark;
   }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --bg: #101114;  --sup: #191b1f;  --sup2: #212429;  --sup3: #2a2e35;
-    --texto: #f1efeb; --texto-2: #b3aea6; --texto-3: #918c84;
-    --borda: #2b2f35; --borda-forte: #3c4149;
-    --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
-    --ok: #62d69e; --erro: #ff9083;
-    --pauta: rgba(241,239,235,.13);
-    --psico: .78; --psico-mix: screen; --psico-textura: .07;
-    --halo: 0 1px 14px rgba(6,6,10,.66), 0 0 4px rgba(6,6,10,.5);
-    --sombra: none; --sombra-1: none;
-  } }
-  :root[data-theme="dark"] {
-    --bg: #101114;  --sup: #191b1f;  --sup2: #212429;  --sup3: #2a2e35;
-    --texto: #f1efeb; --texto-2: #b3aea6; --texto-3: #918c84;
-    --borda: #2b2f35; --borda-forte: #3c4149;
-    --acento: #93a8ff; --acento-texto: #10131d; --acento-fraco: #1b2340;
-    --ok: #62d69e; --erro: #ff9083;
-    --pauta: rgba(241,239,235,.13);
-    --psico: .78; --psico-mix: screen; --psico-textura: .07;
-    --halo: 0 1px 14px rgba(6,6,10,.66), 0 0 4px rgba(6,6,10,.5);
-    --sombra: none; --sombra-1: none;
+
+  /* claro: mesma arquitetura, papel no lugar do estudio. O acento escurece
+     porque #82a4f5 sobre branco nao passa em contraste de texto. */
+  :root[data-theme="light"] {
+    --bg: #f2f3f7;  --sup: #fff;  --sup2: #f6f7fa;  --sup3: #eceef4;
+    --borda: #e1e4ed; --borda-forte: #c5cad8;
+    --texto: #15171e; --texto-2: #545b6d; --texto-3: #7c8396;
+
+    --acento: #3253c4; --acento-rgb: 50, 83, 196;
+    --acento-texto: #fff;
+    --acento-fraco: rgba(50, 83, 196, .09);
+    --ok: #0f7a50; --erro: #bd3524; --atencao: #8a640d;
+    --violeta: #6446bd; --rosa: #b83f74; --ciano: #14707d;
+
+    --sombra-1: 0 1px 2px rgba(19, 22, 34, .06);
+    --sombra: 0 1px 2px rgba(19, 22, 34, .05), 0 10px 26px -12px rgba(19, 22, 34, .22);
+    --sombra-3: 0 24px 60px -22px rgba(19, 22, 34, .3);
+    --brilho: none;
+    --pauta: rgba(21, 23, 30, .1);
+    --aurora: .34; --grao: .035; --grao-mix: multiply;
+    --halo: 0 1px 10px rgba(255, 255, 255, .8);
+
+    color-scheme: light;
   }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
   }
 
-
-  /* -------------------------------------------------------- fundo fractal
-     Duas camadas fixas atras de tudo: manchas de cor bem desfocadas e, por cima,
-     RUIDO FRACTAL de cinco oitavas vindo de um SVG embutido (nada de arquivo externo).
-     As duas sao mascaradas no centro: a leitura da partitura vive ali, e contraste perdido
-     no meio da pagina custa mais do que o efeito rende. A rotacao e de transform, que a
-     GPU compoe sozinha — animar `filter: blur` repintaria a tela inteira a cada quadro, e
-     o Pyodide ja disputa a thread principal. */
+  /* ============================================================ fundo
+     Duas camadas fixas, as duas PARADAS. Antes havia um fundo psicodelico
+     girando; ele disputava atencao com o proprio resultado e mantinha o
+     compositor repintando enquanto o Pyodide precisava da maquina. Agora e
+     luz difusa: tres manchas frias, mascaradas no centro para nao roubar
+     contraste de onde a partitura e lida, e um grao fino por cima. */
   body::before, body::after {
-    content: ""; position: fixed; inset: -60%; z-index: -2; pointer-events: none;
-    -webkit-mask-image: radial-gradient(30% 26% at 50% 48%,
-      transparent 0%, rgba(0,0,0,.62) 50%, #000 86%);
-            mask-image: radial-gradient(30% 26% at 50% 48%,
-      transparent 0%, rgba(0,0,0,.62) 50%, #000 86%);
+    content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
   }
   body::before {
     background:
-      radial-gradient(40% 44% at 16% 20%, #ff5cc4 0%, transparent 64%),
-      radial-gradient(44% 48% at 84% 16%, #3fd8ff 0%, transparent 66%),
-      radial-gradient(48% 52% at 24% 86%, #9a6bff 0%, transparent 68%),
-      radial-gradient(42% 46% at 90% 80%, #ffc44d 0%, transparent 64%),
-      conic-gradient(from 200deg at 50% 50%, #5ff, #f7f, #ffb, #5ff);
-    background-blend-mode: screen, screen, screen, screen, normal;
-    filter: blur(58px) saturate(140%);
-    opacity: var(--psico);
-    animation: psico 96s linear infinite;
+      radial-gradient(58% 44% at 14% -6%, rgba(var(--acento-rgb), .9) 0%, transparent 62%),
+      radial-gradient(50% 40% at 92% 6%, #b79bf0 0%, transparent 64%),
+      radial-gradient(58% 40% at 76% 108%, #5cc4cf 0%, transparent 58%);
+    opacity: var(--aurora);
+    -webkit-mask-image: radial-gradient(46% 34% at 50% 46%, transparent 0%, #000 88%);
+            mask-image: radial-gradient(46% 34% at 50% 46%, transparent 0%, #000 88%);
   }
+  /* grao monocromatico de uma oitava — decimo do custo do fractal colorido
+     que estava aqui, e e ele que tira o ar de gradiente de PowerPoint */
   body::after {
     z-index: -1;
-    background: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27900%27%20height%3D%27900%27%3E%3Cfilter%20id%3D%27p%27%20x%3D%270%27%20y%3D%270%27%20width%3D%27100%25%27%20height%3D%27100%25%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.0062%200.0079%27%20numOctaves%3D%275%27%20seed%3D%2711%27%20result%3D%27n%27%2F%3E%3CfeComponentTransfer%20in%3D%27n%27%3E%3CfeFuncR%20type%3D%27table%27%20tableValues%3D%270%201%200.15%200.9%200%201%27%2F%3E%3CfeFuncG%20type%3D%27table%27%20tableValues%3D%270.9%200%201%200.1%200.85%200%27%2F%3E%3CfeFuncB%20type%3D%27table%27%20tableValues%3D%270.1%200.95%201%200%200.2%201%27%2F%3E%3CfeFuncA%20type%3D%27table%27%20tableValues%3D%271%201%27%2F%3E%3C%2FfeComponentTransfer%3E%3C%2Ffilter%3E%3Crect%20width%3D%27900%27%20height%3D%27900%27%20filter%3D%27url%28%23p%29%27%2F%3E%3C%2Fsvg%3E") repeat;
-    background-size: 760px 760px;
-    mix-blend-mode: var(--psico-mix);
-    opacity: var(--psico-textura);
-    animation: psico-textura 140s linear infinite alternate;
+    background: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27180%27%20height%3D%27180%27%3E%3Cfilter%20id%3D%27g%27%3E%3CfeTurbulence%20type%3D%27fractalNoise%27%20baseFrequency%3D%270.8%27%20numOctaves%3D%271%27%20stitchTiles%3D%27stitch%27%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%27180%27%20height%3D%27180%27%20filter%3D%27url%28%23g%29%27%2F%3E%3C%2Fsvg%3E") repeat;
+    background-size: 180px 180px;
+    mix-blend-mode: var(--grao-mix);
+    opacity: var(--grao);
   }
-  /* No celular o fundo e enxuto: uma camada, do tamanho da tela, sem blend nem animacao.
-     O efeito continua, o buffer de composicao cai para um quarto — e memoria de compositor
-     conta no mesmo orcamento que o Pyodide, que aqui e quem manda. */
+  /* no celular fica so a luz: o grao e uma camada de blend em tela cheia, e
+     memoria de compositor conta no mesmo orcamento do Pyodide */
   @media (max-width: 760px), (pointer: coarse) {
-    body::before { inset: -8%; filter: blur(34px) saturate(140%); animation: none; }
     body::after { display: none; }
-  }
-  @keyframes psico { to { transform: rotate(360deg) scale(1.08); } }
-  @keyframes psico-textura { to { transform: translate3d(-6%, 4%, 0) scale(1.14); } }
-  /* quem pediu menos movimento continua com o fundo, so parado */
-  @media (prefers-reduced-motion: reduce) {
-    body::before, body::after { animation: none; }
   }
 
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
   body {
     margin: 0; background: var(--bg); color: var(--texto);
-    font: var(--t-md)/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: var(--t-md)/1.55 var(--fonte-texto);
     -webkit-font-smoothing: antialiased;
   }
-  .pagina { max-width: 760px; margin: 0 auto; padding: var(--s6) var(--s5) 96px; }
+  .pagina { max-width: 820px; margin: 0 auto; padding: var(--s7) var(--s5) 96px; }
   :focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; border-radius: var(--r-sm); }
+  ::selection { background: rgba(var(--acento-rgb), .28); }
 
-  h1 { font-size: var(--t-xl); line-height: 1.1; letter-spacing: -.024em; margin: 0 0 var(--s3);
-       font-weight: 680; }
-  h2 { font-size: var(--t-lg); line-height: 1.3; letter-spacing: -.011em; margin: 0 0 var(--s3); }
+  h1, h2, h3 { font-family: var(--fonte-exibicao); }
+  h1 { font-size: var(--t-xl); line-height: 1.05; letter-spacing: -.02em; margin: 0 0 var(--s3);
+       font-weight: 600; }
+  h2 { font-size: var(--t-lg); line-height: 1.3; letter-spacing: -.01em; margin: 0 0 var(--s3);
+       font-weight: 600; }
   p  { margin: 0 0 var(--s4); }
   .apoio { color: var(--texto-2); max-width: 56ch; }
   .meta  { color: var(--texto-3); font-size: var(--t-sm); }
 
-  /* --------------------------------------------------------------- marca
-     A identidade e o proprio assunto: cinco linhas de pauta. Aparece na marca e,
-     bem apagada, atras do titulo — sem imagem, so gradiente repetido. */
-  header { position: relative; margin-bottom: var(--s5); }
+  /* =========================================================== marca
+     A identidade e o proprio assunto: cinco linhas de pauta atras do nome.
+     Sem imagem — gradiente repetido, apagado em todas as direcoes, senao
+     vira um punhado de rebarbas atravessando a pagina e parece defeito. */
+  header { position: relative; margin-bottom: var(--s6); }
   header::before {
-    content: ""; position: absolute; inset: -18px -12px auto -12px; height: 128px;
+    content: ""; position: absolute; inset: -22px -14px auto -14px; height: 150px;
     background: repeating-linear-gradient(to bottom,
       transparent 0 13px, var(--pauta) 13px 14px, transparent 14px 27px);
-    /* apaga em TODAS as direcoes: senao a pauta vira um punhado de rebarbas
-       atravessando a pagina de ponta a ponta, e parece defeito, nao motivo */
     -webkit-mask-image: radial-gradient(120% 105% at 13% 6%, #000 0%,
                         rgba(0,0,0,.42) 40%, transparent 74%);
             mask-image: radial-gradient(120% 105% at 13% 6%, #000 0%,
@@ -140,121 +168,178 @@
     pointer-events: none; z-index: 0;
   }
   header > * { position: relative; z-index: 1; }
-  /* O nome e o titulo da pagina, nao uma etiqueta: cresce com a largura, mas para de
-     crescer antes de encostar na borda em tela grande. */
+  /* O nome e o titulo da pagina, nao uma etiqueta: cresce com a largura e
+     para antes de encostar na borda. Duas palavras longas — pode quebrar. */
   .marca { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap;
-           margin: 0 0 var(--s2); font-size: clamp(2.5rem, 8.5vw, 3.9rem);
-           font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+           margin: 0 0 var(--s2); font-size: clamp(2.1rem, 6.6vw, 3.15rem);
+           font-weight: 600; letter-spacing: -.022em; line-height: 1.02; }
   .marca svg { display: block; color: var(--acento); flex: none; }
+  /* segunda palavra no acento: e o que separa esta ferramenta de "mais um
+     anotador de PDF" — a analise. <em> em vez de classe: zero risco de
+     colidir com nome ja usado no arquivo. */
+  .marca em { font-style: normal; color: var(--acento); }
   header .marca, header .sub-app, header .beta { text-shadow: var(--halo, none); }
-  .sub-app { font-size: var(--t-lg); color: var(--texto); font-weight: 500;
-             margin: 0 0 var(--s2); }
-  .beta { font-size: var(--t-sm); color: var(--texto-2); margin: 0; }
-  .beta b { color: var(--texto-2); font-weight: 650; }
+  .sub-app { font-size: var(--t-lg); color: var(--texto-2); font-weight: 400;
+             margin: 0 0 var(--s3); max-width: 54ch; }
+  /* inline-BLOCK, nao inline-flex: como flex, cada <b> vira item e o navegador
+     come o espaco entre eles — o texto saia "com PDF . Com print de tela ." */
+  .beta { font-size: var(--t-sm); color: var(--texto-3); margin: 0;
+          display: inline-block; max-width: 100%;
+          padding: 5px var(--s4); border: 1px solid var(--borda);
+          border-radius: 999px; background: var(--sup); box-shadow: var(--sombra-1); }
+  .beta b { color: var(--texto-2); font-weight: 600; }
 
-  /* ------------------------------------------------------------- tema
-     Fica fora do fluxo, no canto: e um controle de ambiente, nao um passo da tarefa. */
+  /* =========================================================== tema
+     Fora do fluxo, no canto: e controle de ambiente, nao passo da tarefa. */
   .btn-tema { position: fixed; top: 14px; right: 14px; z-index: 30;
               width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
               border-radius: 50%; cursor: pointer; color: var(--texto-2);
               background: var(--sup); border: 1px solid var(--borda);
-              box-shadow: var(--sombra-1); }
+              box-shadow: var(--sombra-1), var(--brilho);
+              transition: color .15s ease, border-color .15s ease; }
   .btn-tema:hover { color: var(--texto); border-color: var(--borda-forte); }
   .btn-tema svg { display: block; }
-  .btn-tema .ic-sol { display: none; }
-  :root[data-theme="dark"] .btn-tema .ic-sol { display: block; }
-  :root[data-theme="dark"] .btn-tema .ic-lua { display: none; }
+  .btn-tema .ic-sol { display: block; }
+  .btn-tema .ic-lua { display: none; }
+  :root[data-theme="light"] .btn-tema .ic-sol { display: none; }
+  :root[data-theme="light"] .btn-tema .ic-lua { display: block; }
 
-  /* ------------------------------------------------------------- painel  */
-  .painel { background: var(--sup); border: 1px solid var(--borda);
-            border-radius: var(--r-lg); box-shadow: var(--sombra); overflow: hidden; }
+  /* =========================================================== painel  */
+  .painel { background: linear-gradient(180deg, var(--sup2), var(--sup) 62%);
+            border: 1px solid var(--borda);
+            border-radius: var(--r-lg); box-shadow: var(--sombra), var(--brilho);
+            overflow: hidden; }
   #zona {
     border: 0; border-bottom: 1px solid var(--borda); background: transparent;
-    padding: var(--s6) var(--s5); text-align: center; cursor: pointer;
-    display: block; width: 100%; font: inherit; color: inherit;
-    transition: background .15s ease, color .15s ease;
+    padding: var(--s7) var(--s5); text-align: center; cursor: pointer;
+    display: block; width: 100%; font: inherit; color: inherit; position: relative;
+    transition: background .15s ease;
   }
-  #zona:hover { background: var(--sup2); }
+  /* a moldura tracejada e um filho, nao a borda do botao: assim ela some no
+     hover sem mexer no tamanho da caixa nem empurrar o conteudo 1px */
+  #zona::before {
+    content: ""; position: absolute; inset: var(--s3);
+    border: 1.5px dashed var(--borda-forte); border-radius: var(--r-md);
+    pointer-events: none; transition: border-color .15s ease, background .15s ease;
+  }
+  #zona:hover { background: rgba(var(--acento-rgb), .05); }
+  #zona:hover::before { border-color: rgba(var(--acento-rgb), .55); }
   #zona.sobre { background: var(--acento-fraco); }
-  #zona .titulo { font-size: var(--t-lg); font-weight: 640; display: block; margin-bottom: 2px; }
+  #zona.sobre::before { border-color: var(--acento); border-style: solid; }
+  #zona .titulo { font-family: var(--fonte-exibicao); font-size: 1.32rem; font-weight: 600;
+                  letter-spacing: -.012em; display: block; margin-bottom: var(--s1); }
   #zona .sub { color: var(--texto-3); font-size: var(--t-sm); }
   #zona .alvo {
-    width: 44px; height: 44px; margin: 0 auto var(--s3); border-radius: 50%;
+    width: 52px; height: 52px; margin: 0 auto var(--s4); border-radius: 50%;
     display: grid; place-items: center; color: var(--acento);
-    background: var(--acento-fraco); transition: transform .12s ease;
+    background: var(--acento-fraco); box-shadow: inset 0 0 0 1px rgba(var(--acento-rgb), .22);
+    transition: transform .16s ease;
   }
-  #zona:hover .alvo, #zona.sobre .alvo { transform: translateY(-2px); }
+  #zona:hover .alvo, #zona.sobre .alvo { transform: translateY(-3px); }
   #arquivo { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 
-  /* ------------------------------------------------------------- opcoes  */
+  /* =========================================================== opcoes  */
   .opcoes {
     display: flex; flex-wrap: wrap; align-items: center; gap: var(--s3) var(--s5);
-    padding: var(--s3) var(--s4); background: var(--sup2);
+    padding: var(--s3) var(--s4); background: var(--bg);
+    border-top: 1px solid var(--borda);
     font-size: var(--t-sm); color: var(--texto-2);
   }
-  .grupo { display: inline-flex; align-items: center; gap: var(--s2); }
-  .segmento { display: inline-flex; background: var(--sup3); border-radius: var(--r-sm); padding: 2px; }
+  .grupo { display: inline-flex; align-items: center; gap: var(--s3); }
+  .segmento { display: inline-flex; background: var(--sup3); border-radius: 999px; padding: 3px;
+              border: 1px solid var(--borda); }
   .segmento label {
-    padding: 4px var(--s3); border-radius: 6px; cursor: pointer; color: var(--texto-2);
+    padding: 5px var(--s4); border-radius: 999px; cursor: pointer; color: var(--texto-2);
     transition: background .12s ease, color .12s ease; white-space: nowrap;
   }
   .segmento input { position: absolute; opacity: 0; width: 0; height: 0; }
-  .segmento input:checked + span { color: var(--texto); font-weight: 620; }
-  .segmento label:has(input:checked) { background: var(--sup); box-shadow: var(--sombra-1); }
-  .segmento label:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 1px; }
+  .segmento input:checked + span { color: var(--acento-texto); font-weight: 600; }
+  .segmento label:has(input:checked) { background: var(--acento); box-shadow: var(--sombra-1); }
+  .segmento label:has(input:focus-visible) { outline: 2px solid var(--acento); outline-offset: 2px; }
 
-  /* ------------------------------------------------------------ progresso */
+  /* ========================================================= progresso */
   #barra { margin-top: var(--s4); display: none; }
   #barra.on { display: block; }
   #barra .rotulo { display: flex; justify-content: space-between; font-size: var(--t-sm);
                    color: var(--texto-2); margin-bottom: var(--s2); gap: var(--s3); }
-  #barra .trilho { height: 6px; background: var(--sup3); border-radius: 99px; overflow: hidden; }
-  #barra .cheio { height: 100%; width: 0%; background: var(--acento); border-radius: 99px;
+  #barra .trilho { height: 6px; background: var(--sup3); border-radius: 99px; overflow: hidden;
+                   border: 1px solid var(--borda); }
+  #barra .cheio { height: 100%; width: 0%; border-radius: 99px;
+                  background: linear-gradient(90deg, var(--acento), var(--violeta));
                   transition: width .25s ease; }
   #barra.indeterminado .cheio { width: 35%; animation: correr 1.2s ease-in-out infinite; }
   @keyframes correr { 0% { margin-left: -35%; } 100% { margin-left: 100%; } }
 
-  /* -------------------------------------------------------------- lista  */
-  #lista { margin-top: var(--s5); display: grid; gap: var(--s4); }
+  /* ============================================================ lista
+     Cada arquivo e um cartao com um filete de acento na lateral esquerda —
+     e o que amarra este site ao Diario de Foco. O filete tem cor propria
+     (--acc) quando o assunto pede. */
+  #lista { margin-top: var(--s5); display: grid; gap: var(--s5); }
   .cartao {
-    background: var(--sup); border: 1px solid var(--borda);
-    border-radius: var(--r-lg); box-shadow: var(--sombra); overflow: hidden;
+    --acc: var(--acento);
+    position: relative;
+    background: linear-gradient(180deg, var(--sup2), var(--sup) 62%);
+    border: 1px solid var(--borda);
+    border-radius: var(--r-lg); box-shadow: var(--sombra), var(--brilho);
+    overflow: hidden;
   }
+  .cartao::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+    background: linear-gradient(180deg, var(--acc), rgba(var(--acento-rgb), 0));
+    border-radius: var(--r-lg) 0 0 var(--r-lg);
+  }
+  .cartao::after {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 90px; pointer-events: none;
+    background: linear-gradient(90deg, rgba(var(--acento-rgb), .07), transparent);
+  }
+  .cartao > * { position: relative; }
+
   .topo { display: flex; align-items: center; gap: var(--s4); padding: var(--s4) var(--s5); }
   .ident { min-width: 0; flex: 1; }
-  .ident .nome { font-weight: 640; overflow-wrap: anywhere; line-height: 1.35; }
+  .ident .nome { font-weight: 600; overflow-wrap: anywhere; line-height: 1.35; }
   .ident .estado { font-size: var(--t-sm); color: var(--texto-2); margin-top: 2px; }
   .ident .estado.bom { color: var(--ok); }
   .ident .estado.ruim { color: var(--erro); }
   .ponto { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--borda-forte); }
-  .ponto.trabalhando { background: var(--acento); animation: pulsa 1s ease-in-out infinite; }
+  .ponto.trabalhando { background: var(--acento); animation: pulsa 1s ease-in-out infinite;
+                       box-shadow: 0 0 0 4px rgba(var(--acento-rgb), .18); }
   .ponto.bom { background: var(--ok); }
   .ponto.ruim { background: var(--erro); }
   @keyframes pulsa { 50% { opacity: .35; } }
 
+  /* =========================================================== botoes  */
   .btn {
-    font: inherit; font-size: var(--t-sm); font-weight: 620; border-radius: var(--r-sm);
-    padding: 9px var(--s4); cursor: pointer; white-space: nowrap; text-decoration: none;
-    border: 1px solid transparent; flex: none;
-    transition: background .12s ease, color .12s ease, filter .12s ease;
+    font: inherit; font-size: var(--t-sm); font-weight: 600; border-radius: var(--r-sm);
+    padding: 10px var(--s4); cursor: pointer; white-space: nowrap; text-decoration: none;
+    border: 1px solid transparent; flex: none; display: inline-flex; align-items: center;
+    gap: var(--s2); justify-content: center;
+    transition: background .12s ease, color .12s ease, filter .12s ease, transform .12s ease;
   }
-  .btn-primario { background: var(--acento); color: var(--acento-texto); }
-  .btn-primario:hover { filter: brightness(1.08); }
-  .btn-secundario { background: var(--sup2); color: var(--texto-2); border-color: var(--borda); }
-  .btn-secundario:hover { background: var(--sup3); color: var(--texto); }
+  .btn-primario { background: linear-gradient(180deg,
+                    color-mix(in oklab, var(--acento) 88%, #fff),
+                    var(--acento));
+                  color: var(--acento-texto);
+                  box-shadow: inset 0 1px 0 rgba(255,255,255,.28),
+                              0 6px 16px -8px rgba(var(--acento-rgb), .85); }
+  .btn-primario:hover { filter: brightness(1.07); }
+  .btn-primario:active { transform: translateY(1px); filter: brightness(.97); }
+  .btn-secundario { background: var(--sup3); color: var(--texto-2); border-color: var(--borda); }
+  .btn-secundario:hover { background: var(--sup2); color: var(--texto);
+                          border-color: var(--borda-forte); }
 
-  /* ------------------------------------------------------------- analise */
-  .analise { border-top: 1px solid var(--borda); background: var(--sup2); }
-  .tit-analise { font-size: var(--t-xs); font-weight: 650; color: var(--texto-3);
-                 text-transform: uppercase; letter-spacing: .09em;
+  /* =========================================================== analise */
+  .analise { border-top: 1px solid var(--borda); background: var(--bg); }
+  .tit-analise { font-family: var(--fonte-texto); font-size: 11px; font-weight: 600;
+                 color: var(--texto-3); text-transform: uppercase; letter-spacing: .09em;
                  padding: var(--s5) var(--s5) 0; margin: 0; }
   .selo {
     display: inline-flex; align-items: baseline; gap: 3px; flex: none;
-    background: var(--acento-fraco); border: 1px solid transparent;
-    border-radius: var(--r-sm); padding: 4px var(--s3); line-height: 1.1;
+    background: var(--acento-fraco); border: 1px solid rgba(var(--acento-rgb), .28);
+    border-radius: 999px; padding: 4px var(--s3); line-height: 1.1;
     color: var(--acento);
   }
-  .selo .n { font-size: var(--t-lg); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .selo .n { font-family: var(--fonte-exibicao); font-size: var(--t-lg); font-weight: 600;
+             font-variant-numeric: tabular-nums; }
   .selo .u { font-size: var(--t-xs); opacity: .75; }
   .analise > summary {
     padding: var(--s3) var(--s5); cursor: pointer; font-size: var(--t-sm);
@@ -265,81 +350,116 @@
   .analise[open] > summary::before { transform: rotate(90deg); }
   .analise > summary:hover { color: var(--texto); }
 
-  /* Duas colunas a partir de 640px: em coluna unica a analise virava uma fita
-     sem fim, e o olho nao tinha onde parar. */
-  .corpo { padding: var(--s4) var(--s5) var(--s5); display: grid; gap: var(--s3); }
-  @media (min-width: 640px) { .corpo { grid-template-columns: 1fr 1fr; } }
+  /* Duas colunas a partir de 640px: em coluna unica a analise virava uma
+     fita sem fim, e o olho nao tinha onde parar. */
+  /* minmax(0, 1fr), nao 1fr: a coluna de grid tem minimo AUTO, entao a barra da
+     previa (botoes com flex:none) empurrava a coluna alem da largura do cartao e a
+     partitura saia cortada no celular. */
+  .corpo { padding: var(--s4) var(--s5) var(--s5); display: grid; gap: var(--s3);
+           grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 640px) { .corpo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
   .corpo > .larga { grid-column: 1 / -1; }
-  .bloco { background: var(--sup); border: 1px solid var(--borda);
-           border-radius: var(--r-md); padding: var(--s4); }
-  .bloco h3 { font-size: var(--t-xs); font-weight: 650; color: var(--texto-3);
-              text-transform: uppercase; letter-spacing: .07em; margin: 0 0 var(--s3); }
 
-  .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(94px, 1fr));
+  .bloco { --acc: var(--borda-forte);
+           position: relative; overflow: hidden;
+           background: var(--sup); border: 1px solid var(--borda);
+           border-radius: var(--r-md); padding: var(--s4) var(--s4) var(--s4) var(--s5);
+           box-shadow: var(--sombra-1), var(--brilho); }
+  .bloco::before {
+    content: ""; position: absolute; inset: 0 auto 0 0; width: 3px;
+    background: linear-gradient(180deg, var(--acc), transparent);
+  }
+  .bloco > * { position: relative; }
+  .bloco h3 { font-family: var(--fonte-texto); font-size: 11px; font-weight: 600;
+              color: var(--texto-3); text-transform: uppercase; letter-spacing: .09em;
+              margin: 0 0 var(--s3); }
+  /* o filete ganha cor so quando o assunto tem cor — o resto fica neutro,
+     senao a analise inteira vira arco-iris e a cor deixa de significar algo */
+  .acc-violeta { --acc: var(--violeta); }
+  .acc-ciano   { --acc: var(--ciano); }
+  .acc-rosa    { --acc: var(--rosa); }
+  .acc-ambar   { --acc: var(--atencao); }
+  .acc-verde   { --acc: var(--ok); }
+  .acc-azul    { --acc: var(--acento); }
+
+  .fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(102px, 1fr));
            gap: var(--s2); margin: 0; }
-  .fato { background: var(--sup2); border-radius: var(--r-sm); padding: var(--s2) var(--s3); }
+  .fato { background: var(--sup); border: 1px solid var(--borda);
+          border-radius: var(--r-sm); padding: var(--s2) var(--s3);
+          box-shadow: var(--brilho); }
   .fato dt { font-size: var(--t-xs); color: var(--texto-3); text-transform: uppercase;
-             letter-spacing: .06em; margin-bottom: 1px; }
-  .fato dd { margin: 0; font-size: var(--t-lg); font-weight: 640; line-height: 1.2;
-             font-variant-numeric: tabular-nums; }
-  .fato dd .unid { font-size: var(--t-xs); font-weight: 400; color: var(--texto-3); }
+             letter-spacing: .07em; margin-bottom: 2px; }
+  .fato dd { margin: 0; font-family: var(--fonte-exibicao); font-size: 1.2rem; font-weight: 600;
+             line-height: 1.2; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .fato dd .unid { font-family: var(--fonte-texto); font-size: var(--t-xs);
+                   font-weight: 400; color: var(--texto-3); letter-spacing: 0; }
 
   .fichas { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .ficha { background: var(--sup2); border: 1px solid var(--borda);
-           border-radius: 99px; padding: 3px var(--s3); font-size: var(--t-sm);
+           border-radius: 999px; padding: 3px var(--s3); font-size: var(--t-sm);
            font-variant-numeric: tabular-nums; }
   .escalas { display: grid; gap: 0; font-size: var(--t-sm); margin: 0; }
   .escalas div { display: grid; grid-template-columns: 62px 1fr auto; gap: var(--s2);
-                 align-items: baseline; padding: 5px 0; border-top: 1px solid var(--borda); }
+                 align-items: baseline; padding: 6px 0; border-top: 1px solid var(--borda); }
   .escalas div:first-child { border-top: 0; padding-top: 0; }
-  .escalas b { font-weight: 650; }
+  .escalas b { font-weight: 600; }
   .escalas .notas-ac { color: var(--texto); font-variant-numeric: tabular-nums; }
   .escalas .esc { color: var(--texto-3); font-size: var(--t-xs); text-align: right; }
-  .escalas.campo-tom div { grid-template-columns: 104px 1fr auto; }
+  .escalas.campo-tom div { grid-template-columns: 128px 1fr auto; }
   .escalas.campo-tom b { color: var(--texto-2); font-variant-numeric: tabular-nums; }
   .escalas.comgrau div { grid-template-columns: 66px 46px 1fr auto; }
   .escalas .grau-ac { color: var(--texto-3); font-size: var(--t-xs);
                       font-variant-numeric: tabular-nums; }
+  .escalas.cadencias div { grid-template-columns: 152px 1fr auto; }
   .escalas.cadencias b { font-variant-numeric: normal; }
   .graus { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .grau { background: var(--sup2); border: 1px solid var(--borda); border-radius: var(--r-sm);
-          padding: 2px var(--s2); min-width: 44px; text-align: center; }
-  .grau b { display: block; font-size: var(--t-sm); font-weight: 650;
+          padding: 3px var(--s2); min-width: 44px; text-align: center; }
+  .grau b { display: block; font-size: var(--t-sm); font-weight: 600;
             font-variant-numeric: tabular-nums; }
   .grau i { display: block; font-style: normal; font-size: var(--t-xs); color: var(--texto-3); }
-  .grau.fora { border-color: var(--acento); }
+  .grau.fora { border-color: var(--acento); background: var(--acento-fraco); }
   .aviso-campo { font-size: var(--t-xs); color: var(--texto-3); margin: var(--s2) 0 0; }
   .bloco > .aviso-campo:not(:last-child) { margin: -4px 0 var(--s3); }
   @media (max-width: 480px) {
     .escalas div { grid-template-columns: 52px 1fr; }
     .escalas .esc { grid-column: 2; text-align: left; }
     .escalas.comgrau div { grid-template-columns: 52px 44px 1fr; }
+    /* nome longo nao cabe em coluna estreita: vira linha propria */
+    .escalas.cadencias div, .escalas.campo-tom div { grid-template-columns: 1fr; }
+    .escalas.cadencias .esc, .escalas.campo-tom .esc { grid-column: 1; }
   }
 
   .vozes { display: flex; gap: var(--s2); margin-top: var(--s3); }
   .voz[aria-pressed="false"] { opacity: .42; }
-  .voz[aria-pressed="true"] { border-color: var(--acento); }
+  .voz[aria-pressed="true"] { border-color: var(--acento); color: var(--texto); }
   .medidor { display: flex; align-items: center; gap: var(--s3); }
   .medidor .trilho { display: block; flex: 1; height: 8px; background: var(--sup3);
+                     border: 1px solid var(--borda);
                      border-radius: 99px; overflow: hidden; }
-  .medidor .cheio { display: block; height: 100%; background: var(--acento);
+  .medidor .cheio { display: block; height: 100%;
+                    background: linear-gradient(90deg, var(--ok), var(--atencao) 55%, var(--erro));
                     border-radius: 99px; transition: width .3s ease; }
-  .medidor .valor { font-size: 1.5rem; font-weight: 680; font-variant-numeric: tabular-nums;
-                    line-height: 1; }
+  .medidor .valor { font-family: var(--fonte-exibicao); font-size: 1.9rem; font-weight: 600;
+                    font-variant-numeric: tabular-nums; line-height: 1; letter-spacing: -.02em; }
 
-  /* -------------------------------------------------------------- player */
+  /* =========================================================== player  */
   .tocador { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
   .transporte { display: flex; align-items: center; gap: var(--s1); }
   .icone {
     width: 36px; height: 36px; padding: 0; display: grid; place-items: center;
     border-radius: 50%; border: 1px solid var(--borda); background: var(--sup2);
     color: var(--texto-2); cursor: pointer; flex: none;
-    transition: background .12s ease, color .12s ease;
+    transition: background .12s ease, color .12s ease, border-color .12s ease;
   }
-  .icone:hover { background: var(--sup3); color: var(--texto); }
-  .icone.play { width: 42px; height: 42px; background: var(--acento);
-                border-color: transparent; color: var(--acento-texto); }
-  .icone.play:hover { filter: brightness(1.08); background: var(--acento); }
+  .icone:hover { background: var(--sup3); color: var(--texto); border-color: var(--borda-forte); }
+  .icone.play { width: 44px; height: 44px; border-color: transparent;
+                color: var(--acento-texto);
+                background: linear-gradient(180deg,
+                  color-mix(in oklab, var(--acento) 88%, #fff), var(--acento));
+                box-shadow: inset 0 1px 0 rgba(255,255,255,.28),
+                            0 6px 16px -8px rgba(var(--acento-rgb), .85); }
+  .icone.play:hover { filter: brightness(1.07); }
   .icone svg { display: block; }
   /* o atributo hidden do HTML nao vale dentro de SVG — tem de ser CSS */
   .icone.play .ic-pause { display: none; }
@@ -355,108 +475,139 @@
     height: 6px; border-radius: 99px; background: var(--trilho, var(--sup3)); }
   .linha::-webkit-slider-thumb {
     -webkit-appearance: none; width: 14px; height: 14px; margin-top: -4px;
-    border-radius: 50%; background: var(--acento); border: 0; }
+    border-radius: 50%; background: var(--acento); border: 0;
+    box-shadow: 0 0 0 3px rgba(var(--acento-rgb), .2); }
   .linha::-moz-range-thumb {
-    width: 14px; height: 14px; border-radius: 50%; background: var(--acento); border: 0; }
+    width: 14px; height: 14px; border-radius: 50%; background: var(--acento); border: 0;
+    box-shadow: 0 0 0 3px rgba(var(--acento-rgb), .2); }
   .and { display: flex; align-items: center; gap: var(--s2); margin-top: var(--s3);
          font-size: var(--t-xs); color: var(--texto-3); }
   .and input[type=range] { width: 108px; accent-color: var(--acento); }
   .and .bpm { font-variant-numeric: tabular-nums; min-width: 4.4em; }
 
-  /* ------------------------------------------------------------------ editor
-     A previa vem SEM os nomes e os nomes sao um SVG por cima, em unidades de PONTO da
-     pagina. Assim o overlay escala junto com a imagem sem nenhuma conta de zoom, e cada
-     nome e um alvo de clique de verdade. */
-  /* o .corpo e um grid: sem isso o palco e a dica virariam duas COLUNAS e a partitura
-     encolhia para caber ao lado da legenda */
+  /* =========================================================== editor
+     A previa vem SEM os nomes e os nomes sao um SVG por cima, em unidades de
+     PONTO da pagina. Assim o overlay escala junto com a imagem sem nenhuma
+     conta de zoom, e cada nome e um alvo de clique de verdade. */
+  /* o .corpo e um grid: sem isso o palco e a dica virariam duas COLUNAS e a
+     partitura encolhia para caber ao lado da legenda */
   .palco, .dica-editor, .barra-previa { grid-column: 1 / -1; }
 
-  /* A pagina tem 760px para o texto ficar legivel, mas o RESULTADO quer todo o espaco que
-     houver: a lista de cartoes escapa do container e se centra numa faixa mais larga. E o
-     cartao inteiro que se alarga, e nao um filho dele — filho vazando e recortado pelo
-     cartao e ainda cria rolagem horizontal. */
+  /* A pagina tem 820px para o texto ficar legivel, mas o RESULTADO quer todo
+     o espaco que houver: a lista de cartoes escapa do container e se centra
+     numa faixa mais larga. E o cartao inteiro que se alarga, e nao um filho
+     dele — filho vazando e recortado pelo cartao e ainda cria rolagem. */
   #lista.largo { width: min(1320px, calc(100vw - 2.5rem));
                  margin-left: 50%; transform: translateX(-50%); }
-  /* abaixo disso a faixa larga sairia MENOR que a coluna normal: nao alarga nada */
-  @media (max-width: 860px) {
+  /* abaixo disso a faixa larga sairia MENOR que a coluna normal */
+  @media (max-width: 900px) {
     #lista.largo { width: auto; margin-left: 0; transform: none; }
   }
 
-
   .palco { position: relative; display: block; border-radius: var(--r-md);
-           overflow: hidden; box-shadow: var(--sombra); }
+           overflow: hidden; box-shadow: var(--sombra-3);
+           outline: 1px solid var(--borda); }
   .palco > img { display: block; width: 100%; height: auto; border: 0; border-radius: 0; }
   .palco svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 
   .barra-previa { display: flex; align-items: center; gap: var(--s3);
-                  margin-bottom: var(--s2); }
-  .barra-previa .rot { font-size: var(--t-sm); font-weight: 600; color: var(--texto-2);
-                       letter-spacing: .02em; }
+                  flex-wrap: wrap; margin-bottom: var(--s2); }
+  .barra-previa .rot { font-size: 11px; font-weight: 600; color: var(--texto-3);
+                       text-transform: uppercase; letter-spacing: .09em; }
   .barra-previa .esticar { margin-left: auto; }
   .paginacao { display: flex; align-items: center; gap: var(--s2);
                font-size: var(--t-sm); font-weight: 600; color: var(--texto); }
   .paginacao button { width: 44px; height: 44px; padding: 0; display: grid;
                       place-items: center; font-size: 1.5rem; line-height: 1;
-                      border-radius: var(--r-md); border-color: var(--borda-forte);
-                      color: var(--texto); }
+                      border-radius: var(--r-md); border: 1px solid var(--borda-forte);
+                      background: var(--sup2); color: var(--texto); cursor: pointer; }
   .paginacao button:hover:not([disabled]) { background: var(--acento-fraco);
                                             border-color: var(--acento); }
   .paginacao [data-conta] { min-width: 8.5ch; text-align: center;
                             font-variant-numeric: tabular-nums; }
   .paginacao button[disabled] { opacity: .3; cursor: default; }
-  .btn-mini { padding: .3rem .6rem; font-size: var(--t-xs); border-radius: var(--r-sm);
-              background: var(--sup2); color: var(--texto-2);
-              border: 1px solid var(--borda); cursor: pointer; }
-  .btn-mini:hover { background: var(--sup3); color: var(--texto); }
+  .btn-mini { padding: .35rem .7rem; font: inherit; font-size: var(--t-xs); font-weight: 600;
+              border-radius: 999px; background: var(--sup2); color: var(--texto-2);
+              border: 1px solid var(--borda); cursor: pointer;
+              transition: background .12s ease, color .12s ease, border-color .12s ease; }
+  .btn-mini:hover { background: var(--sup3); color: var(--texto); border-color: var(--borda-forte); }
 
-  /* Ampliado maximiza a LARGURA e rola na vertical. Limitar pela altura da tela era pior
-     que nao ampliar: a pagina e retrato, a tela e paisagem, e a partitura saia mais estreita
-     do que no tamanho normal. O palco encolhe para o tamanho da imagem e o SVG, que e 100%
-     do palco, acompanha sem conta extra. */
+  /* Ampliado maximiza a LARGURA e rola na vertical. Limitar pela altura da
+     tela era pior que nao ampliar: a pagina e retrato, a tela e paisagem, e a
+     partitura saia mais estreita do que no tamanho normal. */
   .lupa { position: fixed; inset: 0; z-index: 60; display: grid; justify-items: center;
           align-items: start; padding: var(--s2) var(--s2) var(--s7);
           overflow: auto; background: var(--bg); }
   .lupa .palco { width: fit-content; max-width: none; border-radius: var(--r-sm); }
   .lupa .palco > img { width: min(1900px, calc(100vw - 2 * var(--s2))); height: auto; }
   .lupa-fechar { position: fixed; top: var(--s3); right: var(--s3); z-index: 61; }
-  /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema escuro
-     herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o que o PDF estampa,
-     entao o overlay mostra o resultado de verdade. */
+  /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema
+     escuro herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o
+     que o PDF estampa, entao o overlay mostra o resultado de verdade. */
   .palco svg text { fill: #111; font-family: Helvetica, Arial, sans-serif;
                     pointer-events: none; }
-  /* ALVO DE TOQUE: o nome tem ~8pt de altura, alvo pequeno demais para o dedo. Quem recebe
-     o clique e um retangulo invisivel bem maior em volta; o texto fica so como desenho. */
+  /* ALVO DE TOQUE: o nome tem ~8pt de altura, alvo pequeno demais para o dedo.
+     Quem recebe o clique e um retangulo invisivel bem maior em volta. */
   .palco svg .toque { fill: transparent; cursor: pointer; }
-  .palco svg .toque:hover + text { fill: #4f46e5; }
-  .palco svg g.sel text { fill: #4f46e5; font-weight: 700; }
-  .palco svg g.sel .toque { fill: rgba(79,70,229,.12); }
+  .palco svg .toque:hover + text { fill: #3253c4; }
+  .palco svg g.sel text { fill: #3253c4; font-weight: 700; }
+  .palco svg g.sel .toque { fill: rgba(50,83,196,.12); }
   .palco.pondo { cursor: crosshair; }
+
+  /* ================================================== seguidor de execucao
+     A barra que anda por cima da partitura enquanto a musica toca. Mora num SVG
+     PROPRIO, irmao do svg do editor, por duas razoes: `redesenhar()` esvazia o svg do
+     editor inteiro e levaria a barra junto, e sem `pointer-events: none` a camada de
+     cima roubaria todo clique de corrigir nome.
+     LARANJA fixo, pelo mesmo motivo do preto dos nomes: o fundo aqui e a partitura
+     branca, entao a cor tem de contrastar com o PAPEL, nao com o tema da pagina. */
+  .palco svg.seguidor { pointer-events: none; }
+  .seguidor .agulha { stroke: #f76707; stroke-width: 2; stroke-linecap: round;
+                      opacity: .88; }
+
+  /* Transporte preso na base da tela. A partitura fica no alto da pagina e o player la
+     embaixo, no bloco de analise: sem isto nao da para ver a barra andando e apertar
+     play ao mesmo tempo. z-index acima da lupa (60), para valer tambem no ampliado. */
+  .rodape-toca { position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+                 display: flex; align-items: center; gap: var(--s3);
+                 padding: var(--s2) var(--s4);
+                 padding-bottom: calc(var(--s2) + env(safe-area-inset-bottom, 0px));
+                 background: var(--sup); border-top: 1px solid var(--borda);
+                 box-shadow: 0 -10px 30px -14px rgba(0,0,0,.5); }
+  .rodape-toca .linha { flex: 1 1 auto; }
+  .rodape-toca .sai-rodape { flex: none; }
+  @media (max-width: 480px) {
+    .rodape-toca { gap: var(--s2); padding-left: var(--s3); padding-right: var(--s3); }
+    .rodape-toca .fim { display: none; }
+  }
   .paleta { position: absolute; z-index: 6; display: flex; flex-wrap: wrap; gap: 3px;
-            width: 13rem; padding: 4px; border-radius: var(--r-sm);
-            background: var(--sup1); border: 1px solid var(--borda);
-            box-shadow: 0 6px 18px rgba(0,0,0,.28); }
-  .paleta button { padding: .18rem .38rem; font-size: var(--t-xs); line-height: 1.1;
+            width: 13rem; padding: var(--s1); border-radius: var(--r-sm);
+            background: var(--sup); border: 1px solid var(--borda-forte);
+            box-shadow: var(--sombra-3); }
+  .paleta button { padding: .2rem .4rem; font: inherit; font-size: var(--t-xs); line-height: 1.1;
                    min-width: 1.7rem; border-radius: 6px; cursor: pointer;
                    background: var(--sup2); color: var(--texto);
                    border: 1px solid var(--borda); }
-  .paleta button:hover { background: var(--acento); color: var(--acento-texto); }
+  .paleta button:hover { background: var(--acento); color: var(--acento-texto);
+                         border-color: var(--acento); }
   .paleta .acc { font-weight: 700; }
   .paleta .zap { margin-left: auto; color: var(--erro); }
-  .campo { position: absolute; z-index: 5; width: 5.2rem; padding: .2rem .35rem;
-           font: inherit; font-size: var(--t--1); text-align: center;
-           background: var(--sup1); color: var(--texto);
-           border: 1px solid var(--acento); border-radius: var(--r-sm); }
+  .campo { position: absolute; z-index: 5; width: 5.2rem; padding: .25rem .35rem;
+           font: inherit; font-size: var(--t-xs); text-align: center;
+           background: var(--sup); color: var(--texto);
+           border: 1px solid var(--acento); border-radius: var(--r-sm);
+           box-shadow: 0 0 0 3px rgba(var(--acento-rgb), .18); }
   .dica-editor { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center;
-                 margin-top: var(--s3); font-size: var(--t--1); color: var(--texto-2); }
-  .dica-editor .chip { padding: .12rem .45rem; border: 1px solid var(--borda);
-                       border-radius: 999px; }
+                 margin-top: var(--s3); font-size: var(--t-xs); color: var(--texto-3); }
+  .dica-editor .chip { padding: .15rem .5rem; border: 1px solid var(--borda);
+                       border-radius: 999px; background: var(--sup2); color: var(--texto-2); }
   .previa img { width: 100%; border: 1px solid var(--borda); border-radius: var(--r-sm);
                 background: #fff; display: block; }
   .previa { padding: 0 var(--s5) var(--s5); }
 
-  /* ---------------------------------------------------------------- dicas
+  /* ============================================================ dicas
      Um balao so, position:fixed e preso no body. Dentro do cartao ele seria
-     cortado pelo overflow:hidden, e mexer no z-index nao resolveria isso. */
+     cortado pelo overflow:hidden, e z-index nao resolveria isso. */
   .tem-dica { cursor: help; }
   .bloco h3.tem-dica, .tem-dica dt {
     text-decoration: underline dotted; text-decoration-color: var(--borda-forte);
@@ -466,10 +617,10 @@
   .dica {
     position: fixed; z-index: 90; left: 0; top: 0;
     max-width: min(330px, calc(100vw - 24px));
-    background: var(--sup3); color: var(--texto);
+    background: var(--sup2); color: var(--texto);
     border: 1px solid var(--borda-forte); border-radius: var(--r-md);
     padding: var(--s3) var(--s4); font-size: var(--t-sm); line-height: 1.45;
-    box-shadow: 0 8px 28px rgba(0,0,0,.22);
+    box-shadow: var(--sombra-3);
     opacity: 0; visibility: hidden; transform: translateY(3px);
     transition: opacity .12s ease, transform .12s ease, visibility .12s;
     pointer-events: none;
@@ -479,10 +630,12 @@
   .dica p:last-child, .dica ul:last-child { margin-bottom: 0; }
   .dica ul { margin: 0 0 var(--s2); padding-left: 1.05em; }
   .dica li { margin-bottom: 2px; }
-  .dica b { font-weight: 650; }
+  .dica b { font-weight: 600; color: var(--texto); }
 
-  /* --------------------------------------------------------------- fim   */
+  /* ============================================================== fim   */
   .nota-rodape { margin-top: var(--s6); color: var(--texto-3); font-size: var(--t-sm); }
+  .cartao > .nota-rodape { margin: 0; padding: var(--s3) var(--s5) var(--s4);
+                           background: var(--bg); }
   footer { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--borda);
            color: var(--texto-3); font-size: var(--t-sm); }
   footer a { color: var(--acento); }
@@ -490,8 +643,9 @@
     .pagina { padding: var(--s5) var(--s4) 72px; }
     :root { --t-xl: 1.75rem; }
     .topo { flex-wrap: wrap; padding: var(--s4); }
-    .topo .btn { width: 100%; text-align: center; }
+    .topo .btn { width: 100%; }
     .corpo, .tit-analise, .previa { padding-left: var(--s4); padding-right: var(--s4); }
+    #zona { padding: var(--s6) var(--s4); }
   }
 </style>
 <script>
@@ -519,16 +673,17 @@
 <div class="pagina">
   <header>
     <h1 class="marca">
-      <svg width="54" height="39" viewBox="0 0 26 19" aria-hidden="true">
-        <g stroke="currentColor" stroke-width="1" opacity=".5" fill="none">
+      <svg width="52" height="38" viewBox="0 0 26 19" aria-hidden="true">
+        <g stroke="currentColor" stroke-width=".9" opacity=".38" fill="none">
           <path d="M0 2.5h26M0 6.5h26M0 10.5h26M0 14.5h26M0 18.5h26"/>
         </g>
         <ellipse cx="8" cy="12.5" rx="4.1" ry="3" fill="currentColor" transform="rotate(-18 8 12.5)"/>
         <path d="M11.9 12V3" stroke="currentColor" stroke-width="1.5" fill="none"/>
       </svg>
-      Muse Pobre
+      Partitura <em>Inteligente</em>
     </h1>
-    <p class="sub-app">Notas anotadas na sua partitura</p>
+    <p class="sub-app">O nome de cada nota escrito embaixo da pauta, no seu próprio PDF — e a
+      leitura da música junto: tom, harmonia, ritmo e o quanto ela pesa no sax alto.</p>
     <p class="beta">Funciona bem com <b>PDF</b>. Com <b>print de tela</b> também funciona,
       mas ainda em <b>beta</b>.</p>
   </header>
@@ -566,9 +721,17 @@
   <div id="lista"></div>
 
   <p class="nota-rodape" id="dica-formatos">
+    Vale qualquer <b>PDF gerado por computador</b> — MuseScore, Sibelius, Finale, Dorico.
+    Partitura <b>escaneada</b> não dá: sem vetor não existe coordenada para ler a altura
+    da nota.
   </p>
 
   <footer>
+    <p>Tudo acontece <b>dentro do seu navegador</b>: o arquivo não sobe para servidor
+      nenhum. O PDF que volta é o original com uma camada de texto por cima — o desenho
+      do arranjador fica intacto.</p>
+    <p style="margin:0"><a href="https://github.com/Manuelstv/anotar-partitura">Código no
+      GitHub</a></p>
   </footer>
 </div>
 
@@ -649,7 +812,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=30";
+const V = "?v=31";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -863,9 +1026,9 @@ function cortarSaida() {
   saidaAudio.connect(ctxAudio.destination);
 }
 
-function montarTocador(melodia, acomp) {
+function montarTocador(melodia, acomp, ctx) {
   const b = document.createElement("div");
-  b.className = "bloco larga";
+  b.className = "bloco larga acc-violeta";
   const ico = (d, extra = "") => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none"
       stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
       aria-hidden="true">${d}</svg>${extra}`;
@@ -910,9 +1073,59 @@ function montarTocador(melodia, acomp) {
   const total = Math.max(melodia.total, melodia.notas[melodia.notas.length - 1].t + 1);
   linha.max = total;
 
+  // ---- espelho do transporte, preso na base da tela. NAO e um segundo player: os botoes
+  // chamam as mesmas funcoes e o estado (`pos`, `tocando`) continua sendo um so — o que
+  // existe em dobro e a vitrine, nao o relogio.
+  const rodape = document.createElement("div");
+  rodape.className = "rodape-toca";
+  rodape.hidden = true;
+  rodape.innerHTML = `
+    <button type="button" class="icone play" aria-label="Tocar">
+      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+        <polygon class="ic-play" points="7 4 20 12 7 20" fill="currentColor"/>
+        <g class="ic-pause" fill="currentColor"><rect x="7" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></g>
+      </svg>
+    </button>
+    <span class="relogio agora">0:00</span>
+    <input type="range" class="linha" min="0" step="0.01" value="0" aria-label="Posição na música">
+    <span class="relogio fim">0:00</span>
+    <button type="button" class="btn-mini sai-rodape">Esconder</button>`;
+  document.body.append(rodape);
+  const linhaR = rodape.querySelector(".linha");
+  linhaR.max = total;
+  const espelhos = [
+    { linha, bt, agora: relAgora, fim: relFim },
+    { linha: linhaR, bt: rodape.querySelector(".play"),
+      agora: rodape.querySelector(".agora"), fim: rodape.querySelector(".fim") },
+  ];
+
+  // ---- onde a barra fica, em funcao do tempo. Dentro de uma pauta e interpolacao pura
+  // entre a nota que acabou de soar e a proxima. Na ULTIMA nota da pauta a barra espera
+  // ali parada: onde a pauta termina nao e uma coordenada que eu tenha — `pautas()` da a
+  // altura das cinco linhas, nao o comprimento delas.
+  const pautas = new Map();
+  (melodia.sistemas || []).forEach(s => pautas.set(s.pg + ":" + s.sl, s));
+
+  function ondeEstou(p) {
+    const n = melodia.notas;
+    if (!pautas.size || p < n[0].t) return null;
+    let lo = 0, hi = n.length - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (n[m].t <= p) lo = m; else hi = m - 1; }
+    const a = n[lo], b = n[lo + 1];
+    const s = pautas.get(a.pg + ":" + a.sl);
+    if (!s) return null;
+    let x = a.x;
+    if (b && b.pg === a.pg && b.sl === a.sl && b.t > a.t)
+      x = a.x + (b.x - a.x) * Math.min(1, (p - a.t) / (b.t - a.t));
+    return { pg: a.pg, sl: a.sl, x, topo: s.topo, base: s.base };
+  }
+
   // A posicao e guardada em TEMPOS, nao em segundos: mudar o andamento no meio nao
   // pode fazer o cursor pular de lugar na musica.
-  let pos = 0, tocando = false, arrastando = false, relogio = null, i = 0, j = 0, ancora = 0;
+  // `arrastando` guarda QUAL das duas linhas o dedo esta segurando (e nao so um sim/nao):
+  // e o que permite a outra continuar acompanhando enquanto esta e arrastada
+  let pos = 0, tocando = false, arrastando = null, relogio = null, i = 0, j = 0, ancora = 0;
+  let seguindo = false;
   const harm = temHarm ? acomp : [];
   const ligado = { mel: true, harm: temHarm };
   const seg = () => 60 / Number(faixaBpm.value);
@@ -920,12 +1133,16 @@ function montarTocador(melodia, acomp) {
     `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`);
 
   function pintar() {
-    if (!arrastando) linha.value = pos;
     const pct = 100 * pos / total;
-    linha.style.setProperty("--trilho",
-      `linear-gradient(to right, var(--acento) ${pct}%, var(--sup3) ${pct}%)`);
-    relAgora.textContent = mmss(pos * seg());
-    relFim.textContent = mmss(total * seg());
+    const trilho = `linear-gradient(to right, var(--acento) ${pct}%, var(--sup3) ${pct}%)`;
+    const agora = mmss(pos * seg()), fim = mmss(total * seg());
+    for (const e of espelhos) {
+      if (e.linha !== arrastando) e.linha.value = pos;
+      e.linha.style.setProperty("--trilho", trilho);
+      e.agora.textContent = agora;
+      e.fim.textContent = fim;
+    }
+    if (seguindo && ctx?.seguir) ctx.seguir(ondeEstou(pos));
   }
 
   function ancorar() {            // recalcula o zero do relogio para a posicao atual
@@ -956,8 +1173,10 @@ function montarTocador(melodia, acomp) {
   }
 
   const icone = (parado) => {
-    bt.classList.toggle("rodando", !parado);
-    bt.setAttribute("aria-label", parado ? "Tocar" : "Pausar");
+    for (const e of espelhos) {
+      e.bt.classList.toggle("rodando", !parado);
+      e.bt.setAttribute("aria-label", parado ? "Tocar" : "Pausar");
+    }
   };
 
   function parar() {
@@ -973,6 +1192,10 @@ function montarTocador(melodia, acomp) {
     c.resume();
     if (pos >= total - 0.01) pos = 0;
     tocando = true;
+    seguindo = !!ctx?.seguir;
+    // um rodape de cada vez: com varios arquivos na fila, todos teriam criado o seu e
+    // eles se empilhariam na base da tela
+    document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
     ancorar();
     icone(false);
     clearInterval(relogio);
@@ -992,23 +1215,28 @@ function montarTocador(melodia, acomp) {
     if (tocando) { cortarSaida(); ancorar(); }   // corta o que ja estava agendado
   }));
 
-  bt.onclick = () => (tocando ? parar() : tocar());
+  espelhos.forEach(e => { e.bt.onclick = () => (tocando ? parar() : tocar()); });
   b.querySelector(".atras").onclick = () => buscar(pos - 5 / seg());
   b.querySelector(".frente").onclick = () => buscar(pos + 5 / seg());
+  // Esconder e so tirar a faixa da frente — a musica segue tocando, que e o que se quer
+  // ao querer a tela inteira para a partitura
+  rodape.querySelector(".sai-rodape").onclick = () => { rodape.hidden = true; };
 
-  linha.addEventListener("pointerdown", () => { arrastando = true; cortarSaida(); });
-  linha.addEventListener("input", () => {
-    pos = Number(linha.value);
-    pintar();
-    if (!arrastando && tocando) ancorar();     // seta do teclado: sem pointerdown
-  });
   const soltar = () => {
     if (!arrastando) return;
-    arrastando = false;
+    arrastando = null;
     if (tocando) ancorar();
   };
-  linha.addEventListener("pointerup", soltar);
-  linha.addEventListener("pointercancel", soltar);
+  espelhos.forEach(e => {
+    e.linha.addEventListener("pointerdown", () => { arrastando = e.linha; cortarSaida(); });
+    e.linha.addEventListener("input", () => {
+      pos = Number(e.linha.value);
+      pintar();
+      if (!arrastando && tocando) ancorar();   // seta do teclado: sem pointerdown
+    });
+    e.linha.addEventListener("pointerup", soltar);
+    e.linha.addEventListener("pointercancel", soltar);
+  });
 
   faixaBpm.addEventListener("input", () => {
     rotBpm.textContent = faixaBpm.value + " BPM";
@@ -1020,7 +1248,7 @@ function montarTocador(melodia, acomp) {
   return b;
 }
 
-function montarAnalise(info, dificuldade) {
+function montarAnalise(info, dificuldade, ctx) {
   const d = document.createElement("section");
   d.className = "analise aberta";
   d.innerHTML = `<h2 class="tit-analise">Análise da música</h2><div class="corpo"></div>`;
@@ -1077,11 +1305,11 @@ function montarAnalise(info, dificuldade) {
   }
   corpo.append(fatos);
   if (info.melodia?.notas?.length)
-    corpo.append(montarTocador(info.melodia, info.acompanhamento));
+    corpo.append(montarTocador(info.melodia, info.acompanhamento, ctx));
 
   if (dificuldade != null) {
     const b = document.createElement("div");
-    b.className = "bloco";
+    b.className = "bloco acc-ambar";
     b.innerHTML = `<h3>Dificuldade no sax alto</h3>
       <div class="medidor"><span class="valor"></span>
       <span class="trilho"><span class="cheio"></span></span>
@@ -1107,7 +1335,7 @@ function montarAnalise(info, dificuldade) {
 
   if (info.mais_tocadas?.length) {
     const b = document.createElement("div");
-    b.className = "bloco";
+    b.className = "bloco acc-ciano";
     b.innerHTML = `<h3>Notas mais tocadas</h3><div class="fichas"></div>`;
     comDica(b.querySelector("h3"), "As que mais aparecem na música. Costumam ser bons "
       + "pontos de apoio para começar e terminar frases.");
@@ -1119,7 +1347,7 @@ function montarAnalise(info, dificuldade) {
   // para bater o olho e a lista logo abaixo para ver de que notas cada uma e feita.
   if (info.cifras?.length) {
     const b = document.createElement("div");
-    b.className = "bloco";
+    b.className = "bloco acc-azul";
     b.innerHTML = `<h3>Acordes da música</h3><div class="fichas"></div>
       <div class="escalas comgrau"></div>`;
     comDica(b.querySelector("h3"), "Os acordes que o arranjador escreveu acima da pauta, "
@@ -1144,7 +1372,7 @@ function montarAnalise(info, dificuldade) {
   // tres acordes separados, ver que os tres sao um ii-V-I e que uma escala cobre todos.
   if (info.cadencias?.length || info.blues) {
     const b = document.createElement("div");
-    b.className = "bloco larga";
+    b.className = "bloco larga acc-rosa";
     b.innerHTML = `<h3>O que a harmonia está fazendo</h3>
       <p class="aviso-campo"></p><div class="escalas cadencias"></div>`;
     comDica(b.querySelector("h3"), trecho(`
@@ -1171,7 +1399,7 @@ function montarAnalise(info, dificuldade) {
   // A sequencia em GRAUS: e a musica sem o tom, que e como ela se guarda de cabeca
   if (info.funcional?.length > 1) {
     const b = document.createElement("div");
-    b.className = "bloco larga";
+    b.className = "bloco larga acc-rosa";
     b.innerHTML = `<h3>A sequência em graus</h3><div class="graus"></div>`;
     comDica(b.querySelector("h3"), "A mesma progressão escrita em números romanos, sem o "
       + "tom. É assim que se decora uma música e se transporta na hora: o ouvido guarda "
@@ -1190,7 +1418,7 @@ function montarAnalise(info, dificuldade) {
 
   if (info.campo?.length) {
     const b = document.createElement("div");
-    b.className = "bloco";
+    b.className = "bloco acc-azul";
     const semCifra = !info.cifras?.length;
     b.innerHTML = `<h3></h3>
       <p class="aviso-campo"></p><div class="escalas campo-tom"></div>`;
@@ -1224,7 +1452,7 @@ function montarAnalise(info, dificuldade) {
   if (info.real) {
     const reg = info.registro || {};
     const b = document.createElement("div");
-    b.className = "bloco";
+    b.className = "bloco acc-verde";
     b.innerHTML = `<h3>No sax alto</h3><div class="fichas"></div>
       <p class="aviso-campo"></p>`;
     comDica(b.querySelector("h3"), trecho(`
@@ -1390,7 +1618,16 @@ function montarEditor(cartao, ctx) {
   trocarImg(ctx.previa);
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", `0 0 ${pg.largura} ${pg.altura}`);
-  palco.append(img, svg);
+  // camada SEPARADA para a barra de execucao — o porque esta no CSS de .seguidor
+  const svgSeg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svgSeg.setAttribute("class", "seguidor");
+  svgSeg.setAttribute("viewBox", `0 0 ${pg.largura} ${pg.altura}`);
+  svgSeg.style.display = "none";
+  const agulha = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  agulha.setAttribute("class", "agulha");
+  svgSeg.append(agulha);
+  palco.append(img, svg, svgSeg);
+  let alturaPg = pg.altura;
 
   // so a 1a pagina e editavel (e a unica com previa); as outras seguem como foram lidas
   ctx.rotulos = ctx.rel.rotulos.map(r => ({ ...r }));
@@ -1558,6 +1795,8 @@ function montarEditor(cartao, ctx) {
     ctx.pagina = m.pagina;
     trocarImg(png);
     svg.setAttribute("viewBox", `0 0 ${m.largura} ${m.altura}`);
+    svgSeg.setAttribute("viewBox", `0 0 ${m.largura} ${m.altura}`);
+    alturaPg = m.altura;
     atualizarPag();
     redesenhar();
   };
@@ -1573,6 +1812,44 @@ function montarEditor(cartao, ctx) {
     btAnt.addEventListener("click", () => irPara(ctx.pagina - 1));
     btProx.addEventListener("click", () => irPara(ctx.pagina + 1));
   }
+
+  // ---- barra de execucao. O tocador manda a posicao ja resolvida (pagina, pauta e x em
+  // PONTOS da pagina) e aqui so se desenha. Virar a pagina e assunto DAQUI: quem toca a
+  // musica nao sabe que existe paginacao.
+  // Rolar so na TROCA de pauta, nunca a cada quadro: rolagem continua briga com o dedo de
+  // quem esta tentando olhar outro trecho. E nao rola nada se a pagina ja cabe na tela.
+  const rolarAte = (y) => {
+    const r = palco.getBoundingClientRect();
+    if (!r.height) return;
+    const caixa = palco.closest(".lupa");          // ampliado rola a si mesmo, nao a janela
+    const janela = caixa ? caixa.clientHeight : window.innerHeight;
+    if (r.height <= janela * 0.9) return;
+    const desvio = r.top + (y / alturaPg) * r.height - janela * 0.34;
+    (caixa || window).scrollBy({ top: desvio, behavior: "smooth" });
+  };
+
+  let virando = false, ultimaPauta = null;
+  ctx.seguir = (p) => {
+    if (!p) { svgSeg.style.display = "none"; ultimaPauta = null; return; }
+    if (p.pg !== ctx.pagina) {
+      // rasterizar a pagina custa uma fracao de segundo em Python: sem esta trava os
+      // pedidos de 25 em 25 ms se empilhariam durante a virada
+      if (!virando && ctx.py) {
+        virando = true;
+        Promise.resolve(irPara(p.pg)).finally(() => { virando = false; });
+      }
+      return;
+    }
+    svgSeg.style.display = "";
+    const vao = Math.max(1, p.base - p.topo);
+    agulha.setAttribute("x1", p.x);
+    agulha.setAttribute("x2", p.x);
+    // sobra em cima para a haste, e embaixo para a fileira de nomes
+    agulha.setAttribute("y1", p.topo - 0.8 * vao);
+    agulha.setAttribute("y2", p.base + 1.6 * vao);
+    const qual = p.pg + ":" + p.sl;
+    if (qual !== ultimaPauta) { ultimaPauta = qual; rolarAte((p.topo + p.base) / 2); }
+  };
 
   // AMPLIAR: move o proprio palco para um overlay em tela cheia e devolve no fim. Mover um
   // no no DOM preserva os listeners, entao o editor continua funcionando lá dentro — nada e
@@ -1663,7 +1940,9 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
   // no editor. E por isso e um botao, e nao um link com href pronto.
   const bt = document.createElement("button");
   bt.type = "button";
-  bt.className = "btn btn-secundario";
+  // primario: e o arquivo anotado que a pessoa veio buscar. O acento da pagina
+  // e reservado para esta acao — em nenhum outro botao.
+  bt.className = "btn btn-primario";
   bt.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(bt);
 
@@ -1717,7 +1996,7 @@ function concluir(cartao, nome, previa, { rel, info, nota }, extra) {
     cartao.raiz.append(p);
   }
 
-  if (info) cartao.raiz.append(montarAnalise(info, nota));
+  if (info) cartao.raiz.append(montarAnalise(info, nota, ctx));
   if (!rel.tem_analise) {
     const p = document.createElement("p");
     p.className = "nota-rodape";
