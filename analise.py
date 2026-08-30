@@ -858,6 +858,74 @@ def forma(compassos):
     return ''.join(seq)
 
 
+# ------------------------------------------------------------------------- obra
+# Marca de andamento vira lixo no subtitulo: o glifo da seminima e da fonte musical e
+# desaparece no filtro, sobrando so o "= 128" do span de texto ao lado.
+RE_ANDAMENTO = re.compile(r'^[=\u2248~]\s*\d+$')
+
+
+def _fonte_de_musica(nome):
+    """True para fonte de simbolo musical E para fonte de cifra.
+
+    `perfil_da_fonte` devolve None de proposito para as de cifra (senao o 'b' de "Bb"
+    viraria bemol), mas titulo elas tambem nao sao: no Sibelius a cifra do primeiro
+    compasso fica ACIMA do primeiro sistema, na mesma faixa do titulo.
+    """
+    return (A.perfil_da_fonte(nome) is not None
+            or any(k in nome for k in A.FONTES_IGNORADAS))
+
+
+def _e_texto(t):
+    """Descarta glifo de fonte musical convertido: PUA nao e letra de titulo."""
+    if any(0xE000 <= ord(c) <= 0xF8FF for c in t):
+        return False
+    return any(c.isalnum() for c in t)
+
+
+def obra(pg, sistemas):
+    """Titulo, subtitulo e autor gravados no topo da primeira pagina.
+
+    Quem separa o titulo do resto e o TAMANHO da fonte, nunca a altura: no Paso Corto
+    o nome do instrumento fica mais no alto que o titulo, so que num corpo menor.
+    Autor e quem esta encostado na margem DIREITA, que e onde todo editor grava
+    compositor e arranjador.
+
+    Devolve {} quando os glifos vieram em contorno — ali nao ha texto nenhum, nem o
+    titulo.
+    """
+    # Sem pauta na pagina 1 nao quer dizer sem titulo: o cadernin e o chamaleon abrem
+    # em CAPA, e ali o titulo esta sozinho na folha.
+    teto = sistemas[0][0] if sistemas else pg.rect.height
+    larg = pg.rect.width or 1
+    itens = []
+    for b in pg.get_text("dict")["blocks"]:
+        for l in b.get("lines", []):
+            for s in l["spans"]:
+                t = " ".join(s["text"].split())
+                if not t or s["bbox"][3] > teto or RE_ANDAMENTO.match(t):
+                    continue
+                if _fonte_de_musica(s["font"]) or not _e_texto(t):
+                    continue
+                itens.append({"t": t, "tam": round(s["size"], 1),
+                              "y": s["bbox"][1], "dir": s["bbox"][2] / larg})
+    if not itens:
+        return {}
+    maior = max(i["tam"] for i in itens)
+    titulo = min((i for i in itens if i["tam"] == maior), key=lambda i: i["y"])
+    # Subtitulo e autor moram COLADOS no titulo, num bloco so. Sem esta janela, numa
+    # pagina sem pauta (capa, sumario) a varredura descia a folha inteira e o subtitulo
+    # virava a lista de cifras. Tres corpos do titulo, e nao um valor em pontos: a mesma
+    # gravacao aparece em folha de 842 e de 369 pontos no mesmo acervo.
+    perto = [i for i in itens
+             if titulo["y"] - maior <= i["y"] <= titulo["y"] + 3 * maior and i is not titulo]
+    perto.sort(key=lambda i: i["y"])
+    sub = [i["t"] for i in perto if i["dir"] < 0.72]
+    autor = [i["t"] for i in perto if i["dir"] >= 0.72]
+    return {"titulo": titulo["t"],
+            "subtitulo": " ".join(sub) or None,
+            "autor": " \u00b7 ".join(autor) or None}
+
+
 def analisar(dados, sistema="letras"):
     """Recebe bytes de PDF, devolve um dicionario de fatos medidos.
 
@@ -865,6 +933,7 @@ def analisar(dados, sistema="letras"):
     """
     doc = pymupdf.open(stream=dados, filetype="pdf")
     notas, cifras, compassos, linhas_vistas = [], [], {}, []
+    _obra = {}
 
     def caixa(ch):
         return compassos.setdefault(ch, {"notas": [], "pausas": []})
@@ -875,6 +944,8 @@ def analisar(dados, sistema="letras"):
         col = A.coletar(pg, com_ritmo=True)
         textos, horiz, formas = col[1], col[2], col[4]
         sistemas = A.pautas(horiz, pg.rect.width, pg.rect.height)
+        if pg.number == 0:
+            _obra = obra(pg, sistemas)
         rot, _, pausas = A.ler_notas(pg, "letras", com_pausas=True, dados=col)
         for r in sorted(rot, key=lambda r: (r["sistema"], r["x"])):
             notas.append(dict(r, pagina=pg.number))
@@ -987,6 +1058,7 @@ def analisar(dados, sistema="letras"):
         "tom_relativo": relativa,
         "tom_por": por,
         "armadura": arm,
+        "obra": _obra,
         "escala_do_tom": [n for n, _ in escala_tom],
         "grave": CLASSES[min(midis) % 12] + str(min(midis) // 12 - 1),
         "agudo": CLASSES[max(midis) % 12] + str(max(midis) // 12 - 1),
