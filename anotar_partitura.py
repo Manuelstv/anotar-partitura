@@ -952,11 +952,24 @@ def melodia(dados, limite=3000):
     nao vira evento, so empurra o relogio. Apojatura recebe uma duracao simbolica —
     na pratica ela rouba tempo da nota seguinte, mas para ouvir a melodia basta ser
     rapida.
+
+    Alem do tempo e da altura, cada evento leva ONDE a nota esta desenhada: `pg`
+    (pagina), `sl` (pauta dentro da pagina) e `x` (ponto). Com `sistemas`, que da o
+    topo e a base de cada pauta, isso e o bastante para acompanhar a musica com uma
+    barra por cima da partitura.
     """
     doc = fitz.open(stream=dados, filetype="pdf")
     ev, t, base = [], 0.0, 0
+    pautas_ = []
     for pg in doc:
-        rot, _, pausas = ler_notas(pg, "letras", com_pausas=True)
+        col = coletar(pg, com_ritmo=True)
+        rot, _, pausas = ler_notas(pg, "letras", com_pausas=True, dados=col)
+        # Topo e base de CADA pauta da pagina: e a altura em que a barra de reproducao
+        # do site e desenhada. O endereco e (pagina, sistema LOCAL) e nao o `s` global,
+        # porque o global pula a pauta sem nota e nao diz em que pagina a pauta esta.
+        for sidx, linhas in enumerate(pautas(col[2], pg.rect.width, pg.rect.height)):
+            pautas_.append({"pg": pg.number, "sl": sidx,
+                            "topo": round(linhas[0], 2), "base": round(linhas[-1], 2)})
         itens = [{"x": r["x"], "s": r["sistema"], "midi": r["midi"],
                   "d": 0.125 if r["graca"] else r["dur_total"]}
                  for r in rot if not r["ligada"]]
@@ -981,12 +994,13 @@ def melodia(dados, limite=3000):
                     # uma cifra, que so tem posicao na pagina, com o instante em que ela soa
                     ev.append({"t": round(t, 4), "midi": g["midi"],
                                "d": round(g["d"] or 0.25, 4),
-                               "s": base + g["s"], "x": round(g["x"], 2)})
+                               "s": base + g["s"], "x": round(g["x"], 2),
+                               "pg": pg.number, "sl": g["s"]})
             t += passo
             i = j + 1
         base += max((it["s"] for it in itens), default=-1) + 1
     doc.close()
-    return {"notas": ev, "total": round(t, 4)}
+    return {"notas": ev, "total": round(t, 4), "sistemas": pautas_}
 
 
 EXTS_IMAGEM = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic")
