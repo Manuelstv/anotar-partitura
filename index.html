@@ -605,6 +605,24 @@
                 background: #fff; display: block; }
   .previa { padding: 0 var(--s5) var(--s5); }
 
+  /* -------------------------------------------------- conversa sobre a musica */
+  .ia-fio { display: grid; gap: var(--s3); }
+  .ia-bolha { font-size: var(--t-sm); line-height: 1.55; }
+  .ia-bolha.eu { color: var(--texto-2); border-left: 2px solid var(--borda-forte);
+                 padding-left: var(--s3); }
+  .ia-bolha p { margin: 0 0 var(--s2); }
+  .ia-bolha p:last-child { margin: 0; }
+  .ia-bolha a { color: var(--acento); }
+  .ia-perg { display: flex; gap: var(--s2); margin-top: var(--s3); }
+  .ia-campo { flex: 1; min-width: 0; font: inherit; font-size: var(--t-sm);
+              padding: 9px var(--s3); border-radius: var(--r-sm);
+              background: var(--sup2); color: var(--texto); border: 1px solid var(--borda); }
+  .ia-campo::placeholder { color: var(--texto-3); }
+  .ia-campo:focus { outline: none; border-color: var(--acento);
+                    box-shadow: 0 0 0 3px rgba(var(--acento-rgb), .18); }
+  .ia-espera { font-size: var(--t-sm); color: var(--texto-3); animation: pulsa 1.2s ease-in-out infinite; }
+  .ia-erro { font-size: var(--t-sm); color: var(--erro); }
+
   /* ============================================================ dicas
      Um balao so, position:fixed e preso no body. Dentro do cartao ele seria
      cortado pelo overflow:hidden, e z-index nao resolveria isso. */
@@ -682,14 +700,12 @@
       </svg>
       Partitura <em>Inteligente</em>
     </h1>
-    <p class="sub-app">O nome de cada nota escrito embaixo da pauta, no seu próprio PDF — e a
-      leitura da música junto: tom, harmonia, ritmo e o quanto ela pesa no sax alto.</p>
-    <p class="beta">Funciona bem com <b>PDF</b>. Com <b>print de tela</b> também funciona,
-      mas ainda em <b>beta</b>.</p>
+    <p class="sub-app">O nome de cada nota embaixo da pauta, no seu próprio PDF.</p>
+    <p class="beta">print de tela ainda em <b>beta</b></p>
   </header>
 
   <section class="painel">
-    <button type="button" id="zona" aria-describedby="dica-formatos">
+    <button type="button" id="zona">
       <span class="alvo">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -697,7 +713,7 @@
         </svg>
       </span>
       <span class="titulo">Arraste PDF ou print aqui</span>
-      <span class="sub">ou toque para escolher. PDF, JPG ou PNG — pode mandar vários.</span>
+      <span class="sub">PDF, JPG ou PNG</span>
     </button>
     <input type="file" id="arquivo" accept="application/pdf,.pdf,image/*,.jpg,.jpeg,.png,.webp,.bmp,.heic"
            multiple tabindex="-1" aria-hidden="true">
@@ -720,18 +736,8 @@
 
   <div id="lista"></div>
 
-  <p class="nota-rodape" id="dica-formatos">
-    Vale qualquer <b>PDF gerado por computador</b> — MuseScore, Sibelius, Finale, Dorico.
-    Partitura <b>escaneada</b> não dá: sem vetor não existe coordenada para ler a altura
-    da nota.
-  </p>
-
   <footer>
-    <p>Tudo acontece <b>dentro do seu navegador</b>: o arquivo não sobe para servidor
-      nenhum. O PDF que volta é o original com uma camada de texto por cima — o desenho
-      do arranjador fica intacto.</p>
-    <p style="margin:0"><a href="https://github.com/Manuelstv/anotar-partitura">Código no
-      GitHub</a></p>
+    <a href="https://github.com/Manuelstv/anotar-partitura">GitHub</a>
   </footer>
 </div>
 
@@ -812,7 +818,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=31";
+const V = "?v=32";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1449,33 +1455,165 @@ function montarAnalise(info, dificuldade, ctx) {
     corpo.append(b);
   }
 
-  if (info.real) {
-    const reg = info.registro || {};
-    const b = document.createElement("div");
-    b.className = "bloco acc-verde";
-    b.innerHTML = `<h3>No sax alto</h3><div class="fichas"></div>
-      <p class="aviso-campo"></p>`;
-    comDica(b.querySelector("h3"), trecho(`
-      <p>O alto é um instrumento em <b>Mi bemol</b>: o dó que você lê sai como o mi bemol
-      de baixo, uma sexta maior abaixo. A armadura de concerto é a escrita menos três
-      bemóis, e é dela que sai o tom que a banda usa.</p>
-      <p>As contagens embaixo são de dedilhado, não de leitura: da chave de palma para cima
-      a mão esquerda muda de posição, e o altíssimo passa do registro normal do
-      instrumento.</p>`));
-    const fs = b.querySelector(".fichas");
-    fs.append(ficha(`soa em ${info.real.tom}`));
-    fs.append(ficha(`${info.real.grave}–${info.real.agudo} de verdade`));
-    if (reg.palma) fs.append(ficha(`${reg.palma} notas de chave de palma`));
-    if (reg.altissimo) fs.append(ficha(`${reg.altissimo} no altíssimo`));
-    if (reg.mesa) fs.append(ficha(`${reg.mesa} no grave de mindinho`));
-    const fora = (info.fora_do_tom || []).map(([n, q]) => `${n} ${q}×`).join("  ·  ");
-    b.querySelector(".aviso-campo").textContent = fora
-      ? "Notas de fora do tom (é aqui que mora o cromatismo): " + fora
-      : "A música fica inteira dentro do tom.";
-    corpo.append(b);
-  }
+  // ------------------------------------------------------------- sobre a musica
+  // O nome da obra sai do PDF (analise.obra), nao do nome do arquivo. Sem nome nao ha
+  // o que perguntar — e o caso do cadernin, que vem com os glifos em contorno e nao
+  // tem texto nenhum —, entao o cartao simplesmente nao aparece.
+  if (info.obra?.titulo) corpo.append(montarSobre(info));
 
   return d;
+}
+
+// ---------------------------------------------------------------- DeepSeek
+// COLE SUA CHAVE AQUI para o cartao funcionar para qualquer visitante. Ela fica
+// VISIVEL no codigo do site — quem abrir "ver codigo-fonte" le e pode gastar a cota.
+// Deixando vazia, cada pessoa cola a dela, que fica so no navegador dela.
+const CHAVE_DEEPSEEK = "";
+
+const IA_URL = "https://api.deepseek.com/chat/completions";
+const IA_MODELO = "deepseek-chat";
+const IA_LIMITE_MSG = 500;
+const IA_LIMITE_HIST = 12;
+// 429/503 no DeepSeek costumam ser pico de carga, nao erro de verdade: vale uma segunda
+// tentativa antes de mostrar erro para quem so queria saber da musica.
+const IA_RETENTAVEIS = new Set([429, 503]);
+
+const chaveIA = () => CHAVE_DEEPSEEK || (() => {
+  try { return localStorage.getItem("chave_deepseek") || ""; } catch (e) { return ""; }
+})();
+
+async function falarComIA(mensagens) {
+  const chave = chaveIA();
+  if (!chave) throw new Error("sem chave");
+  const corpo = JSON.stringify({ model: IA_MODELO, messages: mensagens, stream: false });
+  const chamar = () => fetch(IA_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${chave}` },
+    body: corpo,
+  });
+  let r = await chamar();
+  if (!r.ok && IA_RETENTAVEIS.has(r.status)) {
+    await new Promise(ok => setTimeout(ok, 1500));
+    r = await chamar();
+  }
+  if (!r.ok) {
+    const detalhe = await r.text().catch(() => "");
+    throw new Error(r.status === 401 ? "a chave não foi aceita"
+                                     : `o DeepSeek respondeu ${r.status}. ${detalhe.slice(0, 120)}`);
+  }
+  const dados = await r.json();
+  const txt = (dados.choices?.[0]?.message?.content || "").trim();
+  if (!txt) throw new Error("veio resposta vazia");
+  return txt;
+}
+
+// Markdown leve -> HTML. Escapa PRIMEIRO e so entao insere tag, entao nada que vem da
+// rede vira marcacao. A alternacao numa regex so importa: o link markdown e tentado
+// antes da URL solta, senao a URL de dentro do [texto](url) seria linkada duas vezes.
+const IA_MD = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>()]+)|\*\*([^*\n]+)\*\*|\*([^*\n]+)\*/g;
+
+function formatarIA(texto) {
+  const esc = texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const a = (url, rot) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${rot}</a>`;
+  const corpo = esc.replace(IA_MD, (m, rot, u1, u2, forte, ital) =>
+    u1 ? a(u1, rot) : u2 ? a(u2, u2) : forte ? `<strong>${forte}</strong>` : `<em>${ital}</em>`);
+  return "<p>" + corpo.replace(/\n{2,}/g, "</p><p>").replace(/\n/g, "<br>") + "</p>";
+}
+
+const IA_PERSONA =
+  "Voce conhece musica popular, jazz e a historia das gravacoes. Responda em portugues do "
+  + "Brasil, sem saudacao e sem introducao. Se nao reconhecer a musica pelo nome, diga isso "
+  + "em uma frase em vez de inventar fato, gravacao ou data.";
+
+const IA_PRIMEIRA =
+  "Escreva UM paragrafo de 4 a 6 frases sobre esta musica: de onde ela vem, quem gravou, e "
+  + "um ou dois fatos curiosos CONCRETOS (nome, ano, episodio) — nada de generalidade. "
+  + "Depois do paragrafo, liste 2 ou 3 links em markdown [texto](url) para ouvir ou ler mais.";
+
+function montarSobre(info) {
+  const o = info.obra;
+  const b = document.createElement("div");
+  b.className = "bloco larga acc-rosa";
+  b.innerHTML = `<h3></h3><div class="ia-fio"></div>`;
+  b.querySelector("h3").textContent = o.titulo;
+  comDica(b.querySelector("h3"), "O nome vem gravado no próprio PDF — é o maior texto "
+    + "acima da primeira pauta. Daqui ele vai para o DeepSeek, que conta o resto.");
+  const fio = b.querySelector(".ia-fio");
+
+  const ficha = [`Partitura: "${o.titulo}"`];
+  if (o.subtitulo) ficha.push(`Subtitulo no papel: ${o.subtitulo}`);
+  if (o.autor) ficha.push(`Credito no papel: ${o.autor}`);
+  ficha.push(`Medido no arquivo: tom ${info.tom}, compasso ${info.ritmo?.formula || "?"},`
+             + ` ${info.compassos} compassos.`);
+  const historico = [{ role: "system", content: `${IA_PERSONA}\n\n${ficha.join("\n")}` }];
+
+  const dizer = (quem, texto) => {
+    const p = document.createElement("div");
+    p.className = "ia-bolha" + (quem === "eu" ? " eu" : "");
+    if (quem === "eu") p.textContent = texto; else p.innerHTML = formatarIA(texto);
+    fio.append(p);
+    return p;
+  };
+
+  async function pedir(mensagem, mostrar) {
+    if (mostrar) dizer("eu", mensagem);
+    const espera = document.createElement("div");
+    espera.className = "ia-espera";
+    espera.textContent = "procurando…";
+    fio.append(espera);
+    historico.push({ role: "user", content: mensagem.slice(0, IA_LIMITE_MSG) });
+    try {
+      const r = await falarComIA(historico.slice(0, 1)
+        .concat(historico.slice(1).slice(-IA_LIMITE_HIST)));
+      historico.push({ role: "assistant", content: r });
+      espera.remove();
+      dizer("ia", r);
+    } catch (e) {
+      espera.className = "ia-erro";
+      espera.textContent = e.message === "sem chave" ? "" : "Não deu: " + e.message;
+      if (e.message === "sem chave") { espera.remove(); pedirChave(); }
+    }
+  }
+
+  // Sem chave o cartao nao some: vira o pedido dela, guardada so neste navegador.
+  function pedirChave() {
+    const f = document.createElement("form");
+    f.className = "ia-perg";
+    f.innerHTML = `<input class="ia-campo" type="password" autocomplete="off"
+                     placeholder="chave do DeepSeek (fica só neste navegador)">
+                   <button type="submit" class="btn btn-secundario">Salvar</button>`;
+    f.onsubmit = (ev) => {
+      ev.preventDefault();
+      const v = f.querySelector(".ia-campo").value.trim();
+      if (!v) return;
+      try { localStorage.setItem("chave_deepseek", v); } catch (e) {}
+      f.remove();
+      perg.hidden = false;
+      pedir(IA_PRIMEIRA, false);
+    };
+    b.append(f);
+  }
+
+  const perg = document.createElement("form");
+  perg.className = "ia-perg";
+  perg.innerHTML = `<input class="ia-campo" maxlength="${IA_LIMITE_MSG}"
+                      placeholder="pergunte mais sobre a música…"
+                      aria-label="Pergunte mais sobre a música">
+                    <button type="submit" class="btn btn-secundario">Perguntar</button>`;
+  // sem chave nao ha o que perguntar: a caixa so aparece depois que ela existe
+  perg.hidden = !chaveIA();
+  perg.onsubmit = (ev) => {
+    ev.preventDefault();
+    const campo = perg.querySelector(".ia-campo");
+    const t = campo.value.trim();
+    if (!t) return;
+    campo.value = "";
+    pedir(t, true);
+  };
+  b.append(perg);
+
+  if (chaveIA()) pedir(IA_PRIMEIRA, false); else pedirChave();
+  return b;
 }
 
 async function processar(arquivos) {
