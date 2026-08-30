@@ -1,4 +1,4 @@
-# Muse Pobre
+# Partitura Inteligente
 
 *(`anotar-partitura` no GitHub — o repo mantém o nome antigo, e a URL com ele.)*
 
@@ -93,6 +93,7 @@ um "F" solto é cifra e fica). Ainda assim, confira o resultado.
 
 - `anotar_partitura.py` — a ferramenta (mesmo arquivo usado pelo site e pela CLI)
 - `index.html` — a interface web (carrega o `.py` acima e roda no Pyodide)
+- `fonts/` — Fraunces (SIL OFL), hospedada aqui para o site não depender de CDN
 
 Técnica de extração vetorial inspirada em
 [vitorfornaro/awesome-music-sheets](https://github.com/vitorfornaro/awesome-music-sheets)
