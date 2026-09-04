@@ -647,6 +647,12 @@ def ligaduras_de(caminhos, notas, esp, pausas=()):
     return out, entra, sai
 
 
+def _par_vertical(p, pontos, esp):
+    """O ponto tem um irmao logo acima ou abaixo, a um espaco: assinatura do ritornello."""
+    return any(q is not p and abs(q["x"] - p["x"]) < 0.25 * esp
+               and 0.6 * esp < abs(q["y"] - p["y"]) < 1.4 * esp for q in pontos)
+
+
 def _e_ritornello(p, pontos, barras, esp):
     """Os dois pontinhos da barra de repeticao, que na fonte Sonata sao o mesmo '.'.
 
@@ -655,8 +661,36 @@ def _e_ritornello(p, pontos, barras, esp):
     """
     if not any(abs(b - p["x"]) < 2.2 * esp for b in barras):
         return False
-    return any(q is not p and abs(q["x"] - p["x"]) < 0.25 * esp
-               and 0.6 * esp < abs(q["y"] - p["y"]) < 1.4 * esp for q in pontos)
+    return _par_vertical(p, pontos, esp)
+
+
+def repeticoes_de(pontos, barras, esp):
+    """Barras de repeticao do sistema: [{x, abre, fecha}], na ordem de leitura.
+
+    O par de pontinhos diz que aquela barra e ritornello; o LADO em que ele esta diz o
+    resto: ponto a DIREITA da barra abre o trecho (|:), a ESQUERDA fecha (:|). Barra com
+    par dos dois lados fecha e reabre no mesmo ponto (:|:), que e o normal entre duas
+    partes seguidas.
+
+    Barras vizinhas viram UMA: o fecha e desenhado como barra fina + barra grossa, e sem
+    juntar as duas o mesmo ritornello sairia marcado duas vezes.
+    """
+    pares = [p for p in pontos if _par_vertical(p, pontos, esp)]
+    if not pares or not barras:
+        return []
+    grupos = [[barras[0]]]
+    for b in barras[1:]:
+        if b - grupos[-1][-1] >= 1.6 * esp:
+            grupos.append([])
+        grupos[-1].append(b)
+    out = []
+    for g in grupos:
+        e, d = g[0], g[-1]
+        abre = any(0 < p["x"] - d < 2.4 * esp for p in pares)
+        fecha = any(0 < e - p["x"] < 2.4 * esp for p in pares)
+        if abre or fecha:
+            out.append({"x": (e + d) / 2, "abre": abre, "fecha": fecha})
+    return out
 
 
 def _pontos_de(alvos, pontos, esp, folga_y):
@@ -702,8 +736,9 @@ def duracao_das(cabecas, pausas, vert, beams, bandeiras, pontos, barras, esp):
 
 
 # --------------------------------------------------------------------- leitura
-def ler_notas(pg, sistema, com_pausas=False, dados=None):
-    """Retorna (rotulos, existentes) — ou (rotulos, existentes, pausas) com `com_pausas`.
+def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False):
+    """Retorna (rotulos, existentes) — ou (rotulos, existentes, pausas) com `com_pausas`,
+    e mais as barras de repeticao no fim com `com_repeticoes`.
 
     Cada rotulo leva `dur`, a duracao lida em tempos de seminima.
 
@@ -717,7 +752,7 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None):
     if not any(g["tipo"] == "cabeca" for g in glifos) and sistemas:
         # PDF com os simbolos convertidos em curvas: le pela geometria
         glifos = glifos_de_contorno(caminhos, sistemas)
-    rotulos, existentes, pausas, pontas = [], [], [], []
+    rotulos, existentes, pausas, pontas, repeticoes = [], [], [], [], []
 
     centros = [(s[0] + s[-1]) / 2 for s in sistemas]
 
@@ -773,11 +808,14 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None):
 
         descansos = sorted((g for g in glifos if g["tipo"] == "pausa" and na_pauta(g, 1.2)),
                            key=lambda g: g["x"])
+        pontos_pg = [g for g in glifos if g["tipo"] == "ponto" and na_pauta(g)]
         dur_de, dur_pausa = duracao_das(
             cabecas, descansos, vert, beams,
             [g for g in glifos if g["tipo"] == "bandeira" and na_pauta(g)],
-            [g for g in glifos if g["tipo"] == "ponto" and na_pauta(g)],
-            barras, span / 4.0)
+            pontos_pg, barras, span / 4.0)
+        if com_repeticoes:
+            for rp in repeticoes_de(pontos_pg, barras, span / 4.0):
+                repeticoes.append(dict(rp, sistema=sidx))
 
         # ---- casa cada acidente com a cabeca mais proxima a sua DIREITA.
         # Amarrar no sentido acidente->nota (e nao nota->acidente) da atribuicao 1:1
@@ -907,9 +945,12 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None):
         if not fim["ligada"] and not fim["texto"].endswith("_"):
             fim["texto"] += "_"
 
+    saida = [rotulos, existentes]
     if com_pausas:
-        return rotulos, existentes, pausas
-    return rotulos, existentes
+        saida.append(pausas)
+    if com_repeticoes:
+        saida.append(repeticoes)
+    return tuple(saida)
 
 
 # ------------------------------------------------------------------- escrita

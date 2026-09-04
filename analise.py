@@ -340,7 +340,8 @@ def _traduzir(d):
     for m in d["motivos"]:
         m["notas"] = [_pt_nota(n) for n in m["notas"]]
     for e in d.get("leitura", []):
-        e["n"] = _pt_nota(e["n"])
+        if not e.get("marca"):
+            e["n"] = _pt_nota(e["n"])
     for linha in d["grade"]:
         for c in linha["cifras"]:
             c["cifra"] = _pt_cifra(c["cifra"])
@@ -937,6 +938,7 @@ def analisar(dados, sistema="letras"):
     """
     doc = pymupdf.open(stream=dados, filetype="pdf")
     notas, cifras, compassos, linhas_vistas = [], [], {}, []
+    repeticoes = []
     _obra = {}
 
     def caixa(ch):
@@ -950,7 +952,10 @@ def analisar(dados, sistema="letras"):
         sistemas = A.pautas(horiz, pg.rect.width, pg.rect.height)
         if pg.number == 0:
             _obra = obra(pg, sistemas)
-        rot, _, pausas = A.ler_notas(pg, "letras", com_pausas=True, dados=col)
+        rot, _, pausas, reps = A.ler_notas(pg, "letras", com_pausas=True, dados=col,
+                                          com_repeticoes=True)
+        for rp in reps:
+            repeticoes.append(dict(rp, pagina=pg.number))
         for r in sorted(rot, key=lambda r: (r["sistema"], r["x"])):
             notas.append(dict(r, pagina=pg.number))
             caixa((pg.number, r["sistema"], r["compasso"]))["notas"].append(r)
@@ -1090,12 +1095,8 @@ def analisar(dados, sistema="letras"):
         "dificeis": dif[:3],
         # grade da folha de cifras: uma LINHA por sistema da partitura, na ordem de
         # leitura, com as cifras daquele sistema na ordem de x
-        # a melodia como texto, compasso por compasso: e o que a folha de leitura estampa.
-        # Cabeca presa por ligadura fica de fora, igual ao que e escrito na pauta — ela nao
-        # e um ataque novo, e repetir o nome atrapalharia a leitura.
-        "leitura": [{"c": num[(r["pagina"], r["sistema"], r["compasso"])], "n": r["nome"],
-                     "pg": r["pagina"], "sl": r["sistema"]}
-                    for r in notas if not r["ligada"] and not r["graca"]],
+        # a melodia como texto, na ordem do papel: e o que a folha de cifras estampa.
+        "leitura": leitura_de(notas, repeticoes, num),
         "grade": [{"linha": i + 1,
                    "cifras": [{"cifra": c["cifra"], "xr": c["xr"], "x": round(c["x"], 2),
                                "grau": grau_de_cifra(c["cifra"], escala_tom)}
@@ -1179,6 +1180,37 @@ def acompanhamento(dados, info):
     return saida
 
 
+def leitura_de(notas, repeticoes, num):
+    """A melodia como texto, na ordem do papel, com as barras de repeticao no meio.
+
+    Cabeca presa por ligadura fica de fora, igual ao que e escrito na pauta — ela nao e um
+    ataque novo, e repetir o nome atrapalharia a leitura.
+
+    O ritornello entra como um item de `marca` na posicao em que ele aparece na linha, e
+    nao como campo a parte: assim quem estampa a folha nao precisa saber que ele existe,
+    so imprime a sequencia. Barra que fecha e reabre vira ":|:" — um item so, porque no
+    papel e um simbolo so.
+    """
+    itens = [{"pg": r["pagina"], "sl": r["sistema"], "x": r["x"],
+              "c": num[(r["pagina"], r["sistema"], r["compasso"])], "n": r["nome"]}
+             for r in notas if not r["ligada"] and not r["graca"]]
+    for rp in repeticoes:
+        itens.append({"pg": rp["pagina"], "sl": rp["sistema"], "x": rp["x"], "c": 0,
+                      "n": (":|:" if rp["abre"] and rp["fecha"]
+                            else "|:" if rp["abre"] else ":|"), "marca": True})
+    itens.sort(key=lambda e: (e["pg"], e["sl"], e["x"]))
+    # a marca herda o compasso do vizinho para nao aparecer como compasso 0 no relatorio
+    ultimo = 0
+    for e in itens:
+        if e.get("marca"):
+            e["c"] = ultimo
+        else:
+            ultimo = e["c"]
+    for e in itens:
+        e.pop("x", None)
+    return itens
+
+
 def folha_de_notas(info, titulo=''):
     """PDF NOVO com a melodia escrita por extenso, ESPELHANDO o papel original.
 
@@ -1228,7 +1260,7 @@ def folha_de_notas(info, titulo=''):
             meta = [info["tom"]]
             if info.get("real"):
                 meta.append('soa em ' + info["real"]["tom"])
-            meta.append(f'{len(seq)} notas')
+            meta.append(f'{sum(1 for e in seq if not e.get("marca"))} notas')
             pg.insert_text((marg, 84), '  ·  '.join(meta), fontname='helv', fontsize=9.5,
                            color=cinza)
             y = 116.0
@@ -1350,13 +1382,13 @@ def folha_de_notas_docx(info, titulo=''):
     UTIL = 595.0 - 2 * 56.7
     CORPO, MIN_CORPO = 11.0, 5.5
     LARG_CAR = 0.6                      # avanco de um caractere em fonte monoespacada
-    campo = max((len(nm) for nm in (e["n"] for e in seq)), default=1) + 1
+    campo = max((len(e["n"]) for e in seq if not e.get("marca")), default=1) + 1
 
     ps = [_par(titulo or 'Notas da melodia', corpo=15, fonte="Calibri", negrito=True)]
     meta = [info["tom"]]
     if info.get("real"):
         meta.append('soa em ' + info["real"]["tom"])
-    meta.append('%d notas' % len(seq))
+    meta.append('%d notas' % sum(1 for e in seq if not e.get('marca')))
     ps.append(_par('  ·  '.join(meta), corpo=9.5, fonte="Calibri", cor="6B6B6B"))
     ps.append(_par(""))
 
@@ -1369,7 +1401,9 @@ def folha_de_notas_docx(info, titulo=''):
         for nomes in linhas:
             if not nomes:
                 continue
-            texto = "".join(nm.ljust(campo) for nm in nomes).rstrip()
+            # a marca de repeticao e mais larga que a coluna das notas: ela ocupa o
+            # que precisar e leva um espaco proprio, senao ":|:" cola na nota seguinte
+            texto = "".join(nm.ljust(max(campo, len(nm) + 1)) for nm in nomes).rstrip()
             # o corpo cede ate o piso para a linha nao requebrar: linha requebrada perde a
             # correspondencia com o atril, que e a razao de ser desta folha
             corpo = CORPO

@@ -65,6 +65,15 @@ meio-espaço** do valor exato. Pipeline:
 - `melodia(dados)` devolve `{notas: [{t, midi, d}], total}` em tempos de semínima — é o
   que o player de piano do site consome.
 
+### Barra de repeticao (`repeticoes_de`)
+
+O par de pontinhos diz que a barra e ritornello; o LADO diz o resto — ponto a direita
+abre (`|:`), a esquerda fecha (`:|`), dos dois lados e `:|:`. **Barras vizinhas viram
+uma**: o fecha e desenhado como barra fina + grossa, e sem juntar o mesmo ritornello sai
+marcado duas vezes. Sai por `ler_notas(..., com_repeticoes=True)` e entra na `leitura`
+como item com `marca`, na posicao em x — quem estampa a folha so imprime a sequencia.
+Depende do glifo de ponto, entao **nao funciona no modo contorno**.
+
 ### Ligadura de valor (`ligaduras_de`)
 
 Arco = path curvo preenchido, 2–4 curvas. Vira **ligadura** (e não fraseado) só quando

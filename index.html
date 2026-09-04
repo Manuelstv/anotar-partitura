@@ -783,7 +783,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=34";
+const V = "?v=35";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1866,7 +1866,7 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
                        { once: true });
     a.download = base + "_cifras.docx";
     a.textContent = "Cifras";
-    a.title = "Documento do Word com o nome das notas por extenso — uma página por página da partitura, uma linha por linha dela, e dá para editar";
+    a.title = "Documento do Word com o nome das notas por extenso — uma página por página da partitura, uma linha por linha dela, com |: e :| onde tem repetição. Dá para editar";
     cartao.topo.append(a);
   }
 
