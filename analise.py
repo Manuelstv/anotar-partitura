@@ -1036,6 +1036,13 @@ def analisar(dados, sistema="letras"):
     # ordem de leitura dos compassos -> numero global, que e como o musico conta
     ordem = sorted(compassos)
     num = {ch: i + 1 for i, ch in enumerate(ordem)}
+    # marca de ensaio -> compasso: a primeira nota a partir do x dela, na mesma linha
+    for p in partes:
+        cand = [r for r in notas if r["pagina"] == p["pagina"]
+                and r["sistema"] == p["sistema"] and r["x"] >= p["x"] - 4]
+        alvo = min(cand, key=lambda r: r["x"], default=None)
+        p["compasso"] = (num[(alvo["pagina"], alvo["sistema"], alvo["compasso"])]
+                         if alvo else None)
     comps = []
     for ch in ordem:
         c = compassos[ch]
@@ -1310,42 +1317,43 @@ def leitura_de(notas, repeticoes, num):
     return itens
 
 
-def _secoes(info, seq):
+def _secoes(info, seq, por_compasso=2):
     """A folha em secoes: [(rotulo, e_nome_de_musica, [(parte, [nome, ...]), ...])].
 
-    `parte` e a marca de ensaio que ABRE aquela linha ("A", "B"), ou "" — e o que divide a
-    musica em blocos na folha. A marca rotula a LINHA em que aparece, e nao o ponto exato:
-    partir a linha no meio dela quebraria o espelho do papel, que e a razao da folha.
+    Cada linha da folha sao `por_compasso` compassos do papel, e nao uma linha dele: em
+    duas colunas fixas de dois compassos a musica se le por frase, que e como ela e
+    ensaiada. Marca de ensaio SEMPRE abre linha — comecar a parte "B" no meio de uma linha
+    esconderia justamente o que se procura na folha.
 
-    Uma secao e uma MUSICA quando o arquivo e um songbook, e uma PAGINA quando ele tem uma
-    musica so. Musica que ocupa duas paginas do papel vira uma secao continua: quebrar ali
-    partiria a mesma musica em duas folhas, e quem le no atril procura pelo nome, nao pelo
-    numero da pagina. Cada linha e uma linha da partitura, na ordem.
+    `parte` e a marca que abre a linha ("A", "B"), ou "".
     """
-    # (pagina, sistema) -> marca(s) de ensaio que abrem aquela linha
     marcas = {}
     for p in sorted((info or {}).get("partes") or [], key=lambda p: p["x"]):
-        marcas.setdefault((p["pagina"], p["sistema"]), []).append(p["marca"])
+        if p.get("compasso"):
+            marcas.setdefault(p["compasso"], []).append(p["marca"])
 
-    paginas, atual = [], None
+    paginas, atual, quantos = [], None, 0
     for e in seq:
-        chave = (e.get("pg", 0), e.get("sl", 0))
-        if not paginas or paginas[-1][0] != chave[0]:
-            paginas.append((chave[0], []))
-            atual = None
-        if atual != chave[1]:
-            paginas[-1][1].append((" ".join(marcas.get(chave, [])), []))
-            atual = chave[1]
+        pg, c = e.get("pg", 0), e.get("c", 0)
+        if not paginas or paginas[-1][0] != pg:
+            paginas.append((pg, []))
+            atual, quantos = None, 0
+        abre = c in marcas and c != atual
+        if atual is None or abre or (c != atual and quantos >= por_compasso):
+            paginas[-1][1].append((" ".join(marcas.get(c, [])) if abre else "", []))
+            quantos = 0
+        if c != atual:
+            quantos += 1
+            atual = c
         paginas[-1][1][-1][1].append(_com_registro(e))
 
     rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
-    # inicio de cada musica: e por ele que se sabe se a pagina abre secao ou continua uma
-    abre = {m["pagina"] for m in (info or {}).get("musicas") or []}
+    abre_musica = {m["pagina"] for m in (info or {}).get("musicas") or []}
     out = []
     for npg, linhas in paginas:
         rot, e_musica = rotulos[npg]
-        if out and e_musica and npg not in abre:
-            out[-1][2].extend(linhas)          # continuacao: emenda na musica anterior
+        if out and e_musica and npg not in abre_musica:
+            out[-1][2].extend(linhas)
         else:
             out.append((rot, e_musica, list(linhas)))
     return out
@@ -1501,6 +1509,44 @@ def _docx(paragrafos):
     return buf.getvalue()
 
 
+# Larguras da grade, em twips (1/20 de ponto). A4 com margem de 2 cm deixa 9639 uteis; as
+# colunas das pontas ficam VAZIAS de proposito — sao a moldura do caderno, nao conteudo.
+_COLS = (600, 8400, 639)
+
+
+def _celula(largura, paragrafos):
+    return ('<w:tc><w:tcPr><w:tcW w:w="%d" w:type="dxa"/></w:tcPr>%s</w:tc>'
+            % (largura, "".join(paragrafos) or "<w:p/>"))
+
+
+def _linha_tabela(meio):
+    """Uma faixa do caderno: coluna estreita, o conteudo, coluna estreita."""
+    return ("<w:tr>" + _celula(_COLS[0], []) + _celula(_COLS[1], meio)
+            + _celula(_COLS[2], []) + "</w:tr>")
+
+
+def _tabela(faixas):
+    borda = ('<w:{0} w:val="single" w:sz="6" w:space="0" w:color="000000"/>')
+    bordas = "".join(borda.format(k) for k in
+                     ("top", "left", "bottom", "right", "insideH", "insideV"))
+    grade = "".join('<w:gridCol w:w="%d"/>' % w for w in _COLS)
+    return ('<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>'
+            + bordas + '</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>'
+            + '<w:tblGrid>' + grade + '</w:tblGrid>' + "".join(faixas) + "</w:tbl>")
+
+
+def _blocos(linhas):
+    """As linhas de uma musica agrupadas por marca de ensaio: uma faixa do caderno cada."""
+    out = []
+    for parte, nomes in linhas:
+        if not nomes:
+            continue
+        if parte or not out:
+            out.append([parte, []])
+        out[-1][1].append(nomes)
+    return out
+
+
 def folha_de_notas_docx(info, titulo=''):
     """A mesma folha de `folha_de_notas`, em .docx editavel.
 
@@ -1522,11 +1568,22 @@ def folha_de_notas_docx(info, titulo=''):
     if not seq:
         return None
     secoes = _secoes(info, seq)
-    # largura util da pagina em pontos: A4 menos as margens de 2 cm declaradas no sectPr
-    UTIL = 595.0 - 2 * 56.7
+    # largura util: a COLUNA do meio, nao a pagina — o texto vive dentro da tabela
+    UTIL = _COLS[1] / 20.0 - 12.0
     CORPO, MIN_CORPO = 11.0, 5.5
     LARG_CAR = 0.6                      # avanco de um caractere em fonte monoespacada
     campo = max((len(e["n"]) for e in seq if not e.get("marca")), default=1) + 1
+
+    def linha_de_notas(nomes):
+        # a marca de repeticao e mais larga que a coluna das notas: ela ocupa o que
+        # precisar e leva um espaco proprio, senao ":|:" cola na nota seguinte
+        texto = "".join(nm.ljust(max(campo, len(nm) + 1)) for nm in nomes).rstrip()
+        # o corpo cede ate o piso para a linha nao requebrar: linha requebrada perde a
+        # correspondencia com o atril, que e a razao de ser desta folha
+        corpo = CORPO
+        while corpo > MIN_CORPO and len(texto) * LARG_CAR * corpo > UTIL:
+            corpo -= 0.25
+        return _par(texto, corpo=corpo)
 
     ps = []
     if titulo is not None:
@@ -1540,27 +1597,22 @@ def folha_de_notas_docx(info, titulo=''):
         ps.append(_par(""))
 
     for i, (rot, e_musica, linhas) in enumerate(secoes):
+        if i:
+            # a quebra mora num paragrafo FORA da tabela: pageBreakBefore dentro de uma
+            # celula nao empurra a tabela para a folha seguinte
+            ps.append(_par("", corpo=1, quebra_antes=True))
+        faixas = []
         if i or len(secoes) > 1:
-            ps.append(_par(rot, corpo=13 if e_musica else 9, fonte="Calibri",
-                           negrito=e_musica, cor=None if e_musica else "6B6B6B",
-                           quebra_antes=(i > 0)))
-        elif i > 0:
-            ps.append(_par("", quebra_antes=True))
-        for n, (parte, nomes) in enumerate(linhas):
-            if not nomes:
-                continue
+            faixas.append(_linha_tabela([_par(rot, corpo=13 if e_musica else 9,
+                                              fonte="Calibri", negrito=e_musica,
+                                              cor=None if e_musica else "6B6B6B")]))
+        for parte, grupo in _blocos(linhas):
+            meio = []
             if parte:
-                ps.append(_par(parte, corpo=11, fonte="Calibri", negrito=True,
-                               traco_acima=bool(n)))
-            # a marca de repeticao e mais larga que a coluna das notas: ela ocupa o
-            # que precisar e leva um espaco proprio, senao ":|:" cola na nota seguinte
-            texto = "".join(nm.ljust(max(campo, len(nm) + 1)) for nm in nomes).rstrip()
-            # o corpo cede ate o piso para a linha nao requebrar: linha requebrada perde a
-            # correspondencia com o atril, que e a razao de ser desta folha
-            corpo = CORPO
-            while corpo > MIN_CORPO and len(texto) * LARG_CAR * corpo > UTIL:
-                corpo -= 0.25
-            ps.append(_par(texto, corpo=corpo))
+                meio.append(_par(parte, corpo=11, fonte="Calibri", negrito=True))
+            meio.extend(linha_de_notas(nomes) for nomes in grupo)
+            faixas.append(_linha_tabela(meio))
+        ps.append(_tabela(faixas))
     return _docx(ps)
 
 def folha_de_acordes(info, titulo=''):
