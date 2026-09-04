@@ -1316,7 +1316,9 @@ def folha_de_notas(info, titulo=''):
 
     for i, (npg, linhas) in enumerate(paginas):
         pg = doc.new_page(width=LARG, height=ALT)
-        if i == 0:
+        if i == 0 and titulo is None:
+            y = 72.0
+        elif i == 0:
             pg.insert_text((marg, 66), titulo or 'Notas da melodia', fontname='hebo',
                            fontsize=17)
             meta = [info["tom"]]
@@ -1427,6 +1429,10 @@ def folha_de_notas_docx(info, titulo=''):
     linha e contagem de caractere, entao da para escolher o corpo que faz a linha caber
     sem o Word requebrar. Em fonte proporcional isso viraria chute.
 
+    Com `titulo=None` a folha sai SEM cabecalho: num songbook o tom e a contagem do
+    arquivo inteiro misturam musicas de tons diferentes e nao dizem nada, e o nome de cada
+    uma ja abre a secao dela.
+
     Devolve bytes de .docx, ou None se nao houver nota lida.
     """
     seq = (info or {}).get("leitura") or []
@@ -1450,13 +1456,16 @@ def folha_de_notas_docx(info, titulo=''):
     LARG_CAR = 0.6                      # avanco de um caractere em fonte monoespacada
     campo = max((len(e["n"]) for e in seq if not e.get("marca")), default=1) + 1
 
-    ps = [_par(titulo or 'Notas da melodia', corpo=15, fonte="Calibri", negrito=True)]
-    meta = [info["tom"]]
-    if info.get("real"):
-        meta.append('soa em ' + info["real"]["tom"])
-    meta.append('%d notas' % sum(1 for e in seq if not e.get('marca')))
-    ps.append(_par('  ·  '.join(meta), corpo=9.5, fonte="Calibri", cor="6B6B6B"))
-    ps.append(_par(""))
+    ps = []
+    if titulo is not None:
+        ps.append(_par(titulo or 'Notas da melodia', corpo=15, fonte="Calibri",
+                       negrito=True))
+        meta = [info["tom"]]
+        if info.get("real"):
+            meta.append('soa em ' + info["real"]["tom"])
+        meta.append('%d notas' % sum(1 for e in seq if not e.get('marca')))
+        ps.append(_par('  ·  '.join(meta), corpo=9.5, fonte="Calibri", cor="6B6B6B"))
+        ps.append(_par(""))
 
     for i, (npg, linhas) in enumerate(paginas):
         rot, e_musica = rotulos[npg]
