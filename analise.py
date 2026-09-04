@@ -1180,6 +1180,29 @@ def acompanhamento(dados, info):
     return saida
 
 
+DO4 = 60          # MIDI do do central, na altura ESCRITA (nao no som que o sax faz)
+
+
+def _com_registro(e):
+    """O nome da nota com a caixa que diz o registro: grave em minusculo, DO4 pra cima
+    em MAIUSCULO.
+
+    E a convencao de Helmholtz, e serve para o mesmo nome nao virar duas notas na folha:
+    sem isso, "sol" duas oitavas abaixo e "sol" agudo saem escritos igual. A marca de
+    repeticao passa direto — ":|" nao tem caixa.
+    """
+    if e.get("marca"):
+        return e["n"]
+    n = e["n"]
+    # a caixa vale so para a LETRA: mexer no acidente junto faz "Bb" virar "BB" e "Sib"
+    # virar "SIB", que se le como outra nota
+    i = len(n)
+    while i > 1 and n[i - 1] in "b#":
+        i -= 1
+    base, acidente = n[:i], n[i:]
+    return (base.upper() if e.get("midi", DO4) >= DO4 else base.lower()) + acidente
+
+
 def leitura_de(notas, repeticoes, num):
     """A melodia como texto, na ordem do papel, com as barras de repeticao no meio.
 
@@ -1191,7 +1214,7 @@ def leitura_de(notas, repeticoes, num):
     so imprime a sequencia. Barra que fecha e reabre vira ":|:" — um item so, porque no
     papel e um simbolo so.
     """
-    itens = [{"pg": r["pagina"], "sl": r["sistema"], "x": r["x"],
+    itens = [{"pg": r["pagina"], "sl": r["sistema"], "x": r["x"], "midi": r["midi"],
               "c": num[(r["pagina"], r["sistema"], r["compasso"])], "n": r["nome"]}
              for r in notas if not r["ligada"] and not r["graca"]]
     for rp in repeticoes:
@@ -1237,7 +1260,7 @@ def folha_de_notas(info, titulo=''):
         if atual != chave[1]:
             paginas[-1][1].append([])
             atual = chave[1]
-        paginas[-1][1][-1].append(e["n"])
+        paginas[-1][1][-1].append(_com_registro(e))
 
     doc = pymupdf.open()
     LARG, ALT = 595.0, 842.0
@@ -1376,7 +1399,7 @@ def folha_de_notas_docx(info, titulo=''):
         if atual != chave[1]:
             paginas[-1][1].append([])
             atual = chave[1]
-        paginas[-1][1][-1].append(e["n"])
+        paginas[-1][1][-1].append(_com_registro(e))
 
     # largura util da pagina em pontos: A4 menos as margens de 2 cm declaradas no sectPr
     UTIL = 595.0 - 2 * 56.7
