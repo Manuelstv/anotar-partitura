@@ -938,7 +938,7 @@ def analisar(dados, sistema="letras"):
     """
     doc = pymupdf.open(stream=dados, filetype="pdf")
     notas, cifras, compassos, linhas_vistas = [], [], {}, []
-    repeticoes = []
+    repeticoes, musicas = [], []
     _obra = {}
 
     def caixa(ch):
@@ -950,8 +950,15 @@ def analisar(dados, sistema="letras"):
         col = A.coletar(pg, com_ritmo=True)
         textos, horiz, formas = col[1], col[2], col[4]
         sistemas = A.pautas(horiz, pg.rect.width, pg.rect.height)
+        _o = obra(pg, sistemas)
         if pg.number == 0:
-            _obra = obra(pg, sistemas)
+            _obra = _o
+        # Songbook: cada musica traz o nome no alto da pagina em que comeca, e a pagina de
+        # continuacao traz so o NUMERO dela ali. Titulo que e so digito e numero de pagina,
+        # nao nome de musica — sem essa trava, "Que Calor" virava a musica "2".
+        _t = (_o or {}).get("titulo") or ""
+        if _t and not _t.strip().isdigit() and _t != (musicas[-1]["titulo"] if musicas else None):
+            musicas.append({"pagina": pg.number, "titulo": _t})
         rot, _, pausas, reps = A.ler_notas(pg, "letras", com_pausas=True, dados=col,
                                           com_repeticoes=True)
         for rp in reps:
@@ -1068,6 +1075,7 @@ def analisar(dados, sistema="letras"):
         "tom_por": por,
         "armadura": arm,
         "obra": _obra,
+        "musicas": musicas,
         "escala_do_tom": [n for n, _ in escala_tom],
         "grave": CLASSES[min(midis) % 12] + str(min(midis) // 12 - 1),
         "agudo": CLASSES[max(midis) % 12] + str(max(midis) // 12 - 1),
@@ -1184,6 +1192,32 @@ def acompanhamento(dados, info):
 # central: DO4 e a primeira suplementar ABAIXO da pauta, e como o sax alto so desce ate
 # Sib3, com ele a folha inteira saia em maiuscula (medido: 0,9% das notas do acervo
 # ficavam minusculas, e 0% nos arquivos de sax alto).
+def _rotulos_de_pagina(info, paginas):
+    """Como chamar cada pagina da folha: o nome da MUSICA, quando o PDF e um songbook.
+
+    Devolve pagina -> (rotulo, e_nome_de_musica). O segundo campo existe porque o nome da
+    musica e o cabecalho da secao e sai em destaque, enquanto "pagina N" e so um endereco.
+
+    Num arquivo de uma musica so o nome ja esta no topo da folha, e repeti-lo em cada
+    pagina nao diz nada — ali continua valendo "pagina N", que e o endereco no papel.
+    Com varias musicas o endereco util passa a ser o nome, e a pagina de continuacao vira
+    "Nome (2)".
+    """
+    musicas = [m for m in (info or {}).get("musicas") or []]
+    if len(musicas) < 2:
+        return {n: ('pagina %d' % (n + 1), False) for n in paginas}
+    out = {}
+    for n in paginas:
+        anteriores = [m for m in musicas if m["pagina"] <= n]
+        if not anteriores:
+            out[n] = ('pagina %d' % (n + 1), False)
+            continue
+        m = anteriores[-1]
+        k = n - m["pagina"] + 1
+        out[n] = (m["titulo"] if k == 1 else '%s (%d)' % (m["titulo"], k), True)
+    return out
+
+
 DO5 = 72          # MIDI, na altura ESCRITA (nao no som que o sax faz)
 
 
@@ -1266,6 +1300,7 @@ def folha_de_notas(info, titulo=''):
             atual = chave[1]
         paginas[-1][1][-1].append(_com_registro(e))
 
+    rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
     doc = pymupdf.open()
     LARG, ALT = 595.0, 842.0
     marg, h = 52.0, 26.0
@@ -1293,10 +1328,13 @@ def folha_de_notas(info, titulo=''):
             y = 116.0
         else:
             y = 72.0
+        rot, e_musica = rotulos[npg]
         if npg or len(paginas) > 1:
-            pg.insert_text((marg, y), f'pagina {npg + 1}', fontname='helv', fontsize=9,
-                           color=cinza)
-            y += 20.0
+            pg.insert_text((marg, y), rot,
+                           fontname='hebo' if e_musica else 'helv',
+                           fontsize=13 if e_musica else 9,
+                           color=preto if e_musica else cinza)
+            y += 26.0 if e_musica else 20.0
         for n, nomes in enumerate(linhas):
             if not nomes:
                 continue
@@ -1405,6 +1443,7 @@ def folha_de_notas_docx(info, titulo=''):
             atual = chave[1]
         paginas[-1][1][-1].append(_com_registro(e))
 
+    rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
     # largura util da pagina em pontos: A4 menos as margens de 2 cm declaradas no sectPr
     UTIL = 595.0 - 2 * 56.7
     CORPO, MIN_CORPO = 11.0, 5.5
@@ -1420,8 +1459,10 @@ def folha_de_notas_docx(info, titulo=''):
     ps.append(_par(""))
 
     for i, (npg, linhas) in enumerate(paginas):
+        rot, e_musica = rotulos[npg]
         if npg or len(paginas) > 1:
-            ps.append(_par('pagina %d' % (npg + 1), corpo=9, fonte="Calibri", cor="6B6B6B",
+            ps.append(_par(rot, corpo=13 if e_musica else 9, fonte="Calibri",
+                           negrito=e_musica, cor=None if e_musica else "6B6B6B",
                            quebra_antes=(i > 0)))
         elif i > 0:
             ps.append(_par("", quebra_antes=True))
