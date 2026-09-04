@@ -72,7 +72,15 @@ abre (`|:`), a esquerda fecha (`:|`), dos dois lados e `:|:`. **Barras vizinhas 
 uma**: o fecha e desenhado como barra fina + grossa, e sem juntar o mesmo ritornello sai
 marcado duas vezes. Sai por `ler_notas(..., com_repeticoes=True)` e entra na `leitura`
 como item com `marca`, na posicao em x — quem estampa a folha so imprime a sequencia.
-Depende do glifo de ponto, entao **nao funciona no modo contorno**.
+
+**As duas familias discordam de onde vem o pontinho, e calibrar so no Sibelius nao pega
+isso.** Na Sonata o ritornello usa o MESMO glifo do ponto de aumento, e quem o denuncia e
+o par vertical encostado na barra. No SMuFL ele tem codepoint proprio — `U+E044` (um
+ponto) e `U+E043` (o par) —, que vale sozinho. Eles ficam em `pontos_rep`, **fora** de
+`pontos`: ali dentro virariam ponto de aumento e esticariam a nota anterior. Sem isso,
+todo PDF de MuseScore saia sem nenhuma repeticao — e parecia que a musica nao tinha.
+
+Depende do glifo, entao **nao funciona no modo contorno**.
 
 ### Ligadura de valor (`ligaduras_de`)
 

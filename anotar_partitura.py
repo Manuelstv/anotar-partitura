@@ -47,6 +47,10 @@ PERFIS = {
         "bandeiras": {0xE240: 1, 0xE241: 1, 0xE242: 2, 0xE243: 2, 0xE244: 3, 0xE245: 3,
                       0xE246: 4, 0xE247: 4, 0xE248: 5, 0xE249: 5, 0xE24A: 6, 0xE24B: 6},
         "pontos": {0xE1E7},
+        # o pontinho do ritornello tem codepoint SO dele: E044 e um ponto (vem em par
+        # vertical), E043 ja e o par inteiro. Fora de "pontos" de proposito — ali eles
+        # virariam ponto de aumento e esticariam a nota anterior.
+        "pontos_rep": {0xE043, 0xE044},
         "pausas": {0xE4E2: 8, 0xE4E3: 4, 0xE4E4: 2, 0xE4E5: 1, 0xE4E6: 0.5,
                    0xE4E7: 0.25, 0xE4E8: 0.125, 0xE4E9: 0.0625, 0xE4EA: 0.03125},
     },
@@ -62,6 +66,9 @@ PERFIS = {
         # 0x2E no Maestro/Finale; 0x2122 e o ponto do Sibelius, que mora na fonte
         # OpusSpecialStd — sem ele toda pausa pontuada do The-chicken saia curta.
         "pontos": {0x2E, 0x2122},
+        # na Sonata nao ha glifo proprio: o ritornello usa o MESMO ponto de aumento, e
+        # quem separa os dois e o par vertical encostado na barra (`_e_ritornello`)
+        "pontos_rep": set(),
         "pausas": {0x2211: 4, 0xD3: 2, 0x152: 1, 0x2030: 0.5, 0x2248: 0.25},
     },
 }
@@ -144,6 +151,8 @@ def coletar(pg, com_ritmo=False):
                             tipo, extra = "bandeira", P["bandeiras"][cp]
                         elif com_ritmo and cp in P["pontos"]:
                             tipo, extra = "ponto", None
+                        elif com_ritmo and cp in P["pontos_rep"]:
+                            tipo, extra = "ponto_rep", None
                         elif com_ritmo and cp in P["pausas"]:
                             tipo, extra = "pausa", P["pausas"][cp]
                         else:
@@ -664,7 +673,7 @@ def _e_ritornello(p, pontos, barras, esp):
     return _par_vertical(p, pontos, esp)
 
 
-def repeticoes_de(pontos, barras, esp):
+def repeticoes_de(pontos, pontos_rep, barras, esp):
     """Barras de repeticao do sistema: [{x, abre, fecha}], na ordem de leitura.
 
     O par de pontinhos diz que aquela barra e ritornello; o LADO em que ele esta diz o
@@ -674,8 +683,12 @@ def repeticoes_de(pontos, barras, esp):
 
     Barras vizinhas viram UMA: o fecha e desenhado como barra fina + barra grossa, e sem
     juntar as duas o mesmo ritornello sairia marcado duas vezes.
+
+    Duas origens de pontinho, porque as fontes discordam: no SMuFL ele tem codepoint so
+    dele (`pontos_rep`) e ja vale sozinho; na Sonata e o MESMO glifo do ponto de aumento,
+    e o que o denuncia e o par vertical de um espaco.
     """
-    pares = [p for p in pontos if _par_vertical(p, pontos, esp)]
+    pares = pontos_rep + [p for p in pontos if _par_vertical(p, pontos, esp)]
     if not pares or not barras:
         return []
     grupos = [[barras[0]]]
@@ -814,7 +827,8 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False):
             [g for g in glifos if g["tipo"] == "bandeira" and na_pauta(g)],
             pontos_pg, barras, span / 4.0)
         if com_repeticoes:
-            for rp in repeticoes_de(pontos_pg, barras, span / 4.0):
+            reps_pg = [g for g in glifos if g["tipo"] == "ponto_rep" and na_pauta(g, 1.2)]
+            for rp in repeticoes_de(pontos_pg, reps_pg, barras, span / 4.0):
                 repeticoes.append(dict(rp, sistema=sidx))
 
         # ---- casa cada acidente com a cabeca mais proxima a sua DIREITA.
