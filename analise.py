@@ -20,14 +20,18 @@ lido do PDF. Isso importa num material de estudo — a analise nao pode inventar
   forma     - compassos com a mesma sequencia de alturas viram a mesma letra (A, B...).
   dificil   - dificuldade por compasso, para apontar onde a musica pesa.
   folha     - `folha_de_acordes` gera um PDF novo so com a harmonia, um quadro por compasso.
+              `folha_de_notas_docx` gera o .docx de nomes de nota (o botao "Cifras" do
+              site), espelhando o papel: uma pagina por pagina, uma linha por linha.
 
 Uso:  uv run analise.py <pdf>
 """
 import collections
+import io
 import json
 import os
 import re
 import sys
+import zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pymupdf
@@ -1258,6 +1262,122 @@ def folha_de_notas(info, titulo=''):
     return saida
 
 
+# ---------------------------------------------------------------- folha em .docx
+# Um .docx e um ZIP de XML — da para montar com a stdlib, sem dependencia nenhuma. Isso
+# importa porque a folha tambem e gerada no navegador, dentro do Pyodide: python-docx
+# puxaria lxml, e lxml nao vem com o Pyodide.
+_DOCX_TIPOS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>"""
+
+_DOCX_RELS = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>"""
+
+
+def _xml(t):
+    return (t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+             .replace('"', "&quot;"))
+
+
+def _par(texto, corpo=11.0, fonte="Consolas", negrito=False, cor=None, quebra_antes=False):
+    """Um paragrafo do documento. `corpo` em pontos; no XML vai em meios-pontos."""
+    pr = ['<w:rPr><w:rFonts w:ascii="%s" w:hAnsi="%s"/>' % (fonte, fonte)]
+    if negrito:
+        pr.append("<w:b/>")
+    if cor:
+        pr.append('<w:color w:val="%s"/>' % cor)
+    pr.append('<w:sz w:val="%d"/><w:szCs w:val="%d"/></w:rPr>'
+              % (round(corpo * 2), round(corpo * 2)))
+    ppr = "<w:pPr>"
+    if quebra_antes:
+        ppr += "<w:pageBreakBefore/>"
+    # espacamento apertado: a folha e para caber no atril, nao para respirar
+    ppr += '<w:spacing w:before="0" w:after="60" w:line="240" w:lineRule="auto"/></w:pPr>'
+    return ("<w:p>" + ppr + "<w:r>" + "".join(pr)
+            + '<w:t xml:space="preserve">' + _xml(texto) + "</w:t></w:r></w:p>")
+
+
+def _docx(paragrafos):
+    """Fecha os paragrafos num .docx e devolve os bytes."""
+    corpo = ("".join(paragrafos)
+             + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
+               '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"'
+               ' w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>')
+    doc = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+           "<w:body>" + corpo + "</w:body></w:document>")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", _DOCX_TIPOS)
+        z.writestr("_rels/.rels", _DOCX_RELS)
+        z.writestr("word/document.xml", doc)
+    return buf.getvalue()
+
+
+def folha_de_notas_docx(info, titulo=''):
+    """A mesma folha de `folha_de_notas`, em .docx editavel.
+
+    Mesmo espelho do papel — uma PAGINA daqui por pagina da partitura, uma LINHA por
+    sistema de la. A diferenca e que aqui da para corrigir um nome, apagar um trecho ou
+    escrever em cima, o que o PDF nao permite.
+
+    A fonte e MONOESPACADA de proposito: com ela as notas caem em colunas e a largura da
+    linha e contagem de caractere, entao da para escolher o corpo que faz a linha caber
+    sem o Word requebrar. Em fonte proporcional isso viraria chute.
+
+    Devolve bytes de .docx, ou None se nao houver nota lida.
+    """
+    seq = (info or {}).get("leitura") or []
+    if not seq:
+        return None
+    paginas, atual = [], None
+    for e in seq:
+        chave = (e.get("pg", 0), e.get("sl", 0))
+        if not paginas or paginas[-1][0] != chave[0]:
+            paginas.append((chave[0], []))
+            atual = None
+        if atual != chave[1]:
+            paginas[-1][1].append([])
+            atual = chave[1]
+        paginas[-1][1][-1].append(e["n"])
+
+    # largura util da pagina em pontos: A4 menos as margens de 2 cm declaradas no sectPr
+    UTIL = 595.0 - 2 * 56.7
+    CORPO, MIN_CORPO = 11.0, 5.5
+    LARG_CAR = 0.6                      # avanco de um caractere em fonte monoespacada
+    campo = max((len(nm) for nm in (e["n"] for e in seq)), default=1) + 1
+
+    ps = [_par(titulo or 'Notas da melodia', corpo=15, fonte="Calibri", negrito=True)]
+    meta = [info["tom"]]
+    if info.get("real"):
+        meta.append('soa em ' + info["real"]["tom"])
+    meta.append('%d notas' % len(seq))
+    ps.append(_par('  ·  '.join(meta), corpo=9.5, fonte="Calibri", cor="6B6B6B"))
+    ps.append(_par(""))
+
+    for i, (npg, linhas) in enumerate(paginas):
+        if npg or len(paginas) > 1:
+            ps.append(_par('pagina %d' % (npg + 1), corpo=9, fonte="Calibri", cor="6B6B6B",
+                           quebra_antes=(i > 0)))
+        elif i > 0:
+            ps.append(_par("", quebra_antes=True))
+        for nomes in linhas:
+            if not nomes:
+                continue
+            texto = "".join(nm.ljust(campo) for nm in nomes).rstrip()
+            # o corpo cede ate o piso para a linha nao requebrar: linha requebrada perde a
+            # correspondencia com o atril, que e a razao de ser desta folha
+            corpo = CORPO
+            while corpo > MIN_CORPO and len(texto) * LARG_CAR * corpo > UTIL:
+                corpo -= 0.25
+            ps.append(_par(texto, corpo=corpo))
+    return _docx(ps)
+
 def folha_de_acordes(info, titulo=''):
     """PDF NOVO so com a harmonia: uma faixa por LINHA da partitura, com o grau embaixo.
 
@@ -1339,8 +1459,8 @@ def main():
         print("nenhuma nota legivel")
         return 1
     if "--notas" in sys.argv:
-        alvo = os.path.splitext(sys.argv[1])[0] + "_cifras.pdf"
-        pdf = folha_de_notas(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
+        alvo = os.path.splitext(sys.argv[1])[0] + "_cifras.docx"
+        pdf = folha_de_notas_docx(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
         if not pdf:
             print("nenhuma nota lida")
             return 1
@@ -1348,7 +1468,7 @@ def main():
         print(alvo)
         return 0
     if "--cifras" in sys.argv:
-        alvo = os.path.splitext(sys.argv[1])[0] + "_cifras.pdf"
+        alvo = os.path.splitext(sys.argv[1])[0] + "_acordes.pdf"
         pdf = folha_de_acordes(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
         if not pdf:
             print("essa partitura nao trouxe cifra")

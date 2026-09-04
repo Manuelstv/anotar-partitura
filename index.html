@@ -783,7 +783,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=33";
+const V = "?v=34";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1471,11 +1471,11 @@ if _rel["total"]:
                 _info["acompanhamento"] = analise.acompanhamento(_dados, _info)
             except Exception:
                 _info["acompanhamento"] = []
-# a folha de cifras sai AGORA, junto: e um PDF de texto, custa milissegundos, e assim o
-# botao de baixar nao precisa guardar o dicionario da analise do lado do Python
+# a folha de cifras sai AGORA, junto: e um .docx (zip de XML), custa milissegundos, e
+# assim o botao de baixar nao precisa guardar o dicionario da analise do lado do Python
 if _info and _info.get("leitura"):
     try:
-        _cifras = analise.folha_de_notas(_info, _titulo) or b""
+        _cifras = analise.folha_de_notas_docx(_info, _titulo) or b""
     except Exception:
         _cifras = b""
 (_saida, _previa, json.dumps({"rel": _rel, "info": _info}), _cifras)
@@ -1852,19 +1852,21 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
   bt.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(bt);
 
-  // Cifras: PDF proprio, so os nomes das notas, espelhando o papel — uma pagina por
-  // pagina da partitura, uma linha por linha dela. Ja veio pronto do Python, entao e um
-  // link de verdade: o editor nao mexe nesta folha.
+  // Cifras: documento proprio, so os nomes das notas, espelhando o papel — uma pagina
+  // por pagina da partitura, uma linha por linha dela. Sai em .docx para dar para
+  // corrigir e escrever em cima. Ja veio pronto do Python, entao e um link de verdade:
+  // o editor de nomes nao mexe nesta folha.
   if (extra.cifras?.length) {
     const a = document.createElement("a");
     a.className = "btn btn-secundario";
-    a.href = URL.createObjectURL(new Blob([extra.cifras], { type: "application/pdf" }));
-    // o blob morre com o cartao: sem isto, um PDF por arquivo processado fica preso na aba
+    a.href = URL.createObjectURL(new Blob([extra.cifras],
+      { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }));
+    // o blob morre com o cartao: sem isto, um arquivo por PDF processado fica preso na aba
     a.addEventListener("click", () => setTimeout(() => URL.revokeObjectURL(a.href), 60000),
                        { once: true });
-    a.download = base + "_cifras.pdf";
+    a.download = base + "_cifras.docx";
     a.textContent = "Cifras";
-    a.title = "Uma folha só com o nome das notas por extenso — uma página por página da partitura, uma linha por linha dela";
+    a.title = "Documento do Word com o nome das notas por extenso — uma página por página da partitura, uma linha por linha dela, e dá para editar";
     cartao.topo.append(a);
   }
 
