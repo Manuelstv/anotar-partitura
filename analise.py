@@ -19,7 +19,7 @@ lido do PDF. Isso importa num material de estudo — a analise nao pode inventar
   motivos   - o mesmo desenho de intervalos repetido, ainda que transposto.
   forma     - compassos com a mesma sequencia de alturas viram a mesma letra (A, B...).
   dificil   - dificuldade por compasso, para apontar onde a musica pesa.
-  folha     - `folha_de_cifras` gera um PDF novo so com a harmonia, um quadro por compasso.
+  folha     - `folha_de_acordes` gera um PDF novo so com a harmonia, um quadro por compasso.
 
 Uso:  uv run analise.py <pdf>
 """
@@ -1089,7 +1089,8 @@ def analisar(dados, sistema="letras"):
         # a melodia como texto, compasso por compasso: e o que a folha de leitura estampa.
         # Cabeca presa por ligadura fica de fora, igual ao que e escrito na pauta — ela nao
         # e um ataque novo, e repetir o nome atrapalharia a leitura.
-        "leitura": [{"c": num[(r["pagina"], r["sistema"], r["compasso"])], "n": r["nome"]}
+        "leitura": [{"c": num[(r["pagina"], r["sistema"], r["compasso"])], "n": r["nome"],
+                     "pg": r["pagina"], "sl": r["sistema"]}
                     for r in notas if not r["ligada"] and not r["graca"]],
         "grade": [{"linha": i + 1,
                    "cifras": [{"cifra": c["cifra"], "xr": c["xr"], "x": round(c["x"], 2),
@@ -1175,34 +1176,49 @@ def acompanhamento(dados, info):
 
 
 def folha_de_notas(info, titulo=''):
-    """PDF NOVO com a melodia escrita por extenso, compasso por compasso.
+    """PDF NOVO com a melodia escrita por extenso, ESPELHANDO o papel original.
+
+    Uma PAGINA daqui por pagina da partitura que tenha nota, e dentro dela uma LINHA por
+    sistema de la: a 3a linha daqui e a 3a linha de la. Isso e o que faz achar o trecho —
+    quem le compara com o atril, nao com um numero de compasso.
 
     Sem pauta, sem figura, sem duracao: so a ordem das notas. Serve para quem esta
-    aprendendo a associar nome e dedilhado e ainda tropeca na leitura da pauta — e para
-    conferir de cabeca, longe do instrumento. O nome sai no sistema que foi pedido na
-    entrada, entao com "Do Re Mi" marcado a folha toda vem em do-re-mi.
+    aprendendo a associar nome e dedilhado e ainda tropeca na leitura da pauta. O nome sai
+    no sistema pedido na entrada, entao com "Do Re Mi" marcado a folha toda vem em do-re-mi.
 
     Devolve bytes de PDF, ou None se nao houver nota lida.
     """
     seq = (info or {}).get("leitura") or []
     if not seq:
         return None
-    por_compasso = []
+    # agrupa por (pagina, sistema) preservando a ordem de leitura
+    paginas, atual = [], None
     for e in seq:
-        if not por_compasso or por_compasso[-1][0] != e["c"]:
-            por_compasso.append((e["c"], []))
-        por_compasso[-1][1].append(e["n"])
+        chave = (e.get("pg", 0), e.get("sl", 0))
+        if not paginas or paginas[-1][0] != chave[0]:
+            paginas.append((chave[0], []))
+            atual = None
+        if atual != chave[1]:
+            paginas[-1][1].append([])
+            atual = chave[1]
+        paginas[-1][1][-1].append(e["n"])
 
     doc = pymupdf.open()
     LARG, ALT = 595.0, 842.0
-    marg, h = 52.0, 23.0
+    marg, h = 52.0, 26.0
+    LARG_UTIL = LARG - 2 * marg
+    CORPO, MIN_CORPO = 12.0, 6.5
     cinza, claro, preto = (0.42, 0.42, 0.42), (0.68, 0.68, 0.68), (0, 0, 0)
-    pg, y = None, 0.0
 
-    def nova_pagina(primeira):
-        nonlocal pg, y
+    def largura(nomes, corpo):
+        """Largura de uma linha inteira no corpo dado, com o mesmo passo do desenho."""
+        return sum(max(2.5 * corpo, pymupdf.get_text_length(nm, fontname='hebo',
+                                                            fontsize=corpo) + corpo)
+                   for nm in nomes)
+
+    for i, (npg, linhas) in enumerate(paginas):
         pg = doc.new_page(width=LARG, height=ALT)
-        if primeira:
+        if i == 0:
             pg.insert_text((marg, 66), titulo or 'Notas da melodia', fontname='hebo',
                            fontsize=17)
             meta = [info["tom"]]
@@ -1214,34 +1230,35 @@ def folha_de_notas(info, titulo=''):
             y = 116.0
         else:
             y = 72.0
-
-    nova_pagina(True)
-    for numero, nomes in por_compasso:
-        # compasso comprido continua na linha de baixo, com o numero repetido em claro
-        pedacos, atual = [], []
-        for nm in nomes:
-            atual.append(nm)
-            if len(atual) == 12:
-                pedacos.append(atual)
-                atual = []
-        if atual:
-            pedacos.append(atual)
-        for i, pedaco in enumerate(pedacos):
-            if y + h > ALT - 52:
-                nova_pagina(False)
-            pg.insert_text((marg - 26, y), str(numero), fontname='helv', fontsize=8,
-                           color=claro if i else cinza)
+        if npg or len(paginas) > 1:
+            pg.insert_text((marg, y), f'pagina {npg + 1}', fontname='helv', fontsize=9,
+                           color=cinza)
+            y += 20.0
+        for n, nomes in enumerate(linhas):
+            if not nomes:
+                continue
+            # a linha nunca quebra: e o espelho de uma linha do papel. Quem cede e o corpo
+            # da fonte, ate o piso — abaixo dele nao adianta diminuir, ninguem le no atril.
+            corpo = CORPO
+            while corpo > MIN_CORPO and largura(nomes, corpo) > LARG_UTIL:
+                corpo -= 0.25
+            if y + h > ALT - 52:                 # linha demais para uma pagina so
+                pg = doc.new_page(width=LARG, height=ALT)
+                y = 72.0
+            pg.insert_text((marg - 26, y), str(n + 1), fontname='helv', fontsize=8,
+                           color=claro)
             x = marg
-            for nm in pedaco:
-                pg.insert_text((x, y), nm, fontname='hebo', fontsize=12, color=preto)
-                x += max(30.0, pymupdf.get_text_length(nm, fontname='hebo', fontsize=12) + 12)
+            for nm in nomes:
+                pg.insert_text((x, y), nm, fontname='hebo', fontsize=corpo, color=preto)
+                x += max(2.5 * corpo,
+                         pymupdf.get_text_length(nm, fontname='hebo', fontsize=corpo) + corpo)
             y += h
     saida = doc.tobytes()
     doc.close()
     return saida
 
 
-def folha_de_cifras(info, titulo=''):
+def folha_de_acordes(info, titulo=''):
     """PDF NOVO so com a harmonia: uma faixa por LINHA da partitura, com o grau embaixo.
 
     Nao e a partitura recortada — e uma folha gerada de zero, para quando o que se quer no
@@ -1322,7 +1339,7 @@ def main():
         print("nenhuma nota legivel")
         return 1
     if "--notas" in sys.argv:
-        alvo = os.path.splitext(sys.argv[1])[0] + "_leitura.pdf"
+        alvo = os.path.splitext(sys.argv[1])[0] + "_cifras.pdf"
         pdf = folha_de_notas(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
         if not pdf:
             print("nenhuma nota lida")
@@ -1332,7 +1349,7 @@ def main():
         return 0
     if "--cifras" in sys.argv:
         alvo = os.path.splitext(sys.argv[1])[0] + "_cifras.pdf"
-        pdf = folha_de_cifras(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
+        pdf = folha_de_acordes(r, os.path.basename(os.path.splitext(sys.argv[1])[0]))
         if not pdf:
             print("essa partitura nao trouxe cifra")
             return 1

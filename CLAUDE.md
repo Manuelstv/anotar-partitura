@@ -14,7 +14,7 @@ no código, para evitar problemas de encoding).
 | Caminho | O que é |
 |---|---|
 | `~/notes-pdf/` | este repo (dev). `anotar_partitura.py` é o núcleo |
-| `analise.py` | análise musical determinística: tom, cifras, grau/cadência, campo em tétrades, som real, ritmo, respiro, motivos, e `folha_de_cifras` (PDF só com a harmonia) |
+| `analise.py` | análise musical determinística: tom, cifras, grau/cadência, campo em tétrades, som real, ritmo, respiro, motivos, e `folha_de_acordes` (PDF só com a harmonia) e `folha_de_notas` (a folha "Cifras": uma página por página da partitura, uma linha por linha dela) |
 | `dificuldade.py` + `pesos_dificuldade.json` | nota 0–10 de dificuldade no sax alto; `calibrar` reajusta os pesos |
 | `~/anotar-partitura-web/` | cópia publicada: `index.html` + o mesmo `.py` |
 | `github.com/Manuelstv/anotar-partitura` | repo público, Pages no branch `master` |

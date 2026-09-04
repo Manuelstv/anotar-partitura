@@ -1,0 +1,423 @@
+- generic [ref=f3e1]:
+  - button "Alternar tema claro e escuro" [ref=f3e2] [cursor=pointer]
+  - generic [ref=f3e6]:
+    - banner [ref=f3e7]:
+      - heading [level=1] [ref=f3e8]:
+        - text: Partitura
+        - emphasis [ref=f3e13]: Inteligente
+      - paragraph [ref=f3e14]: "O nome de cada nota escrito embaixo da pauta, no seu próprio PDF — e a leitura da música junto: tom, harmonia, ritmo e o quanto ela pesa no sax alto."
+      - paragraph [ref=f3e15]: Funciona bem com PDF. Com print de tela também funciona, mas ainda em beta.
+    - generic [ref=f3e16]:
+      - button "Arraste PDF ou print aqui ou toque para escolher. PDF, JPG ou PNG — pode mandar vários." [active] [ref=f3e17] [cursor=pointer]:
+        - generic [ref=f3e22]: Arraste PDF ou print aqui
+        - text: ou toque para escolher. PDF, JPG ou PNG — pode mandar vários.
+      - button
+      - generic [ref=f3e24]:
+        - generic [ref=f3e25]: Nomes
+        - radiogroup "Nomes" [ref=f3e26]:
+          - generic [ref=f3e27] [cursor=pointer]:
+            - radio "C D E" [checked]
+            - text: C D E
+          - generic [ref=f3e28] [cursor=pointer]:
+            - radio "Dó Ré Mi"
+            - text: Dó Ré Mi
+    - generic [ref=f3e40]:
+      - generic [ref=f3e41]:
+        - generic [ref=f3e43]:
+          - generic [ref=f3e44]: _teste.pdf
+          - generic [ref=f3e45]: 116 notas anotadas · 2 páginas
+        - generic "Dificuldade estimada no sax alto" [ref=f3e46]:
+          - generic [ref=f3e47]: "5.0"
+          - generic [ref=f3e48]: /10
+        - button "Baixar PDF" [ref=f3e49] [cursor=pointer]
+        - link "Lista de notas" [ref=f3e50] [cursor=pointer]:
+          - /url: blob:http://localhost:8899/147b50b6-42f6-4f4b-842d-21b13660c6a3
+      - group [ref=f3e51]:
+        - generic "▸ Página anotada — toque num nome para corrigir" [ref=f3e52] [cursor=pointer]
+        - generic [ref=f3e53]:
+          - generic [ref=f3e54]:
+            - generic [ref=f3e55]:
+              - button "‹" [disabled] [ref=f3e56]
+              - generic [ref=f3e57]: 1/2 · 51 nomes
+              - button "›" [ref=f3e58] [cursor=pointer]
+            - button "Desfazer" [disabled] [ref=f3e59] [cursor=pointer]
+            - button "Ampliar" [ref=f3e60] [cursor=pointer]
+          - generic [ref=f3e61]:
+            - img "Página de _teste.pdf" [ref=f3e62]
+            - img [ref=f3e63]:
+              - generic [ref=f3e64]:
+                - generic [ref=f3e65] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e66]:
+                - generic [ref=f3e67] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e68]:
+                - generic [ref=f3e69] [cursor=pointer]
+                - generic: B
+              - generic [ref=f3e70]:
+                - generic [ref=f3e71] [cursor=pointer]
+                - generic: D
+              - generic [ref=f3e72]:
+                - generic [ref=f3e73] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e74]:
+                - generic [ref=f3e75] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e76]:
+                - generic [ref=f3e77] [cursor=pointer]
+                - generic: B_
+              - generic [ref=f3e78]:
+                - generic [ref=f3e79] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e80]:
+                - generic [ref=f3e81] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e82]:
+                - generic [ref=f3e83] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e84]:
+                - generic [ref=f3e85] [cursor=pointer]
+                - generic: C
+              - generic [ref=f3e86]:
+                - generic [ref=f3e87] [cursor=pointer]
+                - generic: B
+              - generic [ref=f3e88]:
+                - generic [ref=f3e89] [cursor=pointer]
+                - generic: B
+              - generic [ref=f3e90]:
+                - generic [ref=f3e91] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e92]:
+                - generic [ref=f3e93] [cursor=pointer]
+                - generic: D
+              - generic [ref=f3e94]:
+                - generic [ref=f3e95] [cursor=pointer]
+                - generic: Bb
+              - generic [ref=f3e96]:
+                - generic [ref=f3e97] [cursor=pointer]
+                - generic: A_
+              - generic [ref=f3e98]:
+                - generic [ref=f3e99] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e100]:
+                - generic [ref=f3e101] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e102]:
+                - generic [ref=f3e103] [cursor=pointer]
+                - generic: G_
+              - generic [ref=f3e104]:
+                - generic [ref=f3e105] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e106]:
+                - generic [ref=f3e107] [cursor=pointer]
+                - generic: F#
+              - generic [ref=f3e108]:
+                - generic [ref=f3e109] [cursor=pointer]
+                - generic: F#
+              - generic [ref=f3e110]:
+                - generic [ref=f3e111] [cursor=pointer]
+                - generic: F#
+              - generic [ref=f3e112]:
+                - generic [ref=f3e113] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e114]:
+                - generic [ref=f3e115] [cursor=pointer]
+                - generic: D
+              - generic [ref=f3e116]:
+                - generic [ref=f3e117] [cursor=pointer]
+                - generic: E_
+              - generic [ref=f3e118]:
+                - generic [ref=f3e119] [cursor=pointer]
+                - generic: Eb
+              - generic [ref=f3e120]:
+                - generic [ref=f3e121] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e122]:
+                - generic [ref=f3e123] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e124]:
+                - generic [ref=f3e125] [cursor=pointer]
+                - generic: B
+              - generic [ref=f3e126]:
+                - generic [ref=f3e127] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e128]:
+                - generic [ref=f3e129] [cursor=pointer]
+                - generic: G_
+              - generic [ref=f3e130]:
+                - generic [ref=f3e131] [cursor=pointer]
+                - generic: Eb
+              - generic [ref=f3e132]:
+                - generic [ref=f3e133] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e134]:
+                - generic [ref=f3e135] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e136]:
+                - generic [ref=f3e137] [cursor=pointer]
+                - generic: B
+              - generic [ref=f3e138]:
+                - generic [ref=f3e139] [cursor=pointer]
+                - generic: G_
+              - generic [ref=f3e140]:
+                - generic [ref=f3e141] [cursor=pointer]
+                - generic: Eb
+              - generic [ref=f3e142]:
+                - generic [ref=f3e143] [cursor=pointer]
+                - generic: E
+              - generic [ref=f3e144]:
+                - generic [ref=f3e145] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e146]:
+                - generic [ref=f3e147] [cursor=pointer]
+                - generic: B
+              - generic [ref=f3e148]:
+                - generic [ref=f3e149] [cursor=pointer]
+                - generic: G_
+              - generic [ref=f3e150]:
+                - generic [ref=f3e151] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e152]:
+                - generic [ref=f3e153] [cursor=pointer]
+                - generic: F
+              - generic [ref=f3e154]:
+                - generic [ref=f3e155] [cursor=pointer]
+                - generic: D
+              - generic [ref=f3e156]:
+                - generic [ref=f3e157] [cursor=pointer]
+                - generic: C
+              - generic [ref=f3e158]:
+                - generic [ref=f3e159] [cursor=pointer]
+                - generic: Bb
+              - generic [ref=f3e160]:
+                - generic [ref=f3e161] [cursor=pointer]
+                - generic: G
+              - generic [ref=f3e162]:
+                - generic [ref=f3e163] [cursor=pointer]
+                - generic: F
+              - generic [ref=f3e164]:
+                - generic [ref=f3e165] [cursor=pointer]
+                - generic: G
+          - generic [ref=f3e166]:
+            - generic [ref=f3e167]: num nome
+            - text: corrige, ou apaga se esvaziar
+            - generic [ref=f3e168]: no vazio
+            - text: acrescenta um nome
+      - paragraph [ref=f3e169]: Esta partitura já tem 156 nomes escritos, então os meus ficam por cima. Toque num nome meu e esvazie o campo para tirá-lo.
+      - generic [ref=f3e170]:
+        - heading "Análise da música" [level=2] [ref=f3e171]
+        - generic [ref=f3e172]:
+          - generic [ref=f3e173]:
+            - generic [ref=f3e174]:
+              - term [ref=f3e175]: Tom
+              - definition [ref=f3e176]: C maior
+            - generic [ref=f3e177]:
+              - term [ref=f3e178]: Soa em
+              - definition [ref=f3e179]: Eb maior
+            - generic [ref=f3e180]:
+              - term [ref=f3e181]: Compasso
+              - definition [ref=f3e182]: 4/4
+            - generic [ref=f3e183]:
+              - term [ref=f3e184]: Âmbito
+              - definition [ref=f3e185]: D4–C6
+            - generic [ref=f3e186]:
+              - term [ref=f3e187]: Extensão
+              - definition [ref=f3e188]: 22 semitons
+            - generic [ref=f3e189]:
+              - term [ref=f3e190]: Notas
+              - definition [ref=f3e191]: "116"
+            - generic [ref=f3e192]:
+              - term [ref=f3e193]: Compassos
+              - definition [ref=f3e194]: "28"
+            - generic [ref=f3e195]:
+              - term [ref=f3e196]: Alteradas
+              - definition [ref=f3e197]: 13%
+          - generic [ref=f3e198]:
+            - heading "Ouvir e tocar junto" [level=3] [ref=f3e199]
+            - generic [ref=f3e200]:
+              - generic [ref=f3e201]:
+                - button "Voltar 5 segundos" [ref=f3e202] [cursor=pointer]
+                - button "Tocar" [ref=f3e205] [cursor=pointer]
+                - button "Avançar 5 segundos" [ref=f3e208] [cursor=pointer]
+              - generic [ref=f3e211]: 0:00
+              - slider "Posição na música" [ref=f3e212] [cursor=pointer]: "0"
+              - generic [ref=f3e213]: 1:15
+            - generic [ref=f3e214]:
+              - text: Andamento
+              - slider "Andamento 92 BPM" [ref=f3e215]: "92"
+              - generic [ref=f3e216]: 92 BPM
+            - generic [ref=f3e217]:
+              - button "Melodia" [pressed] [ref=f3e218] [cursor=pointer]
+              - button "Acompanhamento" [pressed] [ref=f3e219] [cursor=pointer]
+          - generic [ref=f3e220]:
+            - heading "Dificuldade no sax alto" [level=3] [ref=f3e221]
+            - generic [ref=f3e222]:
+              - generic [ref=f3e223]: "5.0"
+              - generic [ref=f3e226]: de 10
+          - generic [ref=f3e227]:
+            - heading "Notas mais tocadas" [level=3] [ref=f3e228]
+            - generic [ref=f3e229]:
+              - generic [ref=f3e230]: G · 25×
+              - generic [ref=f3e231]: C · 23×
+              - generic [ref=f3e232]: E · 19×
+              - generic [ref=f3e233]: A · 13×
+              - generic [ref=f3e234]: B · 11×
+          - generic [ref=f3e235]:
+            - heading "Acordes da música" [level=3] [ref=f3e236]
+            - generic [ref=f3e237]:
+              - generic [ref=f3e238]: G7
+              - generic [ref=f3e239]: C7
+              - generic [ref=f3e240]: B7
+              - generic [ref=f3e241]: E7
+              - generic [ref=f3e242]: A7
+              - generic [ref=f3e243]: F7
+              - generic [ref=f3e244]: D7
+            - generic [ref=f3e245]:
+              - generic [ref=f3e246]:
+                - generic [ref=f3e247]: G7
+                - generic [ref=f3e248]: V7
+                - generic [ref=f3e249]: G B D F
+                - generic [ref=f3e250]: mixolídio
+              - generic [ref=f3e251]:
+                - generic [ref=f3e252]: C7
+                - generic [ref=f3e253]: I7
+                - generic [ref=f3e254]: C E G Bb
+                - generic [ref=f3e255]: mixolídio
+              - generic [ref=f3e256]:
+                - generic [ref=f3e257]: B7
+                - generic [ref=f3e258]: VII7
+                - generic [ref=f3e259]: B D# F# A
+                - generic [ref=f3e260]: mixolídio
+              - generic [ref=f3e261]:
+                - generic [ref=f3e262]: E7
+                - generic [ref=f3e263]: III7
+                - generic [ref=f3e264]: E G# B D
+                - generic [ref=f3e265]: mixolídio
+              - generic [ref=f3e266]:
+                - generic [ref=f3e267]: A7
+                - generic [ref=f3e268]: VI7
+                - generic [ref=f3e269]: A C# E G
+                - generic [ref=f3e270]: mixolídio
+              - generic [ref=f3e271]:
+                - generic [ref=f3e272]: F7
+                - generic [ref=f3e273]: IV7
+                - generic [ref=f3e274]: F A C Eb
+                - generic [ref=f3e275]: mixolídio
+              - generic [ref=f3e276]:
+                - generic [ref=f3e277]: D7
+                - generic [ref=f3e278]: II7
+                - generic [ref=f3e279]: D F# A C
+                - generic [ref=f3e280]: mixolídio
+          - generic [ref=f3e281]:
+            - heading "O que a harmonia está fazendo" [level=3] [ref=f3e282]
+            - paragraph [ref=f3e283]: "harmonia de blues: I7, IV7 e V7 — escala de blues em C"
+            - generic [ref=f3e284]:
+              - generic [ref=f3e285]:
+                - generic [ref=f3e286]: dominantes em cadeia
+                - generic [ref=f3e287]: B7 → E7 → A7
+                - generic [ref=f3e288]: mixolídio em cada um, ou a alterada para tensão · linha 3
+              - generic [ref=f3e289]:
+                - generic [ref=f3e290]: dominantes em cadeia
+                - generic [ref=f3e291]: E7 → A7 → D7
+                - generic [ref=f3e292]: mixolídio em cada um, ou a alterada para tensão · linha 7
+          - generic [ref=f3e293]:
+            - heading "A sequência em graus" [level=3] [ref=f3e294]
+            - generic [ref=f3e295]:
+              - generic "dominante do tom" [ref=f3e296]:
+                - generic [ref=f3e297]: V7
+                - generic [ref=f3e298]: G7
+              - generic [ref=f3e299]:
+                - generic [ref=f3e300]: I7
+                - generic [ref=f3e301]: C7
+              - generic "dominante do tom" [ref=f3e302]:
+                - generic [ref=f3e303]: V7
+                - generic [ref=f3e304]: G7
+              - generic [ref=f3e305]:
+                - generic [ref=f3e306]: I7
+                - generic [ref=f3e307]: C7
+              - generic "dominante do tom" [ref=f3e308]:
+                - generic [ref=f3e309]: V7
+                - generic [ref=f3e310]: G7
+              - generic [ref=f3e311]:
+                - generic [ref=f3e312]: I7
+                - generic [ref=f3e313]: C7
+              - generic "dominante de III7" [ref=f3e314]:
+                - generic [ref=f3e315]: VII7
+                - generic [ref=f3e316]: B7
+              - generic "dominante de VI7" [ref=f3e317]:
+                - generic [ref=f3e318]: III7
+                - generic [ref=f3e319]: E7
+              - generic [ref=f3e320]:
+                - generic [ref=f3e321]: VI7
+                - generic [ref=f3e322]: A7
+              - generic "dominante de IV7" [ref=f3e323]:
+                - generic [ref=f3e324]: I7
+                - generic [ref=f3e325]: C7
+              - generic [ref=f3e326]:
+                - generic [ref=f3e327]: IV7
+                - generic [ref=f3e328]: F7
+              - generic "dominante de IV7" [ref=f3e329]:
+                - generic [ref=f3e330]: I7
+                - generic [ref=f3e331]: C7
+              - generic [ref=f3e332]:
+                - generic [ref=f3e333]: IV7
+                - generic [ref=f3e334]: F7
+              - generic "dominante de IV7" [ref=f3e335]:
+                - generic [ref=f3e336]: I7
+                - generic [ref=f3e337]: C7
+              - generic [ref=f3e338]:
+                - generic [ref=f3e339]: IV7
+                - generic [ref=f3e340]: F7
+              - generic "dominante de VI7" [ref=f3e341]:
+                - generic [ref=f3e342]: III7
+                - generic [ref=f3e343]: E7
+              - generic "dominante de II7" [ref=f3e344]:
+                - generic [ref=f3e345]: VI7
+                - generic [ref=f3e346]: A7
+              - generic [ref=f3e347]:
+                - generic [ref=f3e348]: II7
+                - generic [ref=f3e349]: D7
+          - generic [ref=f3e350]:
+            - heading "Campo harmônico de C maior" [level=3] [ref=f3e351]
+            - paragraph [ref=f3e352]: O que o tom comporta, para comparar com as cifras acima.
+            - generic [ref=f3e353]:
+              - generic "tríade C (maior) · maior com sétima maior" [ref=f3e354]:
+                - generic [ref=f3e355]: Imaj7 · Cmaj7
+                - generic [ref=f3e356]: C E G B
+                - generic [ref=f3e357]: jônio (maior)
+              - generic "tríade Dm (menor) · menor com sétima" [ref=f3e358]:
+                - generic [ref=f3e359]: ii7 · Dm7
+                - generic [ref=f3e360]: D F A C
+                - generic [ref=f3e361]: dórico
+              - generic "tríade Em (menor) · menor com sétima" [ref=f3e362]:
+                - generic [ref=f3e363]: iii7 · Em7
+                - generic [ref=f3e364]: E G B D
+                - generic [ref=f3e365]: frígio
+              - generic "tríade F (maior) · maior com sétima maior" [ref=f3e366]:
+                - generic [ref=f3e367]: IVmaj7 · Fmaj7
+                - generic [ref=f3e368]: F A C E
+                - generic [ref=f3e369]: lídio
+              - generic "tríade G (maior) · dominante" [ref=f3e370]:
+                - generic [ref=f3e371]: V7 · G7
+                - generic [ref=f3e372]: G B D F
+                - generic [ref=f3e373]: mixolídio
+              - generic "tríade Am (menor) · menor com sétima" [ref=f3e374]:
+                - generic [ref=f3e375]: vi7 · Am7
+                - generic [ref=f3e376]: A C E G
+                - generic [ref=f3e377]: eólio (menor)
+              - generic "tríade B° (diminuto) · meio-diminuto" [ref=f3e378]:
+                - generic [ref=f3e379]: vii7b5 · Bm7b5
+                - generic [ref=f3e380]: B D F A
+                - generic [ref=f3e381]: lócrio
+          - generic [ref=f3e382]:
+            - heading "No sax alto" [level=3] [ref=f3e383]
+            - generic [ref=f3e384]:
+              - generic [ref=f3e385]: soa em Eb maior
+              - generic [ref=f3e386]: F3–Eb5 de verdade
+            - paragraph [ref=f3e387]: "Notas de fora do tom (é aqui que mora o cromatismo): Eb 5× · Bb 4× · F# 3× · Ab 3×"
+    - paragraph [ref=f3e29]: "Vale qualquer PDF gerado por computador — MuseScore, Sibelius, Finale, Dorico. Partitura escaneada não dá: sem vetor não existe coordenada para ler a altura da nota."
+    - contentinfo [ref=f3e30]:
+      - paragraph [ref=f3e31]: "Tudo acontece dentro do seu navegador: o arquivo não sobe para servidor nenhum. O PDF que volta é o original com uma camada de texto por cima — o desenho do arranjador fica intacto."
+      - paragraph [ref=f3e32]:
+        - link "Código no GitHub" [ref=f3e33] [cursor=pointer]:
+          - /url: https://github.com/Manuelstv/anotar-partitura

@@ -1,0 +1,31 @@
+- generic [ref=f1e1]:
+  - button "Alternar tema claro e escuro" [ref=f1e2] [cursor=pointer]
+  - generic [ref=f1e6]:
+    - banner [ref=f1e7]:
+      - heading [level=1] [ref=f1e8]:
+        - text: Partitura
+        - emphasis [ref=f1e13]: Inteligente
+      - paragraph [ref=f1e14]: O nome de cada nota embaixo da pauta, no seu próprio PDF.
+      - paragraph [ref=f1e15]: print de tela ainda em beta
+    - generic [ref=f1e16]:
+      - button "Arraste PDF ou print aqui PDF, JPG ou PNG" [active] [ref=f1e17] [cursor=pointer]:
+        - generic [ref=f1e22]: Arraste PDF ou print aqui
+        - text: PDF, JPG ou PNG
+      - button
+      - generic [ref=f1e24]:
+        - generic [ref=f1e25]: Nomes
+        - radiogroup "Nomes" [ref=f1e26]:
+          - generic [ref=f1e27] [cursor=pointer]:
+            - radio "C D E" [checked]
+            - text: C D E
+          - generic [ref=f1e28] [cursor=pointer]:
+            - radio "Dó Ré Mi"
+            - text: Dó Ré Mi
+    - status [ref=f1e31]:
+      - generic [ref=f1e32]: A fé nao costumaa faiar.
+    - generic [ref=f1e40]:
+      - generic [ref=f1e41]: _teste.pdf
+      - generic [ref=f1e42]: na fila
+    - contentinfo [ref=f1e29]:
+      - link "GitHub" [ref=f1e30] [cursor=pointer]:
+        - /url: https://github.com/Manuelstv/anotar-partitura

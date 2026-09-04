@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - button "Alternar tema claro e escuro" [ref=e2] [cursor=pointer]
+  - generic [ref=e5]:
+    - banner [ref=e6]:
+      - heading [level=1] [ref=e7]:
+        - text: Partitura
+        - emphasis [ref=e12]: Inteligente
+      - paragraph [ref=e13]: "O nome de cada nota escrito embaixo da pauta, no seu próprio PDF — e a leitura da música junto: tom, harmonia, ritmo e o quanto ela pesa no sax alto."
+      - paragraph [ref=e14]:
+        - text: Funciona bem com
+        - generic [ref=e15]: PDF
+        - text: . Com
+        - generic [ref=e16]: print de tela
+        - text: também funciona, mas ainda em
+        - generic [ref=e17]: beta
+        - text: .
+    - generic [ref=e18]:
+      - button "Arraste PDF ou print aqui ou toque para escolher. PDF, JPG ou PNG — pode mandar vários." [ref=e19] [cursor=pointer]:
+        - generic [ref=e24]: Arraste PDF ou print aqui
+        - text: ou toque para escolher. PDF, JPG ou PNG — pode mandar vários.
+      - button
+      - generic [ref=e26]:
+        - generic [ref=e27]: Nomes
+        - radiogroup "Nomes" [ref=e28]:
+          - generic [ref=e29] [cursor=pointer]:
+            - radio "C D E" [checked]
+            - text: C D E
+          - generic [ref=e30] [cursor=pointer]:
+            - radio "Dó Ré Mi"
+            - text: Dó Ré Mi
+    - paragraph
+    - contentinfo [ref=e31]

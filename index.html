@@ -783,7 +783,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=32";
+const V = "?v=33";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1852,8 +1852,9 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
   bt.textContent = png ? "Baixar imagem" : "Baixar PDF";
   cartao.topo.append(bt);
 
-  // Lista de notas: PDF proprio, so os nomes na ordem, compasso por compasso. Ja veio
-  // pronto do Python, entao e um link de verdade — o editor nao mexe nesta lista.
+  // Cifras: PDF proprio, so os nomes das notas, espelhando o papel — uma pagina por
+  // pagina da partitura, uma linha por linha dela. Ja veio pronto do Python, entao e um
+  // link de verdade: o editor nao mexe nesta folha.
   if (extra.cifras?.length) {
     const a = document.createElement("a");
     a.className = "btn btn-secundario";
@@ -1861,9 +1862,9 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
     // o blob morre com o cartao: sem isto, um PDF por arquivo processado fica preso na aba
     a.addEventListener("click", () => setTimeout(() => URL.revokeObjectURL(a.href), 60000),
                        { once: true });
-    a.download = base + "_leitura.pdf";
-    a.textContent = "Lista de notas";
-    a.title = "Uma folha só com o nome das notas por extenso, na ordem, sem pauta nem ritmo";
+    a.download = base + "_cifras.pdf";
+    a.textContent = "Cifras";
+    a.title = "Uma folha só com o nome das notas por extenso — uma página por página da partitura, uma linha por linha dela";
     cartao.topo.append(a);
   }
 

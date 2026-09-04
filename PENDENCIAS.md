@@ -155,7 +155,7 @@ Entrou em 2026-08-01. O que passou a sair de `analise.py`:
   corridos vira aviso. Limiar de meio tempo dava 46 "respiros" em 28 compassos.
 - **Motivos** por contorno intervalar (pega transposto), **registro** no instrumento
   (chave de palma, mesa, altíssimo) e **notas fora do tom**.
-- **Folha de cifras em PDF** (`folha_de_cifras`): uma faixa por linha da partitura, cifra
+- **Folha de cifras em PDF** (`folha_de_acordes`): uma faixa por linha da partitura, cifra
   grande, grau embaixo, e a posição horizontal igual à da pauta — o espaço entre duas
   cifras conta quanto o acorde durou. Sai no site como "Baixar cifras".
 - **Maior x menor decidido pela harmonia** quando há cifra (`tom_por`), com a melodia como

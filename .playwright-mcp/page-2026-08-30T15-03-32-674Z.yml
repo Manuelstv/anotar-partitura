@@ -1,0 +1,29 @@
+- generic [active] [ref=f2e1]:
+  - button "Alternar tema claro e escuro" [ref=f2e2] [cursor=pointer]
+  - generic [ref=f2e6]:
+    - banner [ref=f2e7]:
+      - heading [level=1] [ref=f2e8]:
+        - text: Partitura
+        - emphasis [ref=f2e13]: Inteligente
+      - paragraph [ref=f2e14]: "O nome de cada nota escrito embaixo da pauta, no seu próprio PDF — e a leitura da música junto: tom, harmonia, ritmo e o quanto ela pesa no sax alto."
+      - paragraph [ref=f2e15]: Funciona bem com PDF. Com print de tela também funciona, mas ainda em beta.
+    - generic [ref=f2e16]:
+      - button "Arraste PDF ou print aqui ou toque para escolher. PDF, JPG ou PNG — pode mandar vários." [ref=f2e17] [cursor=pointer]:
+        - generic [ref=f2e22]: Arraste PDF ou print aqui
+        - text: ou toque para escolher. PDF, JPG ou PNG — pode mandar vários.
+      - button
+      - generic [ref=f2e24]:
+        - generic [ref=f2e25]: Nomes
+        - radiogroup "Nomes" [ref=f2e26]:
+          - generic [ref=f2e27] [cursor=pointer]:
+            - radio "C D E" [checked]
+            - text: C D E
+          - generic [ref=f2e28] [cursor=pointer]:
+            - radio "Dó Ré Mi"
+            - text: Dó Ré Mi
+    - paragraph [ref=f2e29]: "Vale qualquer PDF gerado por computador — MuseScore, Sibelius, Finale, Dorico. Partitura escaneada não dá: sem vetor não existe coordenada para ler a altura da nota."
+    - contentinfo [ref=f2e30]:
+      - paragraph [ref=f2e31]: "Tudo acontece dentro do seu navegador: o arquivo não sobe para servidor nenhum. O PDF que volta é o original com uma camada de texto por cima — o desenho do arranjador fica intacto."
+      - paragraph [ref=f2e32]:
+        - link "Código no GitHub" [ref=f2e33] [cursor=pointer]:
+          - /url: https://github.com/Manuelstv/anotar-partitura
