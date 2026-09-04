@@ -350,6 +350,41 @@ def _traduzir(d):
     return d
 
 
+RE_PARTE = re.compile(r'^[A-Z]\d?$')
+
+
+def ler_partes(pg, sistemas, textos, formas):
+    """Marcas de ensaio ("A", "B", "C1") acima das pautas, em ordem de leitura.
+
+    E o mesmo sinal que `ler_cifras` DESCARTA: letra solta dentro de uma CAIXA desenhada.
+    La ela e ruido — casaria com a regex de cifra e viraria acorde; aqui ela e o dado.
+
+    A caixa sozinha nao basta: o titulo da pagina tambem mora dentro de um retangulo, e
+    sem exigir o formato de marca de ensaio "So de Tu" entrava como tres partes.
+    """
+    def em_caixa(t, x0, x1):
+        larg = max(1.0, x1 - x0)
+        return any(f["x0"] <= x0 + 1 and f["x1"] >= x1 - 1
+                   and f["y0"] <= t["bbox"][1] + 1 and f["y1"] >= t["bbox"][3] - 1
+                   and (f["x1"] - f["x0"]) < 4 * larg
+                   for f in formas)
+
+    achadas = []
+    for t in textos:
+        txt = t["txt"].strip()
+        if not RE_PARTE.match(txt):
+            continue
+        x0, x1 = t["bbox"][0], t["bbox"][2]
+        cy = (t["bbox"][1] + t["bbox"][3]) / 2
+        for i, sis in enumerate(sistemas):
+            span = sis[-1] - sis[0]
+            if sis[0] - 3.5 * span < cy < sis[0] and em_caixa(t, x0, x1):
+                achadas.append({"sistema": i, "x": (x0 + x1) / 2, "marca": txt})
+                break
+    achadas.sort(key=lambda m: (m["sistema"], m["x"]))
+    return achadas
+
+
 def ler_cifras(pg, sistemas, textos, formas):
     """Cifras que estao ACIMA de alguma pauta, em ordem de leitura.
 
@@ -938,7 +973,7 @@ def analisar(dados, sistema="letras"):
     """
     doc = pymupdf.open(stream=dados, filetype="pdf")
     notas, cifras, compassos, linhas_vistas = [], [], {}, []
-    repeticoes, musicas = [], []
+    repeticoes, musicas, partes = [], [], []
     _obra = {}
 
     def caixa(ch):
@@ -963,6 +998,8 @@ def analisar(dados, sistema="letras"):
                                           com_repeticoes=True)
         for rp in reps:
             repeticoes.append(dict(rp, pagina=pg.number))
+        for mk in ler_partes(pg, sistemas, textos, formas):
+            partes.append(dict(mk, pagina=pg.number))
         for r in sorted(rot, key=lambda r: (r["sistema"], r["x"])):
             notas.append(dict(r, pagina=pg.number))
             caixa((pg.number, r["sistema"], r["compasso"]))["notas"].append(r)
@@ -1076,6 +1113,7 @@ def analisar(dados, sistema="letras"):
         "armadura": arm,
         "obra": _obra,
         "musicas": musicas,
+        "partes": partes,
         "escala_do_tom": [n for n, _ in escala_tom],
         "grave": CLASSES[min(midis) % 12] + str(min(midis) // 12 - 1),
         "agudo": CLASSES[max(midis) % 12] + str(max(midis) // 12 - 1),
@@ -1273,13 +1311,22 @@ def leitura_de(notas, repeticoes, num):
 
 
 def _secoes(info, seq):
-    """A folha em secoes: [(rotulo, e_nome_de_musica, [linha, ...])].
+    """A folha em secoes: [(rotulo, e_nome_de_musica, [(parte, [nome, ...]), ...])].
+
+    `parte` e a marca de ensaio que ABRE aquela linha ("A", "B"), ou "" — e o que divide a
+    musica em blocos na folha. A marca rotula a LINHA em que aparece, e nao o ponto exato:
+    partir a linha no meio dela quebraria o espelho do papel, que e a razao da folha.
 
     Uma secao e uma MUSICA quando o arquivo e um songbook, e uma PAGINA quando ele tem uma
     musica so. Musica que ocupa duas paginas do papel vira uma secao continua: quebrar ali
     partiria a mesma musica em duas folhas, e quem le no atril procura pelo nome, nao pelo
     numero da pagina. Cada linha e uma linha da partitura, na ordem.
     """
+    # (pagina, sistema) -> marca(s) de ensaio que abrem aquela linha
+    marcas = {}
+    for p in sorted((info or {}).get("partes") or [], key=lambda p: p["x"]):
+        marcas.setdefault((p["pagina"], p["sistema"]), []).append(p["marca"])
+
     paginas, atual = [], None
     for e in seq:
         chave = (e.get("pg", 0), e.get("sl", 0))
@@ -1287,9 +1334,9 @@ def _secoes(info, seq):
             paginas.append((chave[0], []))
             atual = None
         if atual != chave[1]:
-            paginas[-1][1].append([])
+            paginas[-1][1].append((" ".join(marcas.get(chave, [])), []))
             atual = chave[1]
-        paginas[-1][1][-1].append(_com_registro(e))
+        paginas[-1][1][-1][1].append(_com_registro(e))
 
     rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
     # inicio de cada musica: e por ele que se sabe se a pagina abre secao ou continua uma
@@ -1357,9 +1404,19 @@ def folha_de_notas(info, titulo=''):
                            fontsize=13 if e_musica else 9,
                            color=preto if e_musica else cinza)
             y += 26.0 if e_musica else 20.0
-        for n, nomes in enumerate(linhas):
+        for n, (parte, nomes) in enumerate(linhas):
             if not nomes:
                 continue
+            if parte:
+                if y + 3 * h > ALT - 52:
+                    pg = doc.new_page(width=LARG, height=ALT)
+                    y = 72.0
+                elif n:
+                    y += 10.0
+                    pg.draw_line((marg - 26, y - 6), (LARG - marg, y - 6),
+                                 color=claro, width=0.6)
+                pg.insert_text((marg - 26, y + 8), parte, fontname='hebo', fontsize=11)
+                y += 20.0
             # a linha nunca quebra: e o espelho de uma linha do papel. Quem cede e o corpo
             # da fonte, ate o piso — abaixo dele nao adianta diminuir, ninguem le no atril.
             corpo = CORPO
@@ -1403,7 +1460,8 @@ def _xml(t):
              .replace('"', "&quot;"))
 
 
-def _par(texto, corpo=11.0, fonte="Consolas", negrito=False, cor=None, quebra_antes=False):
+def _par(texto, corpo=11.0, fonte="Consolas", negrito=False, cor=None,
+         quebra_antes=False, traco_acima=False):
     """Um paragrafo do documento. `corpo` em pontos; no XML vai em meios-pontos."""
     pr = ['<w:rPr><w:rFonts w:ascii="%s" w:hAnsi="%s"/>' % (fonte, fonte)]
     if negrito:
@@ -1415,6 +1473,11 @@ def _par(texto, corpo=11.0, fonte="Consolas", negrito=False, cor=None, quebra_an
     ppr = "<w:pPr>"
     if quebra_antes:
         ppr += "<w:pageBreakBefore/>"
+    if traco_acima:
+        # o traco que separa uma parte da anterior e borda do paragrafo, nao caractere:
+        # assim ele atravessa a coluna inteira sem depender da largura da fonte
+        ppr += ('<w:pBdr><w:top w:val="single" w:sz="4" w:space="6" w:color="BFBFBF"/>'
+                "</w:pBdr>")
     # espacamento apertado: a folha e para caber no atril, nao para respirar
     ppr += '<w:spacing w:before="0" w:after="60" w:line="240" w:lineRule="auto"/></w:pPr>'
     return ("<w:p>" + ppr + "<w:r>" + "".join(pr)
@@ -1483,9 +1546,12 @@ def folha_de_notas_docx(info, titulo=''):
                            quebra_antes=(i > 0)))
         elif i > 0:
             ps.append(_par("", quebra_antes=True))
-        for nomes in linhas:
+        for n, (parte, nomes) in enumerate(linhas):
             if not nomes:
                 continue
+            if parte:
+                ps.append(_par(parte, corpo=11, fonte="Calibri", negrito=True,
+                               traco_acima=bool(n)))
             # a marca de repeticao e mais larga que a coluna das notas: ela ocupa o
             # que precisar e leva um espaco proprio, senao ":|:" cola na nota seguinte
             texto = "".join(nm.ljust(max(campo, len(nm) + 1)) for nm in nomes).rstrip()
