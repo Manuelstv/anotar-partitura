@@ -1180,11 +1180,15 @@ def acompanhamento(dados, info):
     return saida
 
 
-DO4 = 60          # MIDI do do central, na altura ESCRITA (nao no som que o sax faz)
+# O corte fica no DO5, o do em cima da pauta, onde entra a chave de palma — e nao no do
+# central: DO4 e a primeira suplementar ABAIXO da pauta, e como o sax alto so desce ate
+# Sib3, com ele a folha inteira saia em maiuscula (medido: 0,9% das notas do acervo
+# ficavam minusculas, e 0% nos arquivos de sax alto).
+DO5 = 72          # MIDI, na altura ESCRITA (nao no som que o sax faz)
 
 
 def _com_registro(e):
-    """O nome da nota com a caixa que diz o registro: grave em minusculo, DO4 pra cima
+    """O nome da nota com a caixa que diz o registro: grave em minusculo, DO5 pra cima
     em MAIUSCULO.
 
     E a convencao de Helmholtz, e serve para o mesmo nome nao virar duas notas na folha:
@@ -1200,7 +1204,7 @@ def _com_registro(e):
     while i > 1 and n[i - 1] in "b#":
         i -= 1
     base, acidente = n[:i], n[i:]
-    return (base.upper() if e.get("midi", DO4) >= DO4 else base.lower()) + acidente
+    return (base.upper() if e.get("midi", DO5) >= DO5 else base.lower()) + acidente
 
 
 def leitura_de(notas, repeticoes, num):
