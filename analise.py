@@ -1203,7 +1203,7 @@ def _rotulos_de_pagina(info, paginas):
     Com varias musicas o endereco util passa a ser o nome, e a pagina de continuacao vira
     "Nome (2)".
     """
-    musicas = [m for m in (info or {}).get("musicas") or []]
+    musicas = sorted((info or {}).get("musicas") or [], key=lambda m: m["pagina"])
     if len(musicas) < 2:
         return {n: ('pagina %d' % (n + 1), False) for n in paginas}
     out = {}
@@ -1272,6 +1272,38 @@ def leitura_de(notas, repeticoes, num):
     return itens
 
 
+def _secoes(info, seq):
+    """A folha em secoes: [(rotulo, e_nome_de_musica, [linha, ...])].
+
+    Uma secao e uma MUSICA quando o arquivo e um songbook, e uma PAGINA quando ele tem uma
+    musica so. Musica que ocupa duas paginas do papel vira uma secao continua: quebrar ali
+    partiria a mesma musica em duas folhas, e quem le no atril procura pelo nome, nao pelo
+    numero da pagina. Cada linha e uma linha da partitura, na ordem.
+    """
+    paginas, atual = [], None
+    for e in seq:
+        chave = (e.get("pg", 0), e.get("sl", 0))
+        if not paginas or paginas[-1][0] != chave[0]:
+            paginas.append((chave[0], []))
+            atual = None
+        if atual != chave[1]:
+            paginas[-1][1].append([])
+            atual = chave[1]
+        paginas[-1][1][-1].append(_com_registro(e))
+
+    rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
+    # inicio de cada musica: e por ele que se sabe se a pagina abre secao ou continua uma
+    abre = {m["pagina"] for m in (info or {}).get("musicas") or []}
+    out = []
+    for npg, linhas in paginas:
+        rot, e_musica = rotulos[npg]
+        if out and e_musica and npg not in abre:
+            out[-1][2].extend(linhas)          # continuacao: emenda na musica anterior
+        else:
+            out.append((rot, e_musica, list(linhas)))
+    return out
+
+
 def folha_de_notas(info, titulo=''):
     """PDF NOVO com a melodia escrita por extenso, ESPELHANDO o papel original.
 
@@ -1289,18 +1321,7 @@ def folha_de_notas(info, titulo=''):
     if not seq:
         return None
     # agrupa por (pagina, sistema) preservando a ordem de leitura
-    paginas, atual = [], None
-    for e in seq:
-        chave = (e.get("pg", 0), e.get("sl", 0))
-        if not paginas or paginas[-1][0] != chave[0]:
-            paginas.append((chave[0], []))
-            atual = None
-        if atual != chave[1]:
-            paginas[-1][1].append([])
-            atual = chave[1]
-        paginas[-1][1][-1].append(_com_registro(e))
-
-    rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
+    secoes = _secoes(info, seq)
     doc = pymupdf.open()
     LARG, ALT = 595.0, 842.0
     marg, h = 52.0, 26.0
@@ -1314,7 +1335,7 @@ def folha_de_notas(info, titulo=''):
                                                             fontsize=corpo) + corpo)
                    for nm in nomes)
 
-    for i, (npg, linhas) in enumerate(paginas):
+    for i, (rot, e_musica, linhas) in enumerate(secoes):
         pg = doc.new_page(width=LARG, height=ALT)
         if i == 0 and titulo is None:
             y = 72.0
@@ -1330,8 +1351,7 @@ def folha_de_notas(info, titulo=''):
             y = 116.0
         else:
             y = 72.0
-        rot, e_musica = rotulos[npg]
-        if npg or len(paginas) > 1:
+        if i or len(secoes) > 1:
             pg.insert_text((marg, y), rot,
                            fontname='hebo' if e_musica else 'helv',
                            fontsize=13 if e_musica else 9,
@@ -1438,18 +1458,7 @@ def folha_de_notas_docx(info, titulo=''):
     seq = (info or {}).get("leitura") or []
     if not seq:
         return None
-    paginas, atual = [], None
-    for e in seq:
-        chave = (e.get("pg", 0), e.get("sl", 0))
-        if not paginas or paginas[-1][0] != chave[0]:
-            paginas.append((chave[0], []))
-            atual = None
-        if atual != chave[1]:
-            paginas[-1][1].append([])
-            atual = chave[1]
-        paginas[-1][1][-1].append(_com_registro(e))
-
-    rotulos = _rotulos_de_pagina(info, [p[0] for p in paginas])
+    secoes = _secoes(info, seq)
     # largura util da pagina em pontos: A4 menos as margens de 2 cm declaradas no sectPr
     UTIL = 595.0 - 2 * 56.7
     CORPO, MIN_CORPO = 11.0, 5.5
@@ -1467,9 +1476,8 @@ def folha_de_notas_docx(info, titulo=''):
         ps.append(_par('  ·  '.join(meta), corpo=9.5, fonte="Calibri", cor="6B6B6B"))
         ps.append(_par(""))
 
-    for i, (npg, linhas) in enumerate(paginas):
-        rot, e_musica = rotulos[npg]
-        if npg or len(paginas) > 1:
+    for i, (rot, e_musica, linhas) in enumerate(secoes):
+        if i or len(secoes) > 1:
             ps.append(_par(rot, corpo=13 if e_musica else 9, fonte="Calibri",
                            negrito=e_musica, cor=None if e_musica else "6B6B6B",
                            quebra_antes=(i > 0)))
