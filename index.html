@@ -818,7 +818,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=49";
+const V = "?v=50";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1660,6 +1660,7 @@ function montarEditor(cartao, ctx) {
         </span>
         <button type="button" class="btn-mini esticar" data-modo aria-pressed="false">Modo edição</button>
         <button type="button" class="btn-mini" data-undo disabled>Desfazer</button>
+        <button type="button" class="btn-mini" data-share hidden>Compartilhar</button>
         <button type="button" class="btn-mini" data-lupa>Ampliar</button>
       </div>
       <div class="palco"></div>
@@ -1876,6 +1877,19 @@ function montarEditor(cartao, ctx) {
 
   const btUndo = cx.querySelector("[data-undo]");
   btUndo.addEventListener("click", desfazer);
+
+  // Mora nesta barra, e nao junto do "Baixar PDF" la em cima, porque esta barra viaja para
+  // a tela da musica — que e onde a pessoa cai depois de ler o PDF. No topo do cartao o
+  // botao ficaria atras da tela cheia, inalcancavel sem sair dela.
+  // So aparece onde a bandeja existe (celular, Windows): no Chrome/Firefox de Linux nao
+  // ha `canShare` com arquivo, e um botao que nao faz nada e pior que botao nenhum —
+  // "Baixar" continua ali do lado.
+  const btShare = cx.querySelector("[data-share]");
+  if (navigator.canShare?.({ files: [new File([new Uint8Array(1)], "t.pdf",
+                                              { type: "application/pdf" })] })) {
+    btShare.hidden = false;
+    btShare.addEventListener("click", () => compartilhar(btShare, ctx));
+  }
   palco.addEventListener("keydown", ev => {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === "z") { ev.preventDefault(); desfazer(); }
   });
@@ -2075,25 +2089,58 @@ function montarEditor(cartao, ctx) {
   return ctx;
 }
 
+// Estampa e devolve o arquivo pronto. Mora aqui fora porque baixar e compartilhar querem
+// exatamente o mesmo arquivo — e ele e gerado na HORA, nunca guardado, para sair sempre
+// com as ultimas edicoes do editor de nomes.
+function gerarArquivo(ctx) {
+  ctx.py.globals.set("_rot", JSON.stringify(ctx.rotulos.filter(r => r.texto)));
+  ctx.py.globals.set("_fs", ctx.noFS);
+  ctx.py.globals.set("_fmt", ctx.rel.formato === "png" ? "imagem" : "pdf");
+  const res = ctx.py.runPython(`
+import json, anotar_partitura as A
+_b, _r = A.estampar_bytes(open(_fs,"rb").read(), json.loads(_rot), saida=_fmt)
+(_b, _r["total"])
+`);
+  const [bytes, quantos] = res.toJs({ create_proxies: false });
+  res.destroy?.();
+  const png = ctx.rel.formato === "png";
+  return { bytes, quantos, png,
+           tipo: png ? "image/png" : "application/pdf",
+           nome: ctx.base + "_notas." + (png ? "png" : "pdf") };
+}
+
+// COMPARTILHAR: abre a bandeja do proprio sistema com o arquivo em maos — dali sai para o
+// WhatsApp, Drive, e-mail. Nao da para mandar um LINK: o PDF anotado so existe dentro do
+// navegador e o site e estatico, sem servidor onde hospedar. Entao o que viaja e o arquivo.
+async function compartilhar(botao, ctx) {
+  const antes = botao.textContent;
+  botao.textContent = "gerando…";
+  botao.disabled = true;
+  try {
+    const { bytes, quantos, tipo, nome } = gerarArquivo(ctx);
+    const arq = new File([bytes], nome, { type: tipo });
+    if (!navigator.canShare?.({ files: [arq] })) throw new Error("sem suporte a arquivo");
+    await navigator.share({ files: [arq], title: nome });
+    botao.textContent = `${quantos} nomes · enviado`;
+  } catch (e) {
+    // fechar a bandeja sem escolher ninguem NAO e erro: e a pessoa desistindo
+    if (e?.name === "AbortError") { botao.textContent = antes; }
+    else { botao.textContent = "não deu para compartilhar"; console.error(e); }
+  } finally {
+    botao.disabled = false;
+    setTimeout(() => { if (botao.textContent !== antes) botao.textContent = antes; }, 4000);
+  }
+}
+
 async function baixar(botao, ctx) {
   const antes = botao.textContent;
   botao.textContent = "gerando…";
   botao.disabled = true;
   try {
-    ctx.py.globals.set("_rot", JSON.stringify(ctx.rotulos.filter(r => r.texto)));
-    ctx.py.globals.set("_fs", ctx.noFS);
-    ctx.py.globals.set("_fmt", ctx.rel.formato === "png" ? "imagem" : "pdf");
-    const res = ctx.py.runPython(`
-import json, anotar_partitura as A
-_b, _r = A.estampar_bytes(open(_fs,"rb").read(), json.loads(_rot), saida=_fmt)
-(_b, _r["total"])
-`);
-    const [bytes, quantos] = res.toJs({ create_proxies: false });
-    res.destroy?.();
-    const png = ctx.rel.formato === "png";
+    const { bytes, quantos, tipo, nome } = gerarArquivo(ctx);
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([bytes], { type: png ? "image/png" : "application/pdf" }));
-    a.download = ctx.base + "_notas." + (png ? "png" : "pdf");
+    a.href = URL.createObjectURL(new Blob([bytes], { type: tipo }));
+    a.download = nome;
     a.click();
     // revoga DEPOIS: revogar no mesmo tick pode abortar o download antes de comecar
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
