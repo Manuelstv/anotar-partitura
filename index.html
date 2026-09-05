@@ -516,12 +516,24 @@
   /* Ampliado maximiza a LARGURA e rola na vertical. Limitar pela altura da
      tela era pior que nao ampliar: a pagina e retrato, a tela e paisagem, e a
      partitura saia mais estreita do que no tamanho normal. */
-  .lupa { position: fixed; inset: 0; z-index: 60; display: grid; justify-items: center;
-          align-items: start; padding: var(--s2) var(--s2) var(--s7);
-          overflow: auto; background: var(--bg); }
+  /* TELA DA MUSICA: a pagina inteira cabendo, sem rolar. O limite e a ALTURA — por isso
+     a imagem tem `height` fixo e `width: auto`, o contrario do que ela faz no cartao.
+     O respiro em cima e embaixo desconta a barra de paginas e o transporte, que sao
+     fixos e ficariam por cima da partitura. `dvh` e nao `vh` porque no celular a barra
+     do navegador entra e sai, e com `vh` a ultima pauta ficava escondida atras dela. */
+  .lupa { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+          padding: 52px var(--s2) 68px; overflow: hidden; background: var(--bg); }
   .lupa .palco { width: fit-content; max-width: none; border-radius: var(--r-sm); }
-  .lupa .palco > img { width: min(1900px, calc(100vw - 2 * var(--s2))); height: auto; }
+  .lupa .palco > img { width: auto; max-width: calc(100vw - 2 * var(--s2));
+                       height: auto; max-height: calc(100dvh - 120px); }
   .lupa-fechar { position: fixed; top: var(--s3); right: var(--s3); z-index: 61; }
+  /* com a tela aberta, a roda do mouse rolava a PAGINA DE TRAS — a partitura ficava
+     parada e o cartao passava por baixo, o que parece defeito */
+  body.tela-aberta { overflow: hidden; }
+  /* a barra de paginas viaja junto para a tela cheia: sem ela um PDF de varias paginas
+     ficava presa na primeira ate a musica virar sozinha */
+  .lupa .barra-previa { position: fixed; top: var(--s3); left: var(--s3); z-index: 61;
+                        width: auto; margin: 0; }
   /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema
      escuro herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o
      que o PDF estampa, entao o overlay mostra o resultado de verdade. */
@@ -792,7 +804,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=47";
+const V = "?v=48";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1256,6 +1268,12 @@ function montarTocador(melodia, acomp, ctx) {
   // ao querer a tela inteira para a partitura
   rodape.querySelector(".sai-rodape").onclick = () => { rodape.hidden = true; };
 
+  // a tela cheia liga o transporte sem tocar: e o unico controle que ela tem
+  ctx.transporte = (on) => {
+    if (on) document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
+    else rodape.hidden = true;
+  };
+
   const soltar = () => {
     if (!arrastando) return;
     arrastando = null;
@@ -1587,7 +1605,7 @@ if _info and _info.get("leitura"):
       const [pdfOut, previaOut, extra, cifrasOut] = res.toJs({ create_proxies: false });
       res.destroy?.();
       concluir(cartao, f.name, previaOut, JSON.parse(extra),
-               { py, noFS, sistema, cifras: cifrasOut });
+               { py, noFS, sistema, cifras: cifrasOut, sozinho: fila.length === 1 });
     } catch (e) {
       falhar(cartao, f, e);
     }
@@ -1961,8 +1979,18 @@ function montarEditor(cartao, ctx) {
   // AMPLIAR: move o proprio palco para um overlay em tela cheia e devolve no fim. Mover um
   // no no DOM preserva os listeners, entao o editor continua funcionando lá dentro — nada e
   // recriado nem duplicado.
+  // ---- TELA DA MUSICA: a pagina inteira cabendo na tela, com o transporte embaixo. Ela
+  // MOVE os nos no DOM em vez de recriar — e o que preserva os listeners do editor, do
+  // seguidor e da paginacao, que continuam funcionando la dentro sem nada duplicado.
+  // Nao da para ser uma pagina de verdade: o PDF lido, os rotulos e a melodia vivem na
+  // memoria do Pyodide, e trocar de documento jogaria tudo isso fora.
   const btLupa = cx.querySelector("[data-lupa]");
-  btLupa.addEventListener("click", () => {
+  const barra = cx.querySelector(".barra-previa");
+  const corpo = cx.querySelector(".corpo.previa");
+  let naTela = false;
+  const abrirTela = () => {
+    if (naTela) return;
+    naTela = true;
     fechar();
     const lupa = document.createElement("div");
     lupa.className = "lupa";
@@ -1971,16 +1999,26 @@ function montarEditor(cartao, ctx) {
     sair.className = "btn btn-secundario lupa-fechar";
     sair.textContent = "Fechar (Esc)";
     const volta = () => {
-      cx.querySelector(".barra-previa").after(palco);
+      naTela = false;
+      corpo.prepend(palco);
+      corpo.prepend(barra);          // a ordem no cartao e barra, palco, dica
+      btLupa.hidden = false;
+      document.body.classList.remove("tela-aberta");
+      ctx.transporte?.(false);
       lupa.remove(); sair.remove();
       document.removeEventListener("keydown", naTecla);
     };
     const naTecla = ev => { if (ev.key === "Escape") volta(); };
-    lupa.append(palco);
+    btLupa.hidden = true;            // ja se esta dentro; o botao nao tem o que fazer
+    document.body.classList.add("tela-aberta");
+    lupa.append(barra, palco);
     document.body.append(lupa, sair);
+    ctx.transporte?.(true);
     sair.addEventListener("click", volta);
     document.addEventListener("keydown", naTecla);
-  });
+  };
+  ctx.abrirTela = abrirTela;
+  btLupa.addEventListener("click", abrirTela);
 
   redesenhar();
   cartao.raiz.append(cx);
@@ -2098,6 +2136,12 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
   }
 
   if (info) cartao.raiz.append(montarAnalise(info, ctx));
+
+  // Terminou de ler: vai direto para a tela da musica. E o que se veio fazer aqui, e no
+  // cartao a partitura sai com a largura da coluna — para ver a pagina inteira era preciso
+  // rolar. Com VARIOS arquivos na fila nao entra: abriria uma tela por arquivo, uma por
+  // cima da outra. Sair (Esc) volta para o cartao, com os downloads e a analise.
+  if (extra.sozinho) ctx?.abrirTela?.();
   if (!rel.tem_analise) {
     const p = document.createElement("p");
     p.className = "nota-rodape";
