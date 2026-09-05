@@ -749,9 +749,15 @@ def duracao_das(cabecas, pausas, vert, beams, bandeiras, pontos, barras, esp):
 
 
 # --------------------------------------------------------------------- leitura
-def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False):
+def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False,
+              com_barras=False):
     """Retorna (rotulos, existentes) — ou (rotulos, existentes, pausas) com `com_pausas`,
     e mais as barras de repeticao no fim com `com_repeticoes`.
+
+    Com `com_barras`, sai tambem a lista de barras de compasso por pauta,
+    `[{sl, xs, topo, base}]`. Ela e a MESMA que o nucleo usa para fazer o acidente valer
+    ate o fim do compasso — recalcular por fora da errado (haste longa passa pelo filtro
+    geometrico), e foi por isso que nao deu para dizer em que compasso cada cifra estava.
 
     Cada rotulo leva `dur`, a duracao lida em tempos de seminima.
 
@@ -766,6 +772,7 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False):
         # PDF com os simbolos convertidos em curvas: le pela geometria
         glifos = glifos_de_contorno(caminhos, sistemas)
     rotulos, existentes, pausas, pontas, repeticoes = [], [], [], [], []
+    barras_pauta = []
 
     centros = [(s[0] + s[-1]) / 2 for s in sistemas]
 
@@ -818,6 +825,8 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False):
         barras = sorted(v["x"] for v in vert
                         if v["y0"] <= topo + 0.2 * span and v["y1"] >= base_l - 0.2 * span
                         and v["h"] >= span * 0.9 and not eh_haste(v))
+        barras_pauta.append({"sl": sidx, "xs": [round(b, 2) for b in barras],
+                             "topo": round(topo, 2), "base": round(base_l, 2)})
 
         descansos = sorted((g for g in glifos if g["tipo"] == "pausa" and na_pauta(g, 1.2)),
                            key=lambda g: g["x"])
@@ -964,6 +973,8 @@ def ler_notas(pg, sistema, com_pausas=False, dados=None, com_repeticoes=False):
         saida.append(pausas)
     if com_repeticoes:
         saida.append(repeticoes)
+    if com_barras:
+        saida.append(barras_pauta)
     return tuple(saida)
 
 
@@ -1012,13 +1023,18 @@ def melodia(dados, limite=3000):
     (pagina), `sl` (pauta dentro da pagina) e `x` (ponto). Com `sistemas`, que da o
     topo e a base de cada pauta, isso e o bastante para acompanhar a musica com uma
     barra por cima da partitura.
+
+    `compassos` da o retangulo de cada compasso, `[{pg, sl, x0, x1}]`, para destacar
+    aquele que esta soando. As bordas sao as barras de compasso do nucleo; a primeira e a
+    ultima nao existem como barra, entao viram a extensao das notas da pauta com uma folga.
     """
     doc = fitz.open(stream=dados, filetype="pdf")
     ev, t, base = [], 0.0, 0
-    pautas_ = []
+    pautas_, compassos = [], []
     for pg in doc:
         col = coletar(pg, com_ritmo=True)
-        rot, _, pausas = ler_notas(pg, "letras", com_pausas=True, dados=col)
+        rot, _, pausas, barras_p = ler_notas(pg, "letras", com_pausas=True, dados=col,
+                                             com_barras=True)
         # Topo e base de CADA pauta da pagina: e a altura em que a barra de reproducao
         # do site e desenhada. O endereco e (pagina, sistema LOCAL) e nao o `s` global,
         # porque o global pula a pauta sem nota e nao diz em que pagina a pauta esta.
@@ -1053,9 +1069,22 @@ def melodia(dados, limite=3000):
                                "pg": pg.number, "sl": g["s"]})
             t += passo
             i = j + 1
+        for bp in barras_p:
+            xs_n = [r["x"] for r in rot if r["sistema"] == bp["sl"]]
+            xs_n += [q["x"] for q in pausas if q["sistema"] == bp["sl"]]
+            if not xs_n:
+                continue
+            folga = 0.7 * max(1.0, bp["base"] - bp["topo"])
+            lim = sorted({min(min(xs_n) - folga, *bp["xs"][:1] or [1e9]),
+                          max(max(xs_n) + folga, *bp["xs"][-1:] or [-1e9]), *bp["xs"]})
+            for a, b in zip(lim, lim[1:]):
+                if b - a > folga:
+                    compassos.append({"pg": pg.number, "sl": bp["sl"],
+                                      "x0": round(a, 2), "x1": round(b, 2)})
         base += max((it["s"] for it in itens), default=-1) + 1
     doc.close()
-    return {"notas": ev, "total": round(t, 4), "sistemas": pautas_}
+    return {"notas": ev, "total": round(t, 4), "sistemas": pautas_,
+            "compassos": compassos}
 
 
 EXTS_IMAGEM = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff", ".heic")

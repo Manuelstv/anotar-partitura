@@ -540,11 +540,22 @@
      PROPRIO, irmao do svg do editor, por duas razoes: `redesenhar()` esvazia o svg do
      editor inteiro e levaria a barra junto, e sem `pointer-events: none` a camada de
      cima roubaria todo clique de corrigir nome.
-     LARANJA fixo, pelo mesmo motivo do preto dos nomes: o fundo aqui e a partitura
-     branca, entao a cor tem de contrastar com o PAPEL, nao com o tema da pagina. */
+     COR FIXA, pelo mesmo motivo do preto dos nomes: o fundo aqui e a partitura branca,
+     entao ela tem de contrastar com o PAPEL, nao com o tema da pagina. E o azul do
+     acento na versao clara (#3253c4) — a mesma familia do resto do site; `var(--acento)`
+     nao serve porque no escuro ele e claro (#82a4f5) e sumiria no branco. */
   .palco svg.seguidor { pointer-events: none; }
-  .seguidor .agulha { stroke: #f76707; stroke-width: 2; stroke-linecap: round;
-                      opacity: .88; }
+  .seguidor .agulha { stroke: #3253c4; stroke-width: 2; stroke-linecap: round;
+                      opacity: .9; }
+  .seguidor .pega { fill: #3253c4; opacity: .9; }
+  /* o compasso que esta soando, por baixo da agulha (ordem no DOM) */
+  .seguidor .compasso { fill: rgba(50, 83, 196, .11); stroke: rgba(50, 83, 196, .3);
+                        stroke-width: .6; }
+  /* Unico pedaco da camada que RECEBE toque: uma faixa larga colada na agulha. A camada
+     inteira continua transparente ao clique, senao ela roubaria todo clique de corrigir
+     nome — que e o motivo de ela existir separada. */
+  .seguidor .punho { fill: transparent; pointer-events: auto; cursor: ew-resize;
+                     touch-action: none; }
 
   /* Transporte preso na base da tela. A partitura fica no alto da pagina e o player la
      embaixo, no bloco de analise: sem isto nao da para ver a barra andando e apertar
@@ -619,9 +630,6 @@
   .nota-rodape { margin-top: var(--s6); color: var(--texto-3); font-size: var(--t-sm); }
   .cartao > .nota-rodape { margin: 0; padding: var(--s3) var(--s5) var(--s4);
                            background: var(--bg); }
-  footer { margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--borda);
-           color: var(--texto-3); font-size: var(--t-sm); }
-  footer a { color: var(--acento); }
   @media (max-width: 560px) {
     .pagina { padding: var(--s5) var(--s4) 72px; }
     :root { --t-xl: 1.75rem; }
@@ -701,9 +709,6 @@
 
   <div id="lista"></div>
 
-  <footer>
-    <a href="https://github.com/Manuelstv/anotar-partitura">GitHub</a>
-  </footer>
 </div>
 
 <script type="module">
@@ -783,7 +788,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=43";
+const V = "?v=44";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1075,6 +1080,14 @@ function montarTocador(melodia, acomp, ctx) {
   // altura das cinco linhas, nao o comprimento delas.
   const pautas = new Map();
   (melodia.sistemas || []).forEach(s => pautas.set(s.pg + ":" + s.sl, s));
+  // compassos da pauta, para destacar o que esta soando. Pauta sem barra detectada nao
+  // entra no mapa e simplesmente nao recebe destaque — melhor que destacar errado.
+  const compassos = new Map();
+  (melodia.compassos || []).forEach(c => {
+    const k = c.pg + ":" + c.sl;
+    if (!compassos.has(k)) compassos.set(k, []);
+    compassos.get(k).push(c);
+  });
 
   function ondeEstou(p) {
     const n = melodia.notas;
@@ -1087,7 +1100,24 @@ function montarTocador(melodia, acomp, ctx) {
     let x = a.x;
     if (b && b.pg === a.pg && b.sl === a.sl && b.t > a.t)
       x = a.x + (b.x - a.x) * Math.min(1, (p - a.t) / (b.t - a.t));
-    return { pg: a.pg, sl: a.sl, x, topo: s.topo, base: s.base };
+    const cp = (compassos.get(a.pg + ":" + a.sl) || [])
+      .find(c => x >= c.x0 && x <= c.x1) || null;
+    return { pg: a.pg, sl: a.sl, x, topo: s.topo, base: s.base, cp };
+  }
+
+  // ---- o INVERSO do `ondeEstou`: de um ponto da partitura para o instante. E o que faz
+  // a agulha ser arrastavel como a linha do player. Dentro da pauta e a mesma
+  // interpolacao, so que de x para t.
+  function quandoEm(pg, sl, x) {
+    const n = melodia.notas.filter(k => k.pg === pg && k.sl === sl);
+    if (!n.length) return null;
+    if (x <= n[0].x) return n[0].t;
+    for (let k = 0; k + 1 < n.length; k++) {
+      const d = n[k + 1].x - n[k].x;
+      if (x <= n[k + 1].x)
+        return n[k].t + (n[k + 1].t - n[k].t) * (d > 1e-6 ? (x - n[k].x) / d : 0);
+    }
+    return n[n.length - 1].t;
   }
 
   // A posicao e guardada em TEMPOS, nao em segundos: mudar o andamento no meio nao
@@ -1196,6 +1226,23 @@ function montarTocador(melodia, acomp, ctx) {
     if (!arrastando) return;
     arrastando = null;
     if (tocando) ancorar();
+  };
+
+  // ---- arrastar a AGULHA em cima da partitura. Quem desenha a agulha manda o ponto em
+  // coordenadas da pagina e a fase do arraste; aqui e o mesmo caminho da linha do player,
+  // com um dono de arraste proprio (`AGULHA`) para as duas linhas continuarem seguindo.
+  const AGULHA = Symbol("agulha");
+  ctx.buscarEm = (pg, x, y, fase) => {
+    if (fase === "inicio") { arrastando = AGULHA; cortarSaida(); }
+    let alvo = null, melhor = Infinity;
+    for (const s of pautas.values()) {
+      const d = Math.abs(y - (s.topo + s.base) / 2);
+      if (s.pg === pg && d < melhor) { melhor = d; alvo = s; }
+    }
+    // soltar fora da pagina (`x` nulo) so encerra o arraste, sem pular a musica
+    const t = (x == null || !alvo) ? null : quandoEm(pg, alvo.sl, x);
+    if (t != null) { pos = Math.min(total, Math.max(0, t)); pintar(); }
+    if (fase === "fim") { arrastando = null; if (tocando) ancorar(); }
   };
   espelhos.forEach(e => {
     e.linha.addEventListener("pointerdown", () => { arrastando = e.linha; cortarSaida(); });
@@ -1538,9 +1585,18 @@ function montarEditor(cartao, ctx) {
   svgSeg.setAttribute("class", "seguidor");
   svgSeg.setAttribute("viewBox", `0 0 ${pg.largura} ${pg.altura}`);
   svgSeg.style.display = "none";
-  const agulha = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  const svgNS = "http://www.w3.org/2000/svg";
+  const agulha = document.createElementNS(svgNS, "line");
   agulha.setAttribute("class", "agulha");
-  svgSeg.append(agulha);
+  const compasso = document.createElementNS(svgNS, "rect");
+  compasso.setAttribute("class", "compasso");
+  compasso.style.display = "none";
+  const pega = document.createElementNS(svgNS, "circle");
+  pega.setAttribute("class", "pega");
+  const punho = document.createElementNS(svgNS, "rect");
+  punho.setAttribute("class", "punho");
+  // o retangulo vem PRIMEIRO: no SVG quem esta antes fica embaixo
+  svgSeg.append(compasso, agulha, pega, punho);
   palco.append(img, svg, svgSeg);
   let alturaPg = pg.altura;
 
@@ -1757,14 +1813,61 @@ function montarEditor(cartao, ctx) {
     }
     svgSeg.style.display = "";
     const vao = Math.max(1, p.base - p.topo);
+    // sobra em cima para a haste, e embaixo para a fileira de nomes
+    const y1 = p.topo - 0.8 * vao, y2 = p.base + 1.6 * vao;
     agulha.setAttribute("x1", p.x);
     agulha.setAttribute("x2", p.x);
-    // sobra em cima para a haste, e embaixo para a fileira de nomes
-    agulha.setAttribute("y1", p.topo - 0.8 * vao);
-    agulha.setAttribute("y2", p.base + 1.6 * vao);
+    agulha.setAttribute("y1", y1);
+    agulha.setAttribute("y2", y2);
+    pega.setAttribute("cx", p.x);
+    pega.setAttribute("cy", y1);
+    pega.setAttribute("r", 0.22 * vao);
+    // alvo de toque bem mais largo que a agulha de 2pt — o dedo nao acerta 2pt
+    punho.setAttribute("x", p.x - 0.6 * vao);
+    punho.setAttribute("y", y1 - 0.4 * vao);
+    punho.setAttribute("width", 1.2 * vao);
+    punho.setAttribute("height", y2 - y1 + 0.8 * vao);
+    if (p.cp) {
+      compasso.style.display = "";
+      compasso.setAttribute("x", p.cp.x0);
+      compasso.setAttribute("y", p.topo - 0.7 * vao);
+      compasso.setAttribute("width", Math.max(0, p.cp.x1 - p.cp.x0));
+      compasso.setAttribute("height", 2.4 * vao);
+    } else {
+      compasso.style.display = "none";
+    }
     const qual = p.pg + ":" + p.sl;
     if (qual !== ultimaPauta) { ultimaPauta = qual; rolarAte((p.topo + p.base) / 2); }
   };
+
+  // ---- arraste do punho. Converte o ponto da tela para coordenada da PAGINA (o viewBox
+  // muda a cada pagina, por isso ele e lido na hora) e entrega ao tocador, que resolve
+  // qual pauta e que instante e aquilo.
+  const ondeNaPagina = (ev) => {
+    const r = svgSeg.getBoundingClientRect(), vb = svgSeg.viewBox.baseVal;
+    if (!r.width || !r.height) return null;
+    return { x: (ev.clientX - r.left) / r.width * vb.width,
+             y: (ev.clientY - r.top) / r.height * vb.height };
+  };
+  const mover = (ev) => {
+    const q = ondeNaPagina(ev);
+    if (q && ctx.buscarEm) ctx.buscarEm(ctx.pagina, q.x, q.y, "move");
+  };
+  const largar = (ev) => {
+    punho.removeEventListener("pointermove", mover);
+    const q = ondeNaPagina(ev);
+    if (ctx.buscarEm) ctx.buscarEm(ctx.pagina, q && q.x, q && q.y, "fim");
+  };
+  punho.addEventListener("pointerdown", (ev) => {
+    if (!ctx.buscarEm) return;
+    ev.preventDefault();
+    punho.setPointerCapture(ev.pointerId);
+    const q = ondeNaPagina(ev);
+    ctx.buscarEm(ctx.pagina, q && q.x, q && q.y, "inicio");
+    punho.addEventListener("pointermove", mover);
+  });
+  punho.addEventListener("pointerup", largar);
+  punho.addEventListener("pointercancel", largar);
 
   // AMPLIAR: move o proprio palco para um overlay em tela cheia e devolve no fim. Mover um
   // no no DOM preserva os listeners, entao o editor continua funcionando lá dentro — nada e
