@@ -792,7 +792,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=45";
+const V = "?v=46";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1706,11 +1706,16 @@ function montarEditor(cartao, ctx) {
     });
   };
 
-  const fechar = () => { campo?.remove(); paleta?.remove(); campo = paleta = null;
-                         sel = null; redesenhar(); };
+  // Anula as referencias ANTES de remover. Remover um campo com foco dispara `blur` na
+  // hora, o blur chama `aplicar`, e `aplicar` so sabe se conter quando `campo` ja e nulo.
+  // Fazendo na ordem inversa, fechava duas vezes: estourava NotFoundError e, pior, o Esc
+  // APLICAVA o valor em vez de cancelar — o contrario do que a dica do campo promete.
+  const soltarCampo = () => { const c = campo, p = paleta; campo = paleta = null;
+                              c?.remove(); p?.remove(); };
+  const fechar = () => { soltarCampo(); sel = null; redesenhar(); };
 
   const abrir = (k) => {
-    campo?.remove(); paleta?.remove();
+    soltarCampo();
     sel = k;
     redesenhar();
     // posicao pela MATRIZ do proprio SVG, e nao pelo <text>: um rotulo recem-criado tem
