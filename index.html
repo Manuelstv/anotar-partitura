@@ -556,10 +556,10 @@
      nome — que e o motivo de ela existir separada. */
   .seguidor .punho { fill: transparent; pointer-events: auto; cursor: ew-resize;
                      touch-action: none; }
-  /* compasso clicavel: so enquanto toca, senao rouba o clique de criar nome */
-  .seguidor .zonas rect { fill: transparent; }
-  .seguidor.tocando .zonas rect { pointer-events: auto; cursor: pointer; }
-  .seguidor.tocando .zonas rect:hover { fill: rgba(50, 83, 196, .07); }
+  /* compasso clicavel. Vale sempre, porque ocupa so a faixa da pauta — a fileira de
+     nomes, embaixo, continua sendo do editor */
+  .seguidor .zonas rect { fill: transparent; pointer-events: auto; cursor: pointer; }
+  .seguidor .zonas rect:hover { fill: rgba(50, 83, 196, .07); }
 
   /* Transporte preso na base da tela. A partitura fica no alto da pagina e o player la
      embaixo, no bloco de analise: sem isto nao da para ver a barra andando e apertar
@@ -792,7 +792,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=46";
+const V = "?v=47";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1157,7 +1157,9 @@ function montarTocador(melodia, acomp, ctx) {
   // `arrastando` guarda QUAL das duas linhas o dedo esta segurando (e nao so um sim/nao):
   // e o que permite a outra continuar acompanhando enquanto esta e arrastada
   let pos = 0, tocando = false, arrastando = null, relogio = null, i = 0, j = 0, ancora = 0;
-  let seguindo = false;
+  // ligado desde o inicio: da para pular de compasso com a musica parada, e a agulha tem
+  // de aparecer no lugar mesmo sem nunca ter apertado play
+  let seguindo = !!ctx?.seguir;
   const harm = temHarm ? acomp : [];
   const ligado = { mel: true, harm: temHarm };
   const seg = () => 60 / Number(faixaBpm.value);
@@ -1217,7 +1219,6 @@ function montarTocador(melodia, acomp, ctx) {
     tocando = false;
     cortarSaida();
     icone(true);
-    ctx?.aoTocar?.(false);
   }
 
   function tocar() {
@@ -1231,7 +1232,6 @@ function montarTocador(melodia, acomp, ctx) {
     document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
     ancorar();
     icone(false);
-    ctx?.aoTocar?.(true);
     clearInterval(relogio);
     relogio = setInterval(passo, 25);
   }
@@ -1273,12 +1273,17 @@ function montarTocador(melodia, acomp, ctx) {
       const s = pautas.get(cp.pg + ":" + cp.sl);
       const n = melodia.notas.find(k => k.pg === cp.pg && k.sl === cp.sl && k.x >= cp.x0);
       if (!s || !n) continue;
+      // So a faixa da PAUTA. Embaixo dela moram os nomes, e clique ali continua sendo do
+      // editor — e essa divisao que deixa o pulo de compasso valer com a musica parada
+      // sem tomar o gesto de criar nome.
       const vao = Math.max(1, s.base - s.topo);
-      fora.push({ x: cp.x0, y: s.topo - 0.7 * vao, w: cp.x1 - cp.x0, h: 2.4 * vao, t: n.t });
+      fora.push({ x: cp.x0, y: s.topo - 0.4 * vao, w: cp.x1 - cp.x0,
+                  h: vao * 1.8, t: n.t });
     }
     return fora;
   };
   ctx.irPara = (t) => buscar(t);
+  ctx.zonasProntas?.();
 
   // ---- arrastar a AGULHA em cima da partitura. Quem desenha a agulha manda o ponto em
   // coordenadas da pagina e a fase do arraste; aqui e o mesmo caminho da linha do player,
@@ -1636,7 +1641,6 @@ function montarEditor(cartao, ctx) {
   const svgSeg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svgSeg.setAttribute("class", "seguidor");
   svgSeg.setAttribute("viewBox", `0 0 ${pg.largura} ${pg.altura}`);
-  svgSeg.style.display = "none";
   const svgNS = "http://www.w3.org/2000/svg";
   const agulha = document.createElementNS(svgNS, "line");
   agulha.setAttribute("class", "agulha");
@@ -1649,8 +1653,15 @@ function montarEditor(cartao, ctx) {
   punho.setAttribute("class", "punho");
   const zonas = document.createElementNS(svgNS, "g");
   zonas.setAttribute("class", "zonas");
+  // A agulha e o destaque moram num grupo proprio porque sao eles que somem quando nao ha
+  // posicao. Esconder a CAMADA inteira, como era antes, tambem levava as zonas junto e
+  // matava o clique de compasso com a musica parada.
+  const cursor = document.createElementNS(svgNS, "g");
+  cursor.setAttribute("class", "cursor");
+  cursor.style.display = "none";
   // o retangulo vem PRIMEIRO: no SVG quem esta antes fica embaixo
-  svgSeg.append(zonas, compasso, agulha, pega, punho);
+  cursor.append(compasso, agulha, pega, punho);
+  svgSeg.append(zonas, cursor);
   palco.append(img, svg, svgSeg);
   let alturaPg = pg.altura;
 
@@ -1860,7 +1871,7 @@ function montarEditor(cartao, ctx) {
 
   let virando = false, ultimaPauta = null;
   ctx.seguir = (p) => {
-    if (!p) { svgSeg.style.display = "none"; ultimaPauta = null; return; }
+    if (!p) { cursor.style.display = "none"; ultimaPauta = null; return; }
     if (p.pg !== ctx.pagina) {
       // rasterizar a pagina custa uma fracao de segundo em Python: sem esta trava os
       // pedidos de 25 em 25 ms se empilhariam durante a virada
@@ -1870,8 +1881,8 @@ function montarEditor(cartao, ctx) {
       }
       return;
     }
-    svgSeg.style.display = "";
-    if (svgSeg.classList.contains("tocando") && zonasPg !== p.pg) desenharZonas();
+    cursor.style.display = "";
+    if (zonasPg !== p.pg) desenharZonas();
     const vao = Math.max(1, p.base - p.topo);
     // sobra em cima para a haste, e embaixo para a fileira de nomes
     const y1 = p.topo - 0.8 * vao, y2 = p.base + 1.6 * vao;
@@ -1900,9 +1911,9 @@ function montarEditor(cartao, ctx) {
     if (qual !== ultimaPauta) { ultimaPauta = qual; rolarAte((p.topo + p.base) / 2); }
   };
 
-  // ---- clicar num compasso para pular para ele. As zonas so recebem clique ENQUANTO
-  // toca (classe `tocando`): parado, o clique no vazio da partitura pertence ao editor de
-  // nomes, que cria um rotulo ali — sem essa regra os dois brigariam por todo clique.
+  // ---- clicar num compasso para pular para ele, tocando OU parado. O que separa isto do
+  // editor de nomes nao e um modo, e o DESENHO: a zona cobre so a faixa da pauta, e o
+  // nome mora embaixo dela. Clique na pauta pula; clique embaixo cria nome, como sempre.
   let zonasPg = null;
   const desenharZonas = () => {
     zonas.textContent = "";
@@ -1915,10 +1926,8 @@ function montarEditor(cartao, ctx) {
       zonas.append(r);
     }
   };
-  ctx.aoTocar = (on) => {
-    svgSeg.classList.toggle("tocando", on);
-    if (on && zonasPg !== ctx.pagina) desenharZonas();
-  };
+  // o tocador chama isto assim que sabe onde estao os compassos
+  ctx.zonasProntas = () => desenharZonas();
 
   // ---- arraste do punho. Converte o ponto da tela para coordenada da PAGINA (o viewBox
   // muda a cada pagina, por isso ele e lido na hora) e entrega ao tocador, que resolve
