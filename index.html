@@ -530,6 +530,15 @@
   /* com a tela aberta, a roda do mouse rolava a PAGINA DE TRAS — a partitura ficava
      parada e o cartao passava por baixo, o que parece defeito */
   body.tela-aberta { overflow: hidden; }
+  /* MODO EDICAO: a camada do seguidor para de receber clique inteira, e o palco ganha a
+     mira de quem vai escrever. O player fica visivelmente fora do ar, nao so inerte. */
+  .seguidor.inerte .zonas rect, .seguidor.inerte .punho { pointer-events: none; }
+  .seguidor.inerte .zonas rect { cursor: default; }
+  .palco.editando { cursor: crosshair; }
+  .bloco.travado { opacity: .45; }
+  .rodape-toca .linha:disabled { opacity: .5; }
+  .btn-mini.ligado { background: var(--acento); color: var(--acento-texto);
+                     border-color: var(--acento); }
   /* a barra de paginas viaja junto para a tela cheia: sem ela um PDF de varias paginas
      ficava presa na primeira ate a musica virar sozinha */
   .lupa .barra-previa { position: fixed; top: var(--s3); left: var(--s3); z-index: 61;
@@ -582,6 +591,11 @@
                  padding-bottom: calc(var(--s2) + env(safe-area-inset-bottom, 0px));
                  background: var(--sup); border-top: 1px solid var(--borda);
                  box-shadow: 0 -10px 30px -14px rgba(0,0,0,.5); }
+  /* `display: flex` aqui e regra do AUTOR e ganha da regra do navegador
+     `[hidden] { display: none }` — sem esta linha, `rodape.hidden = true` nao escondia
+     nada: o botao "Esconder" nao funcionava e a trava de um transporte por vez, com
+     varios arquivos na fila, deixava todos empilhados na base da tela. */
+  .rodape-toca[hidden] { display: none; }
   .rodape-toca .linha { flex: 1 1 auto; }
   .rodape-toca .sai-rodape { flex: none; }
   @media (max-width: 480px) {
@@ -804,7 +818,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=48";
+const V = "?v=49";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1268,6 +1282,17 @@ function montarTocador(melodia, acomp, ctx) {
   // ao querer a tela inteira para a partitura
   rodape.querySelector(".sai-rodape").onclick = () => { rodape.hidden = true; };
 
+  // ---- travado pelo modo edicao: para, desliga os controles e recolhe o transporte.
+  // Desabilitar de verdade (e nao so ignorar o clique) e o que deixa claro na TELA que o
+  // player esta fora do ar naquele momento.
+  ctx.travarPlayer = (travado) => {
+    if (travado) parar();
+    b.classList.toggle("travado", travado);
+    for (const e of espelhos) { e.bt.disabled = travado; e.linha.disabled = travado; }
+    if (travado) ctx.transporte?.(false);
+    else if (document.querySelector(".lupa")) ctx.transporte?.(true);
+  };
+
   // a tela cheia liga o transporte sem tocar: e o unico controle que ela tem
   ctx.transporte = (on) => {
     if (on) document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
@@ -1291,17 +1316,18 @@ function montarTocador(melodia, acomp, ctx) {
       const s = pautas.get(cp.pg + ":" + cp.sl);
       const n = melodia.notas.find(k => k.pg === cp.pg && k.sl === cp.sl && k.x >= cp.x0);
       if (!s || !n) continue;
-      // So a faixa da PAUTA. Embaixo dela moram os nomes, e clique ali continua sendo do
-      // editor — e essa divisao que deixa o pulo de compasso valer com a musica parada
-      // sem tomar o gesto de criar nome.
+      // A faixa inteira, pauta e fileira de nomes. Chegou a ser so a pauta, para nao tomar
+      // o clique de criar nome; com o MODO EDICAO essa divisao deixou de ser necessaria, e
+      // alvo maior e mais facil de acertar com o dedo.
       const vao = Math.max(1, s.base - s.topo);
-      fora.push({ x: cp.x0, y: s.topo - 0.4 * vao, w: cp.x1 - cp.x0,
-                  h: vao * 1.8, t: n.t });
+      fora.push({ x: cp.x0, y: s.topo - 0.7 * vao, w: cp.x1 - cp.x0,
+                  h: vao * 2.4, t: n.t });
     }
     return fora;
   };
   ctx.irPara = (t) => buscar(t);
   ctx.zonasProntas?.();
+  ctx.modoPronto?.();      // acerta o rotulo do botao e o estado inicial (modo tocar)
 
   // ---- arrastar a AGULHA em cima da partitura. Quem desenha a agulha manda o ponto em
   // coordenadas da pagina e a fase do arraste; aqui e o mesmo caminho da linha do player,
@@ -1632,7 +1658,8 @@ function montarEditor(cartao, ctx) {
           <span data-conta></span>
           <button type="button" class="btn-mini" data-prox>›</button>
         </span>
-        <button type="button" class="btn-mini esticar" data-undo disabled>Desfazer</button>
+        <button type="button" class="btn-mini esticar" data-modo aria-pressed="false">Modo edição</button>
+        <button type="button" class="btn-mini" data-undo disabled>Desfazer</button>
         <button type="button" class="btn-mini" data-lupa>Ampliar</button>
       </div>
       <div class="palco"></div>
@@ -1730,7 +1757,10 @@ function montarEditor(cartao, ctx) {
       el.setAttribute("font-size", r.corpo);
       el.textContent = r.texto;
       g.append(alvo, el);
-      g.addEventListener("click", ev => { ev.stopPropagation(); abrir(k); });
+      g.addEventListener("click", ev => {
+        if (!edicao) return;                 // no modo tocar a partitura e do player
+        ev.stopPropagation(); abrir(k);
+      });
       svg.append(g);
     });
   };
@@ -1812,6 +1842,7 @@ function montarEditor(cartao, ctx) {
   // clique no vazio: acrescenta um nome ali. Converte o ponto da tela para PONTO da
   // pagina pela matriz do proprio SVG — sem conta de zoom na mao.
   svg.addEventListener("click", ev => {
+    if (!edicao) return;
     if (campo) { fechar(); return; }
     const pt = svg.createSVGPoint();
     pt.x = ev.clientX; pt.y = ev.clientY;
@@ -1823,6 +1854,25 @@ function montarEditor(cartao, ctx) {
     redesenhar();
     abrir(ctx.rotulos.length - 1);
   });
+
+  // ---- MODO EDICAO. Sem ele, tocar e escrever disputam o mesmo clique na partitura: ou
+  // o clique pula de compasso, ou cria um nome. Com o modo, cada um e dono da partitura
+  // INTEIRA no seu turno — nada de dividir a area por altura, que era sutil demais.
+  // Padrao e tocar: e o que a maioria vem fazer depois de ler o PDF.
+  const btModo = cx.querySelector("[data-modo]");
+  let edicao = false;
+  const modo = (on) => {
+    edicao = on;
+    btModo.setAttribute("aria-pressed", String(on));
+    btModo.textContent = on ? "Sair da edição" : "Modo edição";
+    btModo.classList.toggle("ligado", on);
+    palco.classList.toggle("editando", on);
+    svgSeg.classList.toggle("inerte", on);   // zonas e agulha param de receber clique
+    if (!on) fechar();                       // fecha campo aberto ao sair
+    ctx.travarPlayer?.(on);
+  };
+  btModo.addEventListener("click", () => modo(!edicao));
+  ctx.modoPronto = () => modo(false);
 
   const btUndo = cx.querySelector("[data-undo]");
   btUndo.addEventListener("click", desfazer);
