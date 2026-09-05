@@ -1011,6 +1011,54 @@ def escrever(pg, rotulos, cor, desenhar=True):
     return postos
 
 
+def _desdobrar(ev, total, marcas, limite):
+    """Repete os trechos entre `|:` e `:|`, devolvendo (eventos, total) na ordem tocada.
+
+    O instante de cada marca e o da PRIMEIRA nota depois dela na leitura: a barra fica no
+    fim do compasso, entao quem esta antes dela pertence ao trecho que se repete e quem
+    esta depois e a continuacao. Ritornello sem `|:` correspondente volta ao inicio da
+    musica, que e a convencao.
+
+    Cada evento carrega `pg`/`sl`/`x` junto, entao a agulha volta sozinha para o comeco do
+    trecho quando o audio volta — nao ha nada a sincronizar a mao.
+    """
+    if not marcas or not ev:
+        return ev, total
+    ordem = sorted(ev, key=lambda e: (e["s"], e["x"]))
+
+    def instante(m):
+        for e in ordem:
+            if (e["s"], e["x"]) >= (m["s"], m["x"]):
+                return e["t"]
+        return total
+
+    ms = sorted(({**m, "t": instante(m)} for m in marcas), key=lambda m: m["t"])
+    trechos, cursor, ini = [], 0.0, 0.0
+    for m in ms:
+        if m["fecha"]:
+            trechos.append((cursor, m["t"]))     # segue lendo ate a barra
+            trechos.append((ini, m["t"]))        # e volta para o |:
+            cursor = m["t"]
+        if m["abre"]:
+            trechos.append((cursor, m["t"]))
+            cursor = ini = m["t"]
+    trechos.append((cursor, total))
+
+    saida, quando = [], 0.0
+    for t0, t1 in trechos:
+        if t1 - t0 <= 1e-6:
+            continue
+        for e in ev:
+            if t0 - 1e-6 <= e["t"] < t1 - 1e-6:
+                saida.append({**e, "t": round(quando + e["t"] - t0, 4)})
+            if len(saida) >= limite:
+                break
+        quando += t1 - t0
+        if len(saida) >= limite:
+            break
+    return saida, quando
+
+
 def melodia(dados, limite=3000):
     """Sequencia tocavel: [{t, midi, d}] em tempos de seminima, na ordem de leitura.
 
@@ -1027,14 +1075,20 @@ def melodia(dados, limite=3000):
     `compassos` da o retangulo de cada compasso, `[{pg, sl, x0, x1}]`, para destacar
     aquele que esta soando. As bordas sao as barras de compasso do nucleo; a primeira e a
     ultima nao existem como barra, entao viram a extensao das notas da pauta com uma folga.
+
+    As REPETICOES sao desdobradas: `|:` e `:|` viram trecho repetido de verdade na
+    sequencia, como quem toca faz. Sem isso o player atravessava o ritornello reto, e a
+    musica que se ouvia nao era a que esta escrita. Depende do glifo do pontinho, entao
+    nao vale no modo contorno — la simplesmente nao ha marca e a leitura sai linear.
     """
     doc = fitz.open(stream=dados, filetype="pdf")
     ev, t, base = [], 0.0, 0
-    pautas_, compassos = [], []
+    pautas_, compassos, marcas = [], [], []
     for pg in doc:
         col = coletar(pg, com_ritmo=True)
-        rot, _, pausas, barras_p = ler_notas(pg, "letras", com_pausas=True, dados=col,
-                                             com_barras=True)
+        rot, _, pausas, reps_p, barras_p = ler_notas(pg, "letras", com_pausas=True,
+                                                     dados=col, com_repeticoes=True,
+                                                     com_barras=True)
         # Topo e base de CADA pauta da pagina: e a altura em que a barra de reproducao
         # do site e desenhada. O endereco e (pagina, sistema LOCAL) e nao o `s` global,
         # porque o global pula a pauta sem nota e nao diz em que pagina a pauta esta.
@@ -1069,6 +1123,11 @@ def melodia(dados, limite=3000):
                                "pg": pg.number, "sl": g["s"]})
             t += passo
             i = j + 1
+        # a marca guarda a posicao de LEITURA (sistema global, x); o instante dela so da
+        # para saber depois, quando a linha do tempo inteira estiver montada
+        for rp in reps_p:
+            marcas.append({"s": base + rp["sistema"], "x": rp["x"],
+                           "abre": rp["abre"], "fecha": rp["fecha"]})
         for bp in barras_p:
             xs_n = [r["x"] for r in rot if r["sistema"] == bp["sl"]]
             xs_n += [q["x"] for q in pausas if q["sistema"] == bp["sl"]]
@@ -1083,6 +1142,7 @@ def melodia(dados, limite=3000):
                                       "x0": round(a, 2), "x1": round(b, 2)})
         base += max((it["s"] for it in itens), default=-1) + 1
     doc.close()
+    ev, t = _desdobrar(ev, t, marcas, limite)
     return {"notas": ev, "total": round(t, 4), "sistemas": pautas_,
             "compassos": compassos}
 

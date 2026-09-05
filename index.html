@@ -556,6 +556,10 @@
      nome — que e o motivo de ela existir separada. */
   .seguidor .punho { fill: transparent; pointer-events: auto; cursor: ew-resize;
                      touch-action: none; }
+  /* compasso clicavel: so enquanto toca, senao rouba o clique de criar nome */
+  .seguidor .zonas rect { fill: transparent; }
+  .seguidor.tocando .zonas rect { pointer-events: auto; cursor: pointer; }
+  .seguidor.tocando .zonas rect:hover { fill: rgba(50, 83, 196, .07); }
 
   /* Transporte preso na base da tela. A partitura fica no alto da pagina e o player la
      embaixo, no bloco de analise: sem isto nao da para ver a barra andando e apertar
@@ -788,7 +792,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=44";
+const V = "?v=45";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -895,7 +899,9 @@ function tocarNota(midi, quando, segundos) {
   vol.gain.setValueAtTime(0.0001, quando);
   vol.gain.exponentialRampToValueAtTime(0.26, quando + 0.045);
   vol.gain.exponentialRampToValueAtTime(0.195, quando + Math.min(0.16, dur * 0.5));
-  vol.gain.setValueAtTime(0.195, Math.max(quando + 0.05, quando + dur - 0.01));
+  // e o AR ACABANDO: o sustain cede ~9% ate o fim da nota. Numa seminima isso e
+  // imperceptivel; numa semibreve e o que separa "alguem soprando" de "orgao ligado".
+  vol.gain.linearRampToValueAtTime(0.178, quando + dur);
   vol.gain.exponentialRampToValueAtTime(0.0001, fim);
 
   const filtro = c.createBiquadFilter();
@@ -905,9 +911,14 @@ function tocarNota(midi, quando, segundos) {
   // Os limites tem PISO ABSOLUTO, nao so multiplo da nota: com cutoff puramente relativo
   // (f*8) o corte caia sobre o 7o harmonico de um la 440 e o timbre perdia o brilho — medi
   // h7=0,06 e h8=0,02, quando o sax real ainda tem energia ali. Sax alto vive de 3 a 5 kHz.
+  // O cutoff assenta em 0,35 s FIXO e fica parado ate o release. Antes ele descia ate
+  // `quando + dur`: numa semibreve isso virava uma varredura de 4 s, um "uau" lento que
+  // nao existe em sax nenhum. Nota curta nem chega no patamar, e continua igual.
+  const assenta = Math.min(quando + 0.35, quando + dur);
   filtro.frequency.setValueAtTime(Math.max(800, f * 2.4), quando);
   filtro.frequency.linearRampToValueAtTime(Math.min(11000, Math.max(4600, f * 11)), quando + 0.07);
-  filtro.frequency.linearRampToValueAtTime(Math.min(9000, Math.max(3200, f * 7.5)), quando + dur);
+  filtro.frequency.linearRampToValueAtTime(Math.min(9000, Math.max(3200, f * 7.5)), assenta);
+  filtro.frequency.setValueAtTime(Math.min(9000, Math.max(3200, f * 7.5)), quando + dur);
   filtro.frequency.linearRampToValueAtTime(Math.max(900, f * 3), fim);
 
   // FORMANTES: dois picos fixos (~700 Hz e ~1650 Hz) somados por cima. E o que da o
@@ -926,22 +937,43 @@ function tocarNota(midi, quando, segundos) {
 
   // VIBRATO: entra depois do ataque, como um saxofonista faz — vibrato desde o primeiro
   // instante e a marca de sintetizador.
+  // A taxa e SORTEADA por nota (5,0-5,6 Hz). Com 5,2 fixo, duas semibreves seguidas
+  // vibram identicas e o ouvido pega o padrao — e o que denuncia sintetizador.
   const lfo = c.createOscillator();
-  lfo.frequency.value = 5.2;
+  lfo.frequency.value = 5.0 + Math.random() * 0.6;
   const prof = c.createGain();
   prof.gain.setValueAtTime(0.0001, quando);
   prof.gain.setValueAtTime(0.0001, quando + 0.18);
-  prof.gain.linearRampToValueAtTime(f * 0.008, Math.min(fim, quando + 0.55));
+  // sobe em 0,9 s em vez de 0,55: o saxofonista abre o vibrato aos poucos na nota longa
+  prof.gain.linearRampToValueAtTime(f * 0.008, Math.min(fim, quando + 0.9));
   lfo.connect(prof);
   lfo.start(quando); lfo.stop(fim);
 
-  for (const [mult, ganho] of [[1, 1], [1.0029, 0.5]]) {
+  // O vibrato de sax mexe no volume junto com a altura — so na altura soa a theremin.
+  // Entra pelo mesmo LFO, atrasado igual. O valor e ABSOLUTO e soma no envelope, entao
+  // 6% do sustain (0,195) e 0,012, nao 0,06 — com 0,06 medi 107% de ondulacao, a nota
+  // longa pulsando de escancarada a quase muda.
+  const tremor = c.createGain();
+  tremor.gain.setValueAtTime(0.0001, quando);
+  tremor.gain.setValueAtTime(0.0001, quando + 0.18);
+  tremor.gain.linearRampToValueAtTime(0.012, Math.min(fim, quando + 0.9));
+  lfo.connect(tremor);
+  tremor.connect(vol.gain);   // soma ao envelope ja agendado
+
+  // UM oscilador so. Havia um segundo desafinado em 1,0029 para dar corpo, e ele era a
+  // causa da nota longa soar esquisita: duas vozes desafinadas BATEM. Em la 440 a batida
+  // saia em f*0,0029 = 1,28 Hz, e medi 47% de ondulacao no sustain de uma semibreve — um
+  // tremolo lento que ninguem pediu, que a nota curta escondia (so da tempo de 1/4 de
+  // ciclo) e que ainda acelerava no agudo, por ser razao e nao intervalo fixo. Afinar
+  // mais nao resolve: em 1,0008 sobrava 0,35 Hz, um inchaco de +45% no meio da nota.
+  // Chorus nao tem lugar em sax solo — o corpo vem da PeriodicWave e dos formantes.
+  {
     const o = c.createOscillator();
     o.setPeriodicWave(ondaSax);
-    o.frequency.setValueAtTime(f * mult * 0.985, quando);   // a palheta "pega" um pouco
-    o.frequency.linearRampToValueAtTime(f * mult, quando + 0.05);  // abaixo e sobe
+    o.frequency.setValueAtTime(f * 0.985, quando);          // a palheta "pega" um pouco
+    o.frequency.linearRampToValueAtTime(f, quando + 0.05);  // abaixo e sobe
     prof.connect(o.frequency);
-    const g = c.createGain(); g.gain.value = ganho;
+    const g = c.createGain(); g.gain.value = 1.4;   // recompoe o volume das duas vozes
     o.connect(g).connect(filtro);
     o.start(quando); o.stop(fim + 0.02);
   }
@@ -1185,6 +1217,7 @@ function montarTocador(melodia, acomp, ctx) {
     tocando = false;
     cortarSaida();
     icone(true);
+    ctx?.aoTocar?.(false);
   }
 
   function tocar() {
@@ -1198,6 +1231,7 @@ function montarTocador(melodia, acomp, ctx) {
     document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
     ancorar();
     icone(false);
+    ctx?.aoTocar?.(true);
     clearInterval(relogio);
     relogio = setInterval(passo, 25);
   }
@@ -1227,6 +1261,24 @@ function montarTocador(melodia, acomp, ctx) {
     arrastando = null;
     if (tocando) ancorar();
   };
+
+  // ---- zonas clicaveis: um retangulo por compasso da pagina, com o instante em que ele
+  // comeca. O comeco e o `t` da PRIMEIRA nota depois da barra, nao a interpolacao no x da
+  // barra — interpolar ali cai no vao entre a ultima nota do compasso anterior e esta, e
+  // o pulo entrava no fim da nota errada.
+  ctx.zonas = (pg) => {
+    const fora = [];
+    for (const cp of (melodia.compassos || [])) {
+      if (cp.pg !== pg) continue;
+      const s = pautas.get(cp.pg + ":" + cp.sl);
+      const n = melodia.notas.find(k => k.pg === cp.pg && k.sl === cp.sl && k.x >= cp.x0);
+      if (!s || !n) continue;
+      const vao = Math.max(1, s.base - s.topo);
+      fora.push({ x: cp.x0, y: s.topo - 0.7 * vao, w: cp.x1 - cp.x0, h: 2.4 * vao, t: n.t });
+    }
+    return fora;
+  };
+  ctx.irPara = (t) => buscar(t);
 
   // ---- arrastar a AGULHA em cima da partitura. Quem desenha a agulha manda o ponto em
   // coordenadas da pagina e a fase do arraste; aqui e o mesmo caminho da linha do player,
@@ -1595,8 +1647,10 @@ function montarEditor(cartao, ctx) {
   pega.setAttribute("class", "pega");
   const punho = document.createElementNS(svgNS, "rect");
   punho.setAttribute("class", "punho");
+  const zonas = document.createElementNS(svgNS, "g");
+  zonas.setAttribute("class", "zonas");
   // o retangulo vem PRIMEIRO: no SVG quem esta antes fica embaixo
-  svgSeg.append(compasso, agulha, pega, punho);
+  svgSeg.append(zonas, compasso, agulha, pega, punho);
   palco.append(img, svg, svgSeg);
   let alturaPg = pg.altura;
 
@@ -1812,6 +1866,7 @@ function montarEditor(cartao, ctx) {
       return;
     }
     svgSeg.style.display = "";
+    if (svgSeg.classList.contains("tocando") && zonasPg !== p.pg) desenharZonas();
     const vao = Math.max(1, p.base - p.topo);
     // sobra em cima para a haste, e embaixo para a fileira de nomes
     const y1 = p.topo - 0.8 * vao, y2 = p.base + 1.6 * vao;
@@ -1838,6 +1893,26 @@ function montarEditor(cartao, ctx) {
     }
     const qual = p.pg + ":" + p.sl;
     if (qual !== ultimaPauta) { ultimaPauta = qual; rolarAte((p.topo + p.base) / 2); }
+  };
+
+  // ---- clicar num compasso para pular para ele. As zonas so recebem clique ENQUANTO
+  // toca (classe `tocando`): parado, o clique no vazio da partitura pertence ao editor de
+  // nomes, que cria um rotulo ali — sem essa regra os dois brigariam por todo clique.
+  let zonasPg = null;
+  const desenharZonas = () => {
+    zonas.textContent = "";
+    zonasPg = ctx.pagina;
+    for (const z of (ctx.zonas ? ctx.zonas(ctx.pagina) : [])) {
+      const r = document.createElementNS(svgNS, "rect");
+      r.setAttribute("x", z.x); r.setAttribute("y", z.y);
+      r.setAttribute("width", Math.max(0, z.w)); r.setAttribute("height", z.h);
+      r.addEventListener("click", () => ctx.irPara && ctx.irPara(z.t));
+      zonas.append(r);
+    }
+  };
+  ctx.aoTocar = (on) => {
+    svgSeg.classList.toggle("tocando", on);
+    if (on && zonasPg !== ctx.pagina) desenharZonas();
   };
 
   // ---- arraste do punho. Converte o ponto da tela para coordenada da PAGINA (o viewBox
