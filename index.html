@@ -23,10 +23,11 @@
   }
 
   /* ================================================================ tokens
-     ESCURO E O PADRAO. O tema claro entra por cima, como excecao — e o
-     contrario do que era antes, e e de proposito: a partitura anotada e uma
-     folha branca grande, e ela rende mais sobre fundo escuro do que sobre
-     fundo claro, onde a pagina toda vira uma mancha branca so.
+     ESCURO, e so. Havia um tema claro alternavel, e ele saiu: a partitura anotada e uma
+     folha branca grande, e ela rende sobre fundo escuro — no claro a pagina inteira virava
+     uma mancha branca so. As cores que ficam POR CIMA do papel (nomes, agulha, destaque de
+     compasso) continuam fixas pelo mesmo motivo de sempre: elas contrastam com a folha,
+     nao com o fundo do site.
 
      Superficie em quatro degraus (fundo -> cartao -> cartao interno ->
      campo). No escuro cada degrau e um cinza-azulado um passo mais claro,
@@ -39,6 +40,9 @@
   :root {
     --t-xl: 2.125rem; --t-lg: 1.125rem; --t-md: 1rem; --t-sm: .875rem; --t-xs: .75rem;
     --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
+    /* altura reservada para o transporte fixo. Mora aqui porque DOIS blocos dependem dela:
+       a faixa em si e a tela da musica, que a desconta para a partitura nao ficar atras */
+    --transporte-h: 84px; --topo-h: 60px;
     --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
 
     --fonte-exibicao: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
@@ -71,29 +75,6 @@
     color-scheme: dark;
   }
 
-  /* claro: mesma arquitetura, papel no lugar do estudio. O acento escurece
-     porque #82a4f5 sobre branco nao passa em contraste de texto. */
-  :root[data-theme="light"] {
-    --bg: #f2f3f7;  --sup: #fff;  --sup2: #f6f7fa;  --sup3: #eceef4;
-    --borda: #e1e4ed; --borda-forte: #c5cad8;
-    --texto: #15171e; --texto-2: #545b6d; --texto-3: #7c8396;
-
-    --acento: #3253c4; --acento-rgb: 50, 83, 196;
-    --acento-texto: #fff;
-    --acento-fraco: rgba(50, 83, 196, .09);
-    --ok: #0f7a50; --erro: #bd3524; --atencao: #8a640d;
-    --violeta: #6446bd; --rosa: #b83f74; --ciano: #14707d;
-
-    --sombra-1: 0 1px 2px rgba(19, 22, 34, .06);
-    --sombra: 0 1px 2px rgba(19, 22, 34, .05), 0 10px 26px -12px rgba(19, 22, 34, .22);
-    --sombra-3: 0 24px 60px -22px rgba(19, 22, 34, .3);
-    --brilho: none;
-    --pauta: rgba(21, 23, 30, .1);
-    --aurora: .34; --grao: .035; --grao-mix: multiply;
-    --halo: 0 1px 10px rgba(255, 255, 255, .8);
-
-    color-scheme: light;
-  }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
@@ -188,21 +169,6 @@
           padding: 5px var(--s4); border: 1px solid var(--borda);
           border-radius: 999px; background: var(--sup); box-shadow: var(--sombra-1); }
   .beta b { color: var(--texto-2); font-weight: 600; }
-
-  /* =========================================================== tema
-     Fora do fluxo, no canto: e controle de ambiente, nao passo da tarefa. */
-  .btn-tema { position: fixed; top: 14px; right: 14px; z-index: 30;
-              width: 38px; height: 38px; padding: 0; display: grid; place-items: center;
-              border-radius: 50%; cursor: pointer; color: var(--texto-2);
-              background: var(--sup); border: 1px solid var(--borda);
-              box-shadow: var(--sombra-1), var(--brilho);
-              transition: color .15s ease, border-color .15s ease; }
-  .btn-tema:hover { color: var(--texto); border-color: var(--borda-forte); }
-  .btn-tema svg { display: block; }
-  .btn-tema .ic-sol { display: block; }
-  .btn-tema .ic-lua { display: none; }
-  :root[data-theme="light"] .btn-tema .ic-sol { display: none; }
-  :root[data-theme="light"] .btn-tema .ic-lua { display: block; }
 
   /* =========================================================== painel  */
   .painel { background: linear-gradient(180deg, var(--sup2), var(--sup) 62%);
@@ -522,11 +488,34 @@
      fixos e ficariam por cima da partitura. `dvh` e nao `vh` porque no celular a barra
      do navegador entra e sai, e com `vh` a ultima pauta ficava escondida atras dela. */
   .lupa { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
-          padding: 52px var(--s2) 68px; overflow: hidden; background: var(--bg); }
+          padding: calc(var(--topo-h) + var(--s2)) var(--s2)
+                   calc(var(--transporte-h) + var(--s2));
+          overflow: hidden; background: var(--bg); }
   .lupa .palco { width: fit-content; max-width: none; border-radius: var(--r-sm); }
   .lupa .palco > img { width: auto; max-width: calc(100vw - 2 * var(--s2));
-                       height: auto; max-height: calc(100dvh - 120px); }
-  .lupa-fechar { position: fixed; top: var(--s3); right: var(--s3); z-index: 61; }
+                       height: auto;
+                       max-height: calc(100dvh - var(--topo-h) - var(--transporte-h)
+                                        - 2 * var(--s2)
+                                        - env(safe-area-inset-top, 0px)
+                                        - env(safe-area-inset-bottom, 0px)); }
+  /* UMA faixa no topo, com a paginacao e o Fechar dentro. Eram dois elementos fixos
+     independentes, e num celular de 390px eles se sobrepunham: a barra quebrava em duas
+     linhas por baixo do Fechar e o "Modo edicao" sumia atras dele. */
+  .tela-topo { position: fixed; top: 0; left: 0; right: 0; z-index: 61;
+               display: flex; align-items: center; gap: var(--s2); flex-wrap: wrap;
+               min-height: var(--topo-h);
+               padding: var(--s2) var(--s3);
+               padding-top: calc(var(--s2) + env(safe-area-inset-top, 0px)); }
+  /* `display: contents` dissolve a caixa da barra: os botoes dela passam a ser filhos
+     DIRETOS da faixa. Sem isso sao dois flex aninhados, a barra ocupa a linha inteira e o
+     Fechar nao consegue dividir linha com ela — no celular davam tres linhas e 160px
+     comidos da partitura. */
+  .tela-topo .barra-previa { display: contents; }
+  .tela-topo .lupa-fechar { position: static; margin-left: auto; flex: none; }
+  /* dentro da faixa nada empurra: quem separa e o `margin-left: auto` do Fechar */
+  .tela-topo .esticar { margin-left: 0; }
+  /* alvo de dedo: os botoes da faixa sao os mesmos do cartao, onde 28px basta */
+  .tela-topo .btn-mini { min-height: 40px; padding-inline: var(--s3); }
   /* com a tela aberta, a roda do mouse rolava a PAGINA DE TRAS — a partitura ficava
      parada e o cartao passava por baixo, o que parece defeito */
   body.tela-aberta { overflow: hidden; }
@@ -539,10 +528,7 @@
   .rodape-toca .linha:disabled { opacity: .5; }
   .btn-mini.ligado { background: var(--acento); color: var(--acento-texto);
                      border-color: var(--acento); }
-  /* a barra de paginas viaja junto para a tela cheia: sem ela um PDF de varias paginas
-     ficava presa na primeira ate a musica virar sozinha */
-  .lupa .barra-previa { position: fixed; top: var(--s3); left: var(--s3); z-index: 61;
-                        width: auto; margin: 0; }
+
   /* PRETO fixo, nao currentColor: o fundo aqui e a partitura branca, e o tema
      escuro herdava cinza-claro — os nomes ficavam ilegiveis. Preto tambem e o
      que o PDF estampa, entao o overlay mostra o resultado de verdade. */
@@ -585,12 +571,34 @@
   /* Transporte preso na base da tela. A partitura fica no alto da pagina e o player la
      embaixo, no bloco de analise: sem isto nao da para ver a barra andando e apertar
      play ao mesmo tempo. z-index acima da lupa (60), para valer tambem no ampliado. */
+  /* TRANSPORTE DE DEDO. Este e o controle que se usa no celular, com a partitura ocupando
+     a tela toda — entao ele e dimensionado para o POLEGAR, nao para o mouse: alvos de 44px
+     para cima, que e o minimo que a Apple e o Google recomendam, e o trilho grosso o
+     bastante para arrastar sem mirar. O tocador que fica dentro da analise segue miudo:
+     la a pessoa esta lendo no computador, e o espaco e disputado com o texto.
+     `--transporte-h` e a altura reservada; a tela da musica desconta ela para a partitura
+     nao terminar escondida atras da faixa. */
   .rodape-toca { position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
                  display: flex; align-items: center; gap: var(--s3);
-                 padding: var(--s2) var(--s4);
-                 padding-bottom: calc(var(--s2) + env(safe-area-inset-bottom, 0px));
+                 min-height: var(--transporte-h);
+                 padding: var(--s3) var(--s4);
+                 padding-bottom: calc(var(--s3) + env(safe-area-inset-bottom, 0px));
                  background: var(--sup); border-top: 1px solid var(--borda);
                  box-shadow: 0 -10px 30px -14px rgba(0,0,0,.5); }
+  .rodape-toca .icone.play { width: 56px; height: 56px; }
+  .rodape-toca .icone.play svg { width: 26px; height: 26px; }
+  .rodape-toca .relogio { font-size: var(--t-sm); }
+  .rodape-toca .sai-rodape { min-height: 44px; padding-inline: var(--s3); }
+  /* alvo de toque alto: o dedo acerta a faixa inteira, nao so os 12px do trilho */
+  .rodape-toca .linha { height: 44px; }
+  .rodape-toca .linha::-webkit-slider-runnable-track { height: 12px; }
+  .rodape-toca .linha::-moz-range-track { height: 12px; }
+  /* a margem negativa e (trilho - polegar) / 2: sem recalcular, o polegar maior sai
+     desalinhado do trilho */
+  .rodape-toca .linha::-webkit-slider-thumb { width: 28px; height: 28px; margin-top: -8px;
+                                              box-shadow: 0 0 0 4px rgba(var(--acento-rgb), .18); }
+  .rodape-toca .linha::-moz-range-thumb { width: 28px; height: 28px;
+                                          box-shadow: 0 0 0 4px rgba(var(--acento-rgb), .18); }
   /* `display: flex` aqui e regra do AUTOR e ganha da regra do navegador
      `[hidden] { display: none }` — sem esta linha, `rodape.hidden = true` nao escondia
      nada: o botao "Esconder" nao funcionava e a trava de um transporte por vez, com
@@ -601,6 +609,9 @@
   @media (max-width: 480px) {
     .rodape-toca { gap: var(--s2); padding-left: var(--s3); padding-right: var(--s3); }
     .rodape-toca .fim { display: none; }
+    /* a faixa de cima nao cabe em uma linha aqui: quebra em duas, e a partitura precisa
+       descontar as duas — senao a primeira pauta fica atras dela */
+    :root { --topo-h: 108px; }
   }
   .paleta { position: absolute; z-index: 6; display: flex; flex-wrap: wrap; gap: 3px;
             width: 13rem; padding: var(--s1); border-radius: var(--r-sm);
@@ -669,28 +680,8 @@
     #zona { padding: var(--s6) var(--s4); }
   }
 </style>
-<script>
-  // roda antes do corpo existir: tema salvo manda, senao vale o do sistema
-  try {
-    var _t = localStorage.getItem("tema");
-    document.documentElement.dataset.theme =
-      _t || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-  } catch (e) {}
-</script>
 </head>
 <body>
-<button type="button" class="btn-tema" id="tema" aria-label="Alternar tema claro e escuro"
-        title="Alternar entre claro e escuro">
-  <svg class="ic-lua" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>
-  </svg>
-  <svg class="ic-sol" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-       stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-    <circle cx="12" cy="12" r="4.2"/>
-    <path d="M12 2v2.4M12 19.6V22M2 12h2.4M19.6 12H22M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M19.1 4.9l-1.7 1.7M6.6 17.4l-1.7 1.7"/>
-  </svg>
-</button>
 <div class="pagina">
   <header>
     <h1 class="marca">
@@ -743,13 +734,6 @@
 
 <script type="module">
 const $ = (s) => document.querySelector(s);
-const btTema = $("#tema");
-btTema.addEventListener("click", () => {
-  const novo = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = novo;
-  try { localStorage.setItem("tema", novo); } catch (e) {}
-});
-
 const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
 const barra = $("#barra"), barraTxt = $("#barra-txt"), barraNum = $("#barra-num"),
       barraCheio = $("#barra-cheio");
@@ -818,7 +802,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=50";
+const V = "?v=51";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -2069,14 +2053,18 @@ function montarEditor(cartao, ctx) {
       btLupa.hidden = false;
       document.body.classList.remove("tela-aberta");
       ctx.transporte?.(false);
-      lupa.remove(); sair.remove();
+      lupa.remove();                 // leva a faixa do topo e o Fechar junto
       document.removeEventListener("keydown", naTecla);
     };
     const naTecla = ev => { if (ev.key === "Escape") volta(); };
     btLupa.hidden = true;            // ja se esta dentro; o botao nao tem o que fazer
     document.body.classList.add("tela-aberta");
-    lupa.append(barra, palco);
-    document.body.append(lupa, sair);
+    // barra e Fechar numa faixa SO: soltos, eles se sobrepunham no celular
+    const topo = document.createElement("div");
+    topo.className = "tela-topo";
+    topo.append(barra, sair);
+    lupa.append(topo, palco);
+    document.body.append(lupa);
     ctx.transporte?.(true);
     sair.addEventListener("click", volta);
     document.addEventListener("keydown", naTecla);
