@@ -588,7 +588,6 @@
   .rodape-toca .icone.play { width: 56px; height: 56px; }
   .rodape-toca .icone.play svg { width: 26px; height: 26px; }
   .rodape-toca .relogio { font-size: var(--t-sm); }
-  .rodape-toca .sai-rodape { min-height: 44px; padding-inline: var(--s3); }
   /* alvo de toque alto: o dedo acerta a faixa inteira, nao so os 12px do trilho */
   .rodape-toca .linha { height: 44px; }
   .rodape-toca .linha::-webkit-slider-runnable-track { height: 12px; }
@@ -601,11 +600,10 @@
                                           box-shadow: 0 0 0 4px rgba(var(--acento-rgb), .18); }
   /* `display: flex` aqui e regra do AUTOR e ganha da regra do navegador
      `[hidden] { display: none }` — sem esta linha, `rodape.hidden = true` nao escondia
-     nada: o botao "Esconder" nao funcionava e a trava de um transporte por vez, com
-     varios arquivos na fila, deixava todos empilhados na base da tela. */
+     nada: a trava de um transporte por vez, com varios arquivos na fila, deixava todos
+     empilhados na base da tela. */
   .rodape-toca[hidden] { display: none; }
   .rodape-toca .linha { flex: 1 1 auto; }
-  .rodape-toca .sai-rodape { flex: none; }
   @media (max-width: 480px) {
     .rodape-toca { gap: var(--s2); padding-left: var(--s3); padding-right: var(--s3); }
     .rodape-toca .fim { display: none; }
@@ -802,7 +800,7 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=51";
+const V = "?v=52";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1105,8 +1103,7 @@ function montarTocador(melodia, acomp, ctx) {
     </button>
     <span class="relogio agora">0:00</span>
     <input type="range" class="linha" min="0" step="0.01" value="0" aria-label="Posição na música">
-    <span class="relogio fim">0:00</span>
-    <button type="button" class="btn-mini sai-rodape">Esconder</button>`;
+    <span class="relogio fim">0:00</span>`;
   document.body.append(rodape);
   const linhaR = rodape.querySelector(".linha");
   linhaR.max = total;
@@ -1262,10 +1259,6 @@ function montarTocador(melodia, acomp, ctx) {
   espelhos.forEach(e => { e.bt.onclick = () => (tocando ? parar() : tocar()); });
   b.querySelector(".atras").onclick = () => buscar(pos - 5 / seg());
   b.querySelector(".frente").onclick = () => buscar(pos + 5 / seg());
-  // Esconder e so tirar a faixa da frente — a musica segue tocando, que e o que se quer
-  // ao querer a tela inteira para a partitura
-  rodape.querySelector(".sai-rodape").onclick = () => { rodape.hidden = true; };
-
   // ---- travado pelo modo edicao: para, desliga os controles e recolhe o transporte.
   // Desabilitar de verdade (e nao so ignorar o clique) e o que deixa claro na TELA que o
   // player esta fora do ar naquele momento.
@@ -1643,7 +1636,6 @@ function montarEditor(cartao, ctx) {
           <button type="button" class="btn-mini" data-prox>›</button>
         </span>
         <button type="button" class="btn-mini esticar" data-modo aria-pressed="false">Modo edição</button>
-        <button type="button" class="btn-mini" data-undo disabled>Desfazer</button>
         <button type="button" class="btn-mini" data-share hidden>Compartilhar</button>
         <button type="button" class="btn-mini" data-lupa>Ampliar</button>
       </div>
@@ -1699,18 +1691,17 @@ function montarEditor(cartao, ctx) {
   ctx.rotulos = ctx.rel.rotulos.map(r => ({ ...r }));
   ctx.pagina = 0;
   let sel = null, campo = null, paleta = null;
-  // pilha de desfazer: uma copia da lista ANTES de cada mexida. Apagar sem querer e o
-  // acidente mais provavel num editor de toque, e nao havia volta.
+  // pilha de desfazer: uma copia da lista ANTES de cada mexida. O botao saiu da barra; o
+  // que restou e o Ctrl+Z, entao no CELULAR nao ha mais volta para um nome apagado sem
+  // querer — que era o acidente mais provavel num editor de toque.
   const pilha = [];
   const guardar = () => {
     pilha.push(ctx.rotulos.map(r => ({ ...r })));
     if (pilha.length > 40) pilha.shift();
-    if (btUndo) btUndo.disabled = false;
   };
   const desfazer = () => {
     if (!pilha.length) return;
     ctx.rotulos = pilha.pop();
-    if (btUndo) btUndo.disabled = !pilha.length;
     fechar();
   };
 
@@ -1858,9 +1849,6 @@ function montarEditor(cartao, ctx) {
   };
   btModo.addEventListener("click", () => modo(!edicao));
   ctx.modoPronto = () => modo(false);
-
-  const btUndo = cx.querySelector("[data-undo]");
-  btUndo.addEventListener("click", desfazer);
 
   // Mora nesta barra, e nao junto do "Baixar PDF" la em cima, porque esta barra viaja para
   // a tela da musica — que e onde a pessoa cai depois de ler o PDF. No topo do cartao o
@@ -2206,17 +2194,6 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
     p.innerHTML = `A partitura está <b>pequena nesta imagem</b> (${ii.esp_px} px por espaço `
                 + `de pauta; o bom é 10 ou mais), então algumas notas podem ter escapado. `
                 + `Se puder, mande um print com a partitura maior na tela.`;
-    cartao.raiz.append(p);
-  }
-
-  // A partitura JA tem nomes proprios: o resultado sai com duas fileiras, uma em cima da
-  // outra. O programa sempre soube disso (rel.existentes) mas nao dizia nada, e na previa
-  // isso parece defeito do editor. Quem quiser so uma fileira apaga a minha no editor.
-  if (rel.existentes) {
-    const p = document.createElement("p");
-    p.className = "nota-rodape";
-    p.innerHTML = `Esta partitura já tem <b>${rel.existentes} nomes escritos</b>, então os `
-                + `meus ficam por cima. Toque num nome meu e esvazie o campo para tirá-lo.`;
     cartao.raiz.append(p);
   }
 
