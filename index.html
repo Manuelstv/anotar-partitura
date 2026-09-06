@@ -479,9 +479,6 @@
               transition: background .12s ease, color .12s ease, border-color .12s ease; }
   .btn-mini:hover { background: var(--sup3); color: var(--texto); border-color: var(--borda-forte); }
 
-  /* Ampliado maximiza a LARGURA e rola na vertical. Limitar pela altura da
-     tela era pior que nao ampliar: a pagina e retrato, a tela e paisagem, e a
-     partitura saia mais estreita do que no tamanho normal. */
   /* TELA DA MUSICA: a pagina inteira cabendo, sem rolar. O limite e a ALTURA — por isso
      a imagem tem `height` fixo e `width: auto`, o contrario do que ela faz no cartao.
      O respiro em cima e embaixo desconta a barra de paginas e o transporte, que sao
@@ -498,6 +495,25 @@
                                         - 2 * var(--s2)
                                         - env(safe-area-inset-top, 0px)
                                         - env(safe-area-inset-bottom, 0px)); }
+  /* ...MAS "cabe inteira" so serve quando a TELA tem a forma da pagina. No monitor a
+     pagina e retrato e a tela e paisagem: a altura limita, a largura sobra, e a partitura
+     sai com ~500px num monitor de 1900 — pequena demais para ler. Em tela larga e
+     deitada, entao, quem manda e a LARGURA, e rola-se na vertical.
+     O teto de 1150px existe porque sem ele um ultrawide estica a pagina inteira e cada
+     sistema vira uma faixa gigante, com mais rolagem do que leitura. */
+  @media (min-width: 900px) and (orientation: landscape) {
+    /* `display: block`, e nao o grid do modo retrato: a .lupa tem altura fixa (inset: 0),
+       e em grid de altura fixa o item que passa da linha TRANSBORDA sem esticar a area
+       rolavel — medi scrollHeight parado em 1695 com padding, com margem e com item
+       espacador. Em fluxo normal a altura do conteudo manda, e ai o respiro do fim
+       funciona: sem ele a ultima pauta fica atras do transporte. */
+    .lupa { display: block; overflow-y: auto; text-align: center; }
+    .lupa .palco { display: inline-block;
+                   margin-bottom: calc(var(--transporte-h) + var(--s3)); }
+    .lupa .palco > img { width: min(94vw, 1150px); max-width: none;
+                         height: auto; max-height: none; }
+  }
+
   /* UMA faixa no topo, com a paginacao e o Fechar dentro. Eram dois elementos fixos
      independentes, e num celular de 390px eles se sobrepunham: a barra quebrava em duas
      linhas por baixo do Fechar e o "Modo edicao" sumia atras dele. */
