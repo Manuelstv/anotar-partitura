@@ -17,6 +17,7 @@ no código, para evitar problemas de encoding).
 | `analise.py` | análise musical determinística: tom, cifras, grau/cadência, campo em tétrades, som real, ritmo, respiro, motivos, e `folha_de_acordes` (PDF só com a harmonia) e `folha_de_notas`/`folha_de_notas_docx` (a folha "Cifras", em PDF ou .docx: uma página por página da partitura, uma linha por linha dela) |
 | `dificuldade.py` + `pesos_dificuldade.json` | nota 0–10 de dificuldade no sax alto; `calibrar` reajusta os pesos |
 | `player_html.py` + `player_js.js` + `sax.js` | o PDF vira um HTML que abre sozinho: toca a música destacando a nota e deixa corrigir os nomes. Sai por `--html` na CLI e pelo botão **Baixar HTML** no site. `sax.js` é a síntese de sax, **uma cópia só**: o site carrega por `<script src>` e o HTML gerado embute o texto inline |
+| `sw.js` + `manifest.webmanifest` + `icone-*.png` | PWA: instala na tela inicial (iPhone: Compartilhar → Adicionar à Tela de Início) e roda offline. O que o service worker guarda de verdade é o **Pyodide + PyMuPDF, 21,6 MB medidos**, que sem ele vinham do CDN a cada visita. HTML vem da rede primeiro (senão quem instalou nunca recebe versão nova); o resto é cache primeiro, porque toda URL já é versionada. Ao mudar arquivo, subir o `VERSAO` do `sw.js` junto com o `?v=N` |
 | `~/anotar-partitura-web/` | cópia publicada: `index.html` + o mesmo `.py` |
 | `github.com/Manuelstv/anotar-partitura` | repo público, Pages no branch `master` |
 | `https://manuelstv.github.io/anotar-partitura/` | site — arrasta PDF, baixa anotado |

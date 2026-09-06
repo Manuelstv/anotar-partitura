@@ -6,6 +6,15 @@
 <title>Partitura Inteligente — o nome de cada nota no seu PDF</title>
 <meta name="description" content="Solte o PDF da partitura e receba o mesmo arquivo com o nome de cada nota embaixo da pauta, mais a análise da música: tom, harmonia, ritmo e harmonia.">
 <meta name="theme-color" content="#0b0c10">
+<!-- PWA: e o que faz "Adicionar a Tela de Inicio" virar app de verdade no iPhone —
+     abre em tela cheia, sem a barra do Safari, com icone proprio. -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Partitura">
+<!-- o iOS ignora os icones do manifest: quem ele le e este -->
+<link rel="apple-touch-icon" href="icone-180.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 19'%3E%3Cg stroke='%2382a4f5' stroke-width='1' opacity='.45' fill='none'%3E%3Cpath d='M0 2.5h26M0 6.5h26M0 10.5h26M0 14.5h26M0 18.5h26'/%3E%3C/g%3E%3Cellipse cx='8' cy='12.5' rx='4.6' ry='3.4' fill='%2382a4f5' transform='rotate(-18 8 12.5)'/%3E%3Cpath d='M12.2 12V2' stroke='%2382a4f5' stroke-width='1.8'/%3E%3C/svg%3E">
 <style>
   /* ================================================================ fontes
@@ -746,7 +755,7 @@
 
 </div>
 
-<script src="sax.js?v=53"></script>
+<script src="sax.js?v=54"></script>
 <script type="module">
 const $ = (s) => document.querySelector(s);
 const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
@@ -815,9 +824,18 @@ function progresso({ texto = "", feito = 0, total = 0, indet = false, on = true 
   barraCheio.style.width = indet ? "" : (total ? (100 * feito / total) + "%" : "0%");
 }
 
+// ---- service worker: guarda o Pyodide (21,6 MB) depois da primeira leitura, e e o
+// que faz o app abrir offline. Falhar aqui nao pode derrubar o site — sem ele tudo
+// continua funcionando, so que baixando de novo a cada visita.
+if ("serviceWorker" in navigator) {
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw:", e));
+  });
+}
+
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=53";
+const V = "?v=54";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
