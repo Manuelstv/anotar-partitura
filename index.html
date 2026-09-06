@@ -961,9 +961,13 @@ function montarTocador(melodia, acomp, ctx) {
   ];
 
   // ---- onde a barra fica, em funcao do tempo. Dentro de uma pauta e interpolacao pura
-  // entre a nota que acabou de soar e a proxima. Na ULTIMA nota da pauta a barra espera
-  // ali parada: onde a pauta termina nao e uma coordenada que eu tenha — `pautas()` da a
-  // altura das cinco linhas, nao o comprimento delas.
+  // entre a nota que acabou de soar e a proxima.
+  // Na ULTIMA nota da pauta a proxima nota esta na pauta DE BAIXO, entao nao servia de
+  // alvo e a barra congelava no x da nota — parecia travamento, ainda mais em nota longa,
+  // porque o som seguia. O alvo ali e o FIM DA PAUTA: `pautas()` so da a altura das cinco
+  // linhas, mas o ultimo compasso da pauta da o `x1`, que e exatamente onde ela acaba.
+  // O tempo alvo e o inicio da proxima nota (e nao o fim desta), senao a barra chegava no
+  // fim da pauta e parava de novo durante a pausa que fecha o sistema.
   const pautas = new Map();
   (melodia.sistemas || []).forEach(s => pautas.set(s.pg + ":" + s.sl, s));
   // compassos da pauta, para destacar o que esta soando. Pauta sem barra detectada nao
@@ -984,8 +988,16 @@ function montarTocador(melodia, acomp, ctx) {
     const s = pautas.get(a.pg + ":" + a.sl);
     if (!s) return null;
     let x = a.x;
-    if (b && b.pg === a.pg && b.sl === a.sl && b.t > a.t)
+    if (b && b.pg === a.pg && b.sl === a.sl && b.t > a.t) {
       x = a.x + (b.x - a.x) * Math.min(1, (p - a.t) / (b.t - a.t));
+    } else {
+      const cps = compassos.get(a.pg + ":" + a.sl) || [];
+      const fimPauta = cps.length ? cps[cps.length - 1].x1 : null;
+      // sem barra detectada nesta pauta nao ha alvo: fica como era, parada
+      const alvoT = b ? b.t : a.t + (a.d || 0);
+      if (fimPauta != null && fimPauta > a.x && alvoT > a.t)
+        x = a.x + (fimPauta - a.x) * Math.min(1, (p - a.t) / (alvoT - a.t));
+    }
     const cp = (compassos.get(a.pg + ":" + a.sl) || [])
       .find(c => x >= c.x0 && x <= c.x1) || null;
     return { pg: a.pg, sl: a.sl, x, topo: s.topo, base: s.base, cp };
