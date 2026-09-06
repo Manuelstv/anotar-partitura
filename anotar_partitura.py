@@ -1313,12 +1313,28 @@ def main():
     ap.add_argument("--cor", default="0,0,0", help="cor R,G,B em 0-1 (default preto)")
     ap.add_argument("--formato", choices=["pdf", "imagem"], default=None,
                     help="formato da saida (default: o mesmo da entrada)")
+    ap.add_argument("--html", action="store_true",
+                    help="em vez do PDF anotado, gera um HTML que abre sozinho, toca a "
+                         "musica destacando a nota e deixa corrigir os nomes")
+    ap.add_argument("--bpm", type=int, default=90,
+                    help="andamento inicial do --html (default 90; a partitura nao diz "
+                         "o andamento, entao e chute com ajuste na propria pagina)")
     a = ap.parse_args()
 
     cor = tuple(float(v) for v in a.cor.split(","))
 
     with open(a.pdf, "rb") as fp:
         bruto = fp.read()
+
+    # --html sai ANTES do caminho normal: nao gera PDF nenhum, e um arquivo so.
+    if a.html:
+        import player_html
+        saida = a.out or os.path.splitext(a.pdf)[0] + ".html"
+        doc = player_html.html_de(bruto, os.path.basename(a.pdf), a.bpm)
+        with open(saida, "w", encoding="utf-8") as fp:
+            fp.write(doc)
+        print("%s (%.0f KB)" % (saida, len(doc) / 1024))
+        return 0
 
     # IMAGEM (ou saida em imagem pedida): passa pelo mesmo caminho que a web usa, que ja
     # cobre os dois formatos. O caminho de PDF abaixo fica intacto de proposito — e o que
