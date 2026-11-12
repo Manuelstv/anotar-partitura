@@ -755,7 +755,7 @@
 
 </div>
 
-<script src="sax.js?v=56"></script>
+<script src="sax.js?v=57"></script>
 <script type="module">
 const $ = (s) => document.querySelector(s);
 const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
@@ -835,7 +835,7 @@ if ("serviceWorker" in navigator) {
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=56";
+const V = "?v=57";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1111,6 +1111,7 @@ function montarTocador(melodia, acomp, ctx) {
     if (pos >= total - 0.01) pos = 0;
     tocando = true;
     seguindo = !!ctx?.seguir;
+    ctx?.reiniciarSeguir?.();   // o primeiro quadro do play nunca conta como travessia de pagina
     // um rodape de cada vez: com varios arquivos na fila, todos teriam criado o seu e
     // eles se empilhariam na base da tela
     document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
@@ -1812,12 +1813,19 @@ function montarEditor(cartao, ctx) {
   };
 
   let virando = false, ultimaPauta = null;
+  // pagina onde a agulha estava no quadro anterior. A pagina so acompanha a musica quando
+  // a agulha ATRAVESSA para outra pagina enquanto toca; ao dar play, sem cruzar nada, a
+  // pagina que o usuario escolheu fica onde esta.
+  let ultimoPg = null;
+  ctx.reiniciarSeguir = () => { ultimoPg = null; };
   ctx.seguir = (p) => {
-    if (!p) { cursor.style.display = "none"; ultimaPauta = null; return; }
+    if (!p) { cursor.style.display = "none"; ultimaPauta = null; ultimoPg = null; return; }
+    const cruzou = ultimoPg !== null && p.pg !== ultimoPg;
+    ultimoPg = p.pg;
     if (p.pg !== ctx.pagina) {
       // rasterizar a pagina custa uma fracao de segundo em Python: sem esta trava os
       // pedidos de 25 em 25 ms se empilhariam durante a virada
-      if (!virando && ctx.py) {
+      if (cruzou && !virando && ctx.py) {
         virando = true;
         Promise.resolve(irPara(p.pg)).finally(() => { virando = false; });
       }

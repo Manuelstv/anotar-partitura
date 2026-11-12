@@ -9,7 +9,7 @@
 //     instalou, e o app congela na versao do dia da instalacao;
 //   - o resto e o cache PRIMEIRO, porque toda URL ja carrega versao (o `?v=` do site e o
 //     numero da versao no caminho do Pyodide). URL versionada nao muda de conteudo.
-const VERSAO = "v56";
+const VERSAO = "v57";
 const CACHE = "partitura-" + VERSAO;
 const CDN = "https://cdn.jsdelivr.net/pyodide/";
 
