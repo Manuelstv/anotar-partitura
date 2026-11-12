@@ -1111,7 +1111,7 @@ function montarTocador(melodia, acomp, ctx) {
     if (pos >= total - 0.01) pos = 0;
     tocando = true;
     seguindo = !!ctx?.seguir;
-    ultimoPg = null;   // o primeiro quadro do play nunca conta como travessia de pagina
+    ctx?.reiniciarSeguir?.();   // o primeiro quadro do play nunca conta como travessia de pagina
     // um rodape de cada vez: com varios arquivos na fila, todos teriam criado o seu e
     // eles se empilhariam na base da tela
     document.querySelectorAll(".rodape-toca").forEach(r => { r.hidden = r !== rodape; });
@@ -1817,6 +1817,7 @@ function montarEditor(cartao, ctx) {
   // a agulha ATRAVESSA para outra pagina enquanto toca; ao dar play, sem cruzar nada, a
   // pagina que o usuario escolheu fica onde esta.
   let ultimoPg = null;
+  ctx.reiniciarSeguir = () => { ultimoPg = null; };
   ctx.seguir = (p) => {
     if (!p) { cursor.style.display = "none"; ultimaPauta = null; ultimoPg = null; return; }
     const cruzou = ultimoPg !== null && p.pg !== ultimoPg;
