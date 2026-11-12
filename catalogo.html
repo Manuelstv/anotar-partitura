@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo — Partitura Inteligente</title>
+<style>
+  :root {
+    --fundo: #f6f5f1; --texto: #1d1d1b; --suave: #5d5b55; --cartao: #ffffff;
+    --acento: #3253c4; --borda: #dcdad2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --fundo: #161614; --texto: #ecebe6; --suave: #a7a59c; --cartao: #22221f;
+      --acento: #7f97ea; --borda: #3a3a35;
+    }
+  }
+  :root[data-theme="dark"] {
+    --fundo: #161614; --texto: #ecebe6; --suave: #a7a59c; --cartao: #22221f;
+    --acento: #7f97ea; --borda: #3a3a35;
+  }
+  body { margin: 0; background: var(--fundo); color: var(--texto);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--suave); margin: 0 0 24px; }
+  .peca { background: var(--cartao); border: 1px solid var(--borda);
+          border-radius: 12px; padding: 18px; }
+  .peca h2 { font-size: 1.2rem; margin: 0 0 4px; }
+  .meta { color: var(--suave); font-size: .9rem; margin: 0 0 14px; }
+  .acoes { display: flex; flex-wrap: wrap; gap: 10px; }
+  .acoes a { display: inline-block; padding: 10px 14px; border-radius: 8px;
+             text-decoration: none; border: 1px solid var(--acento); color: var(--acento); }
+  .acoes a.principal { background: var(--acento); color: #fff; }
+  @media (max-width: 480px) { .acoes a { flex: 1 1 100%; text-align: center; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Catálogo</h1>
+  <p class="sub">Partituras já anotadas com o nome de cada nota.</p>
+
+  <article class="peca">
+    <h2>Xepa Book 1 (Eb)</h2>
+    <p class="meta">Sax alto · 74 páginas · player com a melodia inteira</p>
+    <div class="acoes">
+      <a class="principal" href="catalogo/xepa-book.html">Abrir no player</a>
+      <a href="catalogo/xepa-book-anotado.pdf">Baixar PDF anotado</a>
+    </div>
+  </article>
+</main>
+</body>
+</html>
