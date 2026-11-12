@@ -1230,6 +1230,48 @@ def estampar_bytes(dados, rotulos, cor=(0, 0, 0), saida="pdf", dpi_saida=None,
                          "formato": "png" if saida == "imagem" else "pdf"}
 
 
+DPI_PAUTA_EM_IMAGEM = 200
+
+
+def ler_pagina_como_imagem(pg, sistema, dpi=DPI_PAUTA_EM_IMAGEM):
+    """Le uma pagina de PDF pelos pixels e devolve os rotulos em pontos da propria pagina.
+
+    Serve para o PDF em que a pauta foi colada como figura: nao ha simbolo de nota nem
+    linha de pauta para ler, so a foto deles. A pagina vira imagem, passa pelo leitor de
+    imagem, e as posicoes voltam de pixel para ponto, para o nome cair no PDF original.
+
+    Devolve None quando o leitor de imagem nao esta disponivel, e lista vazia quando a
+    pagina nao tem pauta. Com 150 dpi a leitura perde notas e inventa uma ao lado da
+    clave; 200 foi o menor valor em que isso parou.
+    """
+    try:
+        import bitmap
+        if bitmap.cv2 is None:
+            # o opencv pode ter sido carregado depois do primeiro import
+            import cv2
+            bitmap.cv2 = cv2
+    except ImportError:
+        return None
+    pix = pg.get_pixmap(dpi=dpi, colorspace=fitz.csRGB)
+    try:
+        pre = bitmap.coletar_da_imagem(bitmap.imagem_de_pixmap(pix), com_ritmo=True)
+    except bitmap.ImagemIlegivel:
+        return []
+    molde = fitz.open()
+    rotulos, _ = ler_notas(molde.new_page(width=pix.width, height=pix.height), sistema,
+                           dados=pre)
+    molde.close()
+    k = 72.0 / dpi
+    for r in rotulos:
+        for campo in ("x", "y_base", "y_nota", "corpo"):
+            r[campo] *= k
+        # a pagina pode nao comecar em (0, 0)
+        r["x"] += pg.rect.x0
+        r["y_base"] += pg.rect.y0
+        r["y_nota"] += pg.rect.y0
+    return rotulos
+
+
 def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pdf",
                  dpi_saida=None, estampar=True, dpi_previa=None):
     """Anota um PDF **ou uma imagem** em memoria e devolve os bytes + um relatorio.
@@ -1251,6 +1293,7 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
     total, existentes_tot, limpos = 0, 0, 0
     por_pagina, avisos, editaveis = [], [], []
     metricas = {}
+    paginas_em_imagem, falta_leitor = 0, False
     for pg in doc:
         pre = None
         if imagem:
@@ -1261,6 +1304,13 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
                 por_pagina.append(0)
                 continue
         rotulos, existentes = ler_notas(pg, sistema, dados=pre)
+        if not imagem and not rotulos and pg.get_images():
+            # nenhuma nota desenhada, mas ha figura na pagina: a pauta pode ser a figura
+            lidos = ler_pagina_como_imagem(pg, sistema)
+            if lidos is None:
+                falta_leitor = True
+            elif lidos:
+                rotulos, paginas_em_imagem = lidos, paginas_em_imagem + 1
         existentes_tot += len(existentes)
         if limpar:
             fam = collections.Counter(familia(t["txt"]) for t in existentes)
@@ -1297,9 +1347,14 @@ def anotar_bytes(dados, sistema="letras", limpar=False, cor=(0, 0, 0), saida="pd
                          "formato": "png" if saida == "imagem" else "pdf",
                          "avisos": avisos, "rotulos": editaveis, "paginas": paginas,
                          "imagem_info": metricas or None,
+                         # paginas de PDF lidas pelos pixels, por terem a pauta em figura
+                         "paginas_em_imagem": paginas_em_imagem,
+                         # ha pagina assim, mas o leitor de imagem nao esta carregado:
+                         # quem chamou carrega e chama de novo
+                         "falta_leitor_de_imagem": falta_leitor,
                          # em imagem nao existe span de texto: sem cifra, sem tom, sem
                          # escala sugerida. A interface tem de dizer isso.
-                         "tem_analise": not imagem}
+                         "tem_analise": not imagem and not paginas_em_imagem}
 
 
 def main():
@@ -1342,7 +1397,13 @@ def main():
     # cobre os dois formatos. O caminho de PDF abaixo fica intacto de proposito — e o que
     # esta em 99,51% e tem as mensagens por pagina e as travas do --limpar.
     entrada_imagem = e_imagem(bruto)
-    if entrada_imagem or a.formato == "imagem":
+    pauta_em_figura = False
+    if not entrada_imagem:
+        # PDF em que nenhuma pagina tem nota desenhada, mas ha figura: a pauta e a figura
+        with fitz.open(a.pdf) as sonda:
+            pauta_em_figura = (any(pg.get_images() for pg in sonda)
+                               and not any(ler_notas(pg, a.sistema)[0] for pg in sonda))
+    if entrada_imagem or a.formato == "imagem" or pauta_em_figura:
         formato = a.formato or ("imagem" if entrada_imagem else "pdf")
         bytes_saida, rel = anotar_bytes(bruto, a.sistema, a.limpar, cor, saida=formato)
         ext = ".png" if formato == "imagem" else ".pdf"
@@ -1352,6 +1413,9 @@ def main():
         for aviso in rel["avisos"]:
             print(f"  [aviso] {aviso}")
         print(f"{rel['total']} notas anotadas ({rel['modo']}) -> {destino}")
+        if rel["paginas_em_imagem"]:
+            print(f"  [nota] {rel['paginas_em_imagem']} paginas tinham a pauta em figura e "
+                  "foram lidas pelos pixels: sem cifra, tom ou escala sugerida.")
         if rel["modo"] == "imagem":
             print("  [nota] em imagem nao ha texto: sem cifra, tom ou escala sugerida.")
         if rel["total"] == 0:

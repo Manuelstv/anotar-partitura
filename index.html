@@ -755,7 +755,7 @@
 
 </div>
 
-<script src="sax.js?v=55"></script>
+<script src="sax.js?v=56"></script>
 <script type="module">
 const $ = (s) => document.querySelector(s);
 const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
@@ -835,7 +835,7 @@ if ("serviceWorker" in navigator) {
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=55";
+const V = "?v=56";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
@@ -1440,7 +1440,7 @@ async function processar(arquivos) {
       py.globals.set("_titulo", f.name.replace(/\.[^.]+$/, ""));
       // sem opcao para escolher: sai no mesmo formato que entrou
       py.globals.set("_saida_fmt", imagem ? "imagem" : "pdf");
-      const res = py.runPython(`
+      const ler = () => py.runPython(`
 import json, anotar_partitura as A, analise, pymupdf
 _dados = open("/entrada.pdf","rb").read()
 # estampar=False: a previa sai LIMPA e os nomes vem na lista rel["rotulos"], para o
@@ -1482,8 +1482,19 @@ if _info and _info.get("leitura"):
         _cifras = b""
 (_saida, _previa, json.dumps({"rel": _rel, "info": _info}), _cifras)
 `);
-      const [pdfOut, previaOut, extra, cifrasOut] = res.toJs({ create_proxies: false });
+      let res = ler();
+      let [pdfOut, previaOut, extra, cifrasOut] = res.toJs({ create_proxies: false });
       res.destroy?.();
+      // PDF com a pauta colada como figura: so depois de ler se descobre que ele precisa
+      // do leitor de pixels. Carrega e le de novo.
+      if (JSON.parse(extra).rel.falta_leitor_de_imagem) {
+        await prepararImagem(py);
+        cartao.marcar("trabalhando", "a pauta é uma figura: lendo pelos pixels, demora mais…");
+        await new Promise(r => setTimeout(r, 20));
+        res = ler();
+        [pdfOut, previaOut, extra, cifrasOut] = res.toJs({ create_proxies: false });
+        res.destroy?.();
+      }
       concluir(cartao, f.name, previaOut, JSON.parse(extra),
                { py, noFS, sistema, cifras: cifrasOut, sozinho: fila.length === 1 });
     } catch (e) {
@@ -2128,8 +2139,10 @@ function concluir(cartao, nome, previa, { rel, info }, extra) {
   if (!rel.tem_analise) {
     const p = document.createElement("p");
     p.className = "nota-rodape";
-    p.textContent = "Print não tem texto embutido, então dessa vez não dá para ler "
-                  + "cifra, tom nem escala — só o nome das notas.";
+    p.textContent = (rel.paginas_em_imagem
+                     ? "Neste PDF a pauta é uma figura, sem texto embutido, então "
+                     : "Print não tem texto embutido, então ")
+                  + "dessa vez não dá para ler cifra, tom nem escala — só o nome das notas.";
     cartao.raiz.append(p);
   }
 
