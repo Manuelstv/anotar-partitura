@@ -417,6 +417,65 @@ def _tem_vertical_longa(limpo, c, fracao=0.94):
     return False
 
 
+# Abaixo disso a mancha tem 4 ou 5 pixels de largura e uma haste some ou se junta com a
+# outra: medido com mancha de 13 a 15 px de altura, bequadro saia como bemol ou sustenido.
+ALT_MIN_SIMBOLO = 18
+
+
+def simbolo_do_acidente(limpo, c):
+    """Diz se a mancha e sustenido, bemol ou bequadro contando as hastes dela.
+
+    A caixa nao separa os tres: bemol e bequadro tem quase a mesma largura, e na armadura
+    nao ha nota vizinha para desempatar pela altura. O que muda e quantos tracos verticais
+    compridos a mancha tem. O sustenido tem dois, quase da altura toda. O bequadro tem
+    dois, de uns 3/4 da altura. O bemol tem um so, inteiro e encostado na borda esquerda,
+    e a direita dele sobra so a barriga.
+
+    Medido em 60 PDFs com o simbolo conhecido pela fonte (maior coluna de tinta, como
+    fracao da altura): haste de bemol 1,00 e barriga 0,35; hastes de sustenido 0,96;
+    hastes de bequadro 0,77. Conta-se GRUPO de colunas, e nao terco da largura: em imagem
+    pequena a mancha tem 8 pixels e a haste cai em qualquer terco. Devolve None quando a
+    mancha nao bate com nenhum dos tres, e ai vale a regra antiga, pela caixa.
+    """
+    x0, x1 = int(c["x0"]), int(min(limpo.shape[1], c["x1"]))
+    y0, y1 = int(c["y0"]), int(min(limpo.shape[0], c["y1"]))
+    larg, alt = x1 - x0, y1 - y0
+    if larg < 3 or alt < ALT_MIN_SIMBOLO:
+        return None
+    corridas = []
+    for col in limpo[y0:y1, x0:x1].T:
+        melhor = atual = 0
+        for v in col:
+            atual = atual + 1 if v else 0
+            melhor = max(melhor, atual)
+        corridas.append(melhor / alt)
+
+    def grupos(minimo):
+        out, ini = [], None
+        for i, r in enumerate(corridas + [0.0]):
+            if r >= minimo and ini is None:
+                ini = i
+            elif r < minimo and ini is not None:
+                out.append((ini, i))
+                ini = None
+        return out
+
+    inteiras = grupos(0.86)
+    if len(inteiras) >= 2:
+        return '#'
+    if len(inteiras) == 1:
+        a, b = inteiras[0]
+        # a haste afina na ponta, entao a coluna vizinha dela ainda passa de 0,70:
+        # a barriga e conferida so da metade da mancha para a direita
+        if (a <= 0.15 * larg and b - a <= 0.35 * larg
+                and max(corridas[max(b, larg // 2):], default=0.0) <= 0.60):
+            return 'b'
+        return None
+    if len(grupos(0.62)) >= 2:
+        return 'n'
+    return None
+
+
 def tirar_pausas(caminhos, limpo, esp):
     """Descarta manchas com tamanho de acidente que nao tenham haste vertical."""
     return [c for c in caminhos
@@ -510,6 +569,10 @@ def coletar_da_imagem(img, com_ritmo=False, metricas=None):
     # de 3,4 px. Eram 4 notas perdidas com a haste ali, encostando, visivel.
     vert_haste = verticais(cena["bin"], esp, larg_max=LARG_HASTE, alt_min=ALT_HASTE_MIN)
     outros = tirar_pausas(blobs(cena["limpo"], esp), cena["limpo"], esp)
+    for c in outros:
+        if (ACC_W[0] <= c["w"] / esp <= ACC_W[1]
+                and ACC_H[0] <= c["h"] / esp <= ACC_H[1]):
+            c["simbolo"] = simbolo_do_acidente(cena["limpo"], c)
     caminhos = cabecas(cena, vert_haste) + tirar_formula(outros, cena["sistemas"], esp)
     formas = [{"x": (c["x0"] + c["x1"]) / 2, "y": (c["y0"] + c["y1"]) / 2,
                "x0": c["x0"], "x1": c["x1"], "y0": c["y0"], "y1": c["y1"]}

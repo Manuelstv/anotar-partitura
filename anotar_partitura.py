@@ -474,6 +474,8 @@ def glifos_de_contorno(caminhos, sistemas):
             # na armadura o bemol nao tem nota vizinha: usa a largura para separar
             if dy is None and 'b' != simbolo and c["w"] < 0.72 * larg_nota:
                 simbolo = 'n'
+            # o modo imagem ja olhou os pixels e sabe qual dos tres e
+            simbolo = c.get("simbolo") or simbolo
             glifos.append({"tipo": "acc", "extra": simbolo,
                            "x": (c["x0"] + c["x1"]) / 2,
                            "y": cy + (0.5 * esp if simbolo == 'b' else 0.0),
