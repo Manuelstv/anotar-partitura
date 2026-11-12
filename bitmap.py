@@ -477,11 +477,19 @@ def simbolo_do_acidente(limpo, c):
 
 
 def tirar_pausas(caminhos, limpo, esp):
-    """Descarta manchas com tamanho de acidente que nao tenham haste vertical."""
+    """Descarta manchas com tamanho de acidente que nao tenham haste vertical.
+
+    Quem a contagem de hastes reconhece como acidente fica, mesmo sem a haste inteira. O
+    bequadro nunca tem uma: as duas hastes dele param em 3/4 da altura, e ele era
+    descartado sempre, com a nota saindo alterada. O sustenido fica no limite, porque as
+    hastes dele medem 0,94 da altura, e sumia conforme o arredondamento do pixel. Medido
+    em 60 PDFs: nenhuma pausa e reconhecida como acidente pela contagem de hastes.
+    """
     return [c for c in caminhos
             if not (ACC_W[0] <= c["w"] / esp <= ACC_W[1]
                     and ACC_H[0] * 0.8 <= c["h"] / esp <= ACC_H[1]
-                    and not _tem_vertical_longa(limpo, c))]
+                    and not _tem_vertical_longa(limpo, c)
+                    and simbolo_do_acidente(limpo, c) is None)]
 
 
 def tirar_formula(caminhos, sistemas, esp):
