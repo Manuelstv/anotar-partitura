@@ -718,6 +718,7 @@
       Partitura <em>Inteligente</em>
     </h1>
     <p class="sub-app">O nome de cada nota embaixo da pauta, no seu próprio PDF.</p>
+    <p><a href="catalogo.html">Catálogo de partituras anotadas</a></p>
     <p class="beta">print de tela ainda em <b>beta</b></p>
   </header>
 
@@ -755,7 +756,7 @@
 
 </div>
 
-<script src="sax.js?v=58"></script>
+<script src="sax.js?v=60"></script>
 <script type="module">
 const $ = (s) => document.querySelector(s);
 const zona = $("#zona"), entrada = $("#arquivo"), lista = $("#lista");
@@ -835,7 +836,7 @@ if ("serviceWorker" in navigator) {
 
 // ---- Pyodide sob demanda: so baixa quando chega o primeiro arquivo
 let pyPromise = null;
-const V = "?v=58";
+const V = "?v=60";
 
 function pegarPy() {
   if (pyPromise) return pyPromise;
