@@ -1061,7 +1061,7 @@ def _desdobrar(ev, total, marcas, limite):
     return saida, quando
 
 
-def melodia(dados, limite=3000):
+def melodia(dados, limite=100000):
     """Sequencia tocavel: [{t, midi, d}] em tempos de seminima, na ordem de leitura.
 
     Cabecas no mesmo x sao um acorde: soam juntas e o tempo anda uma vez so. Pausa
